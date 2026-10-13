@@ -25,14 +25,14 @@
 
 - **安卓目录浏览**：首页和任务详情可打开对应保存目录，查看、打开或分享文件。
 
-当前版本：**Windows 0.1.10 / Android 0.2.9**。前往 [下载页面](https://github.com/norskhelo/jmbatch/releases/tag/release-2026-10-13-8)，查看 [更新日志](CHANGELOG.md)。
+当前版本：**Windows 0.1.10 / Android 0.2.10**。前往 [下载页面](https://github.com/norskhelo/jmbatch/releases/tag/release-2026-10-13-9)，查看 [更新日志](CHANGELOG.md)。
 
 ## 下载与使用
 
 在本仓库的 **Releases** 页面下载对应版本：
 
-- **Windows**：下载 Windows ZIP，解压后运行程序。
-- **Android**：[下载 0.2.9 APK](https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-13-7/JMBatch-0.2.9-Android.apk) 并安装，支持 Android 8.0 及以上。
+- **Windows**：[下载 0.1.10 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-13-8/JMBatch-0.1.10-Windows-x64.zip)，解压后运行程序。
+- **Android**：[下载 0.2.10 APK](https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-13-9/JMBatch-0.2.10-Android.apk) 并安装，支持 Android 8.0 及以上。
 
 输入编号，选择输出格式和保存目录，然后开始下载。
 
@@ -58,7 +58,7 @@
 
 Android 0.2.7 修复 `SigningInfo` 为空导致的更新错误。已遇到该错误的旧版需要手动下载 APK 覆盖安装一次，不要卸载或清除数据。证书预检查不可用时由系统安装器核验，清单签名和文件摘要校验仍然强制执行。
 
-本次 Release 仅包含 Windows 0.1.10 窗口布局修复包及签名更新清单。Android 维持 0.2.9：[安卓下载](https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-13-7/JMBatch-0.2.9-Android.apk)。
+本次 Release 仅包含 Android 0.2.10 目录跳转修复包及签名更新清单。Windows 维持 0.1.10，可从上方链接下载。
 
 ## 已下载漫画与收藏
 
@@ -67,3 +67,5 @@ Windows 点击“已下载漫画”，安卓点击“已下载漫画 / 收藏”
 首次打开会收录仍在队列中的旧成品，以后的新下载完成后自动加入。漫画列表与队列独立保存，清理队列不会清除收藏。已清掉下载记录的历史文件可点击“扫描保存目录 / 扫描目录”导入；扫描首页当前目录的直接子文件，不递归子目录，不覆盖已有收藏。
 
 “删除文件”需要确认，只删除所选成品且不进入回收站，图片缓存保留；“仅移除记录”保留文件。双端批量删除或移除记录前需暂停下载队列。收藏保存在本机，不上传或跨设备同步。
+
+安卓打开保存目录时优先直接调用支持目录定位的系统文件管理器；不支持时再提供系统文件浏览器、其他应用及软件内查看。不同厂商对目录定位的支持可能不同。
