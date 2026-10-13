@@ -20,7 +20,7 @@
 
 - **安卓目录浏览**：首页和任务详情可打开对应保存目录，查看、打开或分享文件。
 
-当前版本：**Windows 0.1.7 / Android 0.2.6**。前往 [下载页面](https://github.com/norskhelo/jmbatch/releases/tag/release-2026-10-13-4)，查看 [更新日志](CHANGELOG.md)。
+当前版本：**Windows 0.1.7 / Android 0.2.7**。前往 [下载页面](https://github.com/norskhelo/jmbatch/releases/tag/release-2026-10-13-5)，查看 [更新日志](CHANGELOG.md)。
 
 ## 下载与使用
 
@@ -48,3 +48,9 @@
 在“软件更新”中检查并下载新版。Windows 点击“安装并重启”；安卓点击“安装新版”，由系统确认安装。旧版本需先手动升级至 Windows 0.1.6 / Android 0.2.5 一次。
 
 只接受本项目发布密钥签署的更新包。安卓下载更新时请保持应用在前台，并在安装前暂停漫画下载。Windows 程序目录需可写，更新会保留备份。
+
+### 部分安卓设备更新报错
+
+Android 0.2.7 修复 `SigningInfo` 为空导致的更新错误。已遇到该错误的旧版需要手动下载 APK 覆盖安装一次，不要卸载或清除数据。证书预检查不可用时由系统安装器核验，清单签名和文件摘要校验仍然强制执行。
+
+Windows 保持 0.1.7：[Windows 下载](https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-13-4/JMBatch-0.1.7-Windows-x64.zip)。本次最新 Release 仅包含安卓修复包。
