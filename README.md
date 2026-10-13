@@ -17,7 +17,7 @@
 
 - **安卓目录浏览**：首页和任务详情可打开对应保存目录，查看、打开或分享文件。
 
-下一次更新：**Windows 0.1.5 / Android 0.2.4**，安装包正在准备发布。详见 [更新日志](CHANGELOG.md)。
+当前版本：**Windows 0.1.5 / Android 0.2.4**。前往 [下载页面](https://github.com/norskhelo/jmbatch/releases/tag/release-2026-10-13-2)，查看 [更新日志](CHANGELOG.md)。
 
 ## 下载与使用
 

@@ -1,6 +1,8 @@
 # 更新日志
 
-## 待发布：Windows 0.1.5 / Android 0.2.4 — 2026-10-13
+## Windows 0.1.5 / Android 0.2.4 — 2026-10-13
+
+[正式发布与安装包](https://github.com/norskhelo/jmbatch/releases/tag/release-2026-10-13-2)
 
 
 ## 双端
