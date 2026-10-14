@@ -1,5 +1,21 @@
 JM Batch 0.3.0 — 当前版本使用说明
 
+安装包下载（含国内镜像，2026-10-14 更新）
+
+当前源码/本地交付版本为 Android 0.3.0，尚未发布 GitHub 安装包。
+下面是已正式发布的 Android 0.2.11 APK（Android 8.0 及以上），已安装更高版本时无需降级。
+GitHub 无法打开或下载缓慢时，直接在浏览器打开国内镜像；无需登录 GitHub，一条失败可切换另一条。
+国内镜像 1（GHFast）：
+https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.2.11-Android.apk
+国内镜像 2（GH-Proxy）：
+https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.2.11-Android.apk
+GitHub 原始下载：
+https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.2.11-Android.apk
+上述 APK 的 SHA-256：496d4784dbd1eb5ab707e665daa3d94023b211ac64c0b354bee02e1d95cc0c51
+最新发布列表：https://github.com/norskhelo/jmbatch/releases
+下载后核对 SHA-256，覆盖安装 APK，保留原应用数据。第三方镜像可用性随网络变化。
+镜像用于手动下载，应用内更新仓库仍填写 norskhelo/jmbatch。
+
 Windows 0.2.0 / Android 0.3.0 — 2026-10-14
 
 下载与导出分离
