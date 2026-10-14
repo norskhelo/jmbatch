@@ -4,6 +4,8 @@
 
 ## 功能
 
+- **连接失败自动换线**：保留内置备用线路，自动尝试其他 API / 图片线路；全部失败时显示各线路的错误原因和次数。
+
 - **扫描与批量管理**：扫描保存目录找回无下载记录的 PDF / ZIP；多选、全选、反选，批量收藏、删除或移除记录。
 - **系统目录跳转**：Windows 打开资源管理器；安卓优先打开系统文件管理器中的保存位置，应用目录也提供系统文档入口。
 
@@ -25,14 +27,14 @@
 
 - **安卓目录浏览**：首页和任务详情可打开对应保存目录，查看、打开或分享文件。
 
-当前版本：**Windows 0.1.10 / Android 0.2.10**。前往 [下载页面](https://github.com/norskhelo/jmbatch/releases/tag/release-2026-10-13-9)，查看 [更新日志](CHANGELOG.md)。
+当前版本：**Windows 0.1.11 / Android 0.2.11**。前往 [下载页面](https://github.com/norskhelo/jmbatch/releases/tag/release-2026-10-14)，查看 [更新日志](CHANGELOG.md)。
 
 ## 下载与使用
 
 在本仓库的 **Releases** 页面下载对应版本：
 
-- **Windows**：[下载 0.1.10 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-13-8/JMBatch-0.1.10-Windows-x64.zip)，解压后运行程序。
-- **Android**：[下载 0.2.10 APK](https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-13-9/JMBatch-0.2.10-Android.apk) 并安装，支持 Android 8.0 及以上。
+- **Windows**：[下载 0.1.11 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.1.11-Windows-x64.zip)，解压后运行程序。
+- **Android**：[下载 0.2.11 APK](https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.2.11-Android.apk) 并安装，支持 Android 8.0 及以上。
 
 输入编号，选择输出格式和保存目录，然后开始下载。
 
@@ -58,7 +60,7 @@
 
 Android 0.2.7 修复 `SigningInfo` 为空导致的更新错误。已遇到该错误的旧版需要手动下载 APK 覆盖安装一次，不要卸载或清除数据。证书预检查不可用时由系统安装器核验，清单签名和文件摘要校验仍然强制执行。
 
-本次 Release 仅包含 Android 0.2.10 目录跳转修复包及签名更新清单。Windows 维持 0.1.10，可从上方链接下载。
+本次 Release 包含 Windows 0.1.11 / Android 0.2.11 连接容错更新及签名更新清单。
 
 ## 已下载漫画与收藏
 
