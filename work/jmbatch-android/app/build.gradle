@@ -1,0 +1,7 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'app.jmbatch.android'
+    compileSdk 35
+    defaultConfig { applicationId 'app.jmbatch.android'; minSdk 26; targetSdk 34; versionCode 300; versionName '0.3.0' }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
+}

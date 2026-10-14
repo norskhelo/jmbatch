@@ -1,0 +1,113 @@
+"""Ordered image albums and explicit, offline PDF/ZIP export."""
+import json
+import os
+import re
+import shutil
+import tempfile
+import uuid
+from pathlib import Path
+
+from core import atomic_json, export_images, safe_name, task_cache, verify_image, Settings
+
+MANIFEST = ".jmbatch-album.json"
+
+
+def read_album(folder, verify=False):
+    folder = Path(folder)
+    if folder.is_symlink() or not folder.is_dir():
+        raise ValueError("图片目录不存在或为链接")
+    marker = folder / MANIFEST
+    if marker.is_symlink() or marker.stat().st_size > 8 * 1024 * 1024:
+        raise ValueError("图片目录信息无效")
+    data = json.loads(marker.read_text(encoding="utf-8"))
+    if data.get("version") != 1 or not re.fullmatch(r"[0-9]{1,10}", str(data.get("id", ""))):
+        raise ValueError("图片目录信息无效")
+    entries, seen = [], set()
+    for item in data["entries"]:
+        chapter, page = int(item["chapter"]), int(item["page"])
+        relative = f"{chapter:04d}/{page:05d}.jpg"
+        if chapter <= 0 or page <= 0 or item["file"] != relative or relative in seen:
+            raise ValueError("图片顺序或路径无效")
+        path = folder / relative
+        if path.parent.is_symlink() or path.is_symlink() or not path.is_file() or path.stat().st_size != item["size"]:
+            raise ValueError("图片缺失、大小变化或路径异常：" + relative)
+        if verify:
+            verify_image(path)
+        entries.append(dict(chapter=chapter, page=page, path=str(path)))
+        seen.add(relative)
+    if not entries:
+        raise ValueError("没有可用图片")
+    entries.sort(key=lambda e: (e["chapter"], e["page"]))
+    return data, entries
+
+
+def save_album(task, title, entries, emit):
+    output, cache = Path(task["settings"]["output"]), task_cache(task)
+    final = output / f"JM{task['album_id']}-{safe_name(title)}-{uuid.uuid4().hex[:8]}"
+    # A unique staging directory allows retry without removing an earlier partial.
+    staging = Path(tempfile.mkdtemp(prefix="album.partial-", dir=cache))
+    records = []
+    try:
+        emit(dict(type="phase", phase="verify", message="校验并保存排序图片"))
+        for entry in sorted(entries, key=lambda e: (e["chapter"], e["page"])):
+            source = Path(entry["path"])
+            verify_image(source)
+            relative = f"{entry['chapter']:04d}/{entry['page']:05d}.jpg"
+            target = staging / relative
+            target.parent.mkdir(exist_ok=True)
+            shutil.copyfile(source, target)
+            if target.stat().st_size != source.stat().st_size:
+                raise OSError("图片保存不完整")
+            records.append(dict(chapter=entry["chapter"], page=entry["page"], file=relative, size=target.stat().st_size))
+            emit(dict(type="export_progress", message=f"保存图片 {len(records)}/{len(entries)}"))
+        atomic_json(staging / MANIFEST, dict(version=1, id=task["album_id"], title=title, entries=records))
+        read_album(staging)
+        os.rename(staging, final)
+        atomic_json(cache / "completed.json", dict(path=str(final), images=len(entries), format="images"))
+        return final, sum(item["size"] for item in records)
+    finally:
+        # Only the newly created staging directory is owned by this operation.
+        if staging.exists():
+            shutil.rmtree(staging)
+
+
+def export_album(folder, destination, fmt, numeric=False, flat=False, split_pdf=False, emit=lambda e: None, cancelled=lambda: False):
+    if fmt not in ("pdf", "zip"):
+        raise ValueError("请选择 PDF 或 ZIP")
+    data, entries = read_album(folder, verify=True)
+    destination = Path(destination).resolve()
+    destination.mkdir(parents=True, exist_ok=True)
+    groups = {}
+    for entry in entries:
+        groups.setdefault(entry["chapter"] if fmt == "pdf" and split_pdf else 0, []).append(entry)
+    stem = str(data["id"]) if numeric else f"JM{data['id']}-{safe_name(data['title'])}-{uuid.uuid4().hex[:8]}"
+    targets = [destination / (stem + (f"-{chapter:04d}" if chapter else "") + "." + fmt) for chapter in groups]
+    if any(target.exists() for target in targets):
+        raise FileExistsError("同名导出文件已存在，请更换目录或关闭纯编号命名；未覆盖")
+    committed = []
+    def progress(event):
+        if cancelled():
+            raise InterruptedError("导出已取消，原始图片保留")
+        emit(event)
+    try:
+        with tempfile.TemporaryDirectory(prefix=".jmbatch-export-", dir=destination) as temporary:
+            staging = Path(temporary)
+            ready = []
+            for (chapter, pages), target in zip(groups.items(), targets):
+                progress(dict(type="export_progress", message=f"导出第 {chapter} 章" if chapter else "正在导出"))
+                task = dict(album_id=str(data["id"]), key=uuid.uuid4().hex,
+                            settings=Settings(output=str(staging), format=fmt, flat_zip=flat).__dict__)
+                ready.append(export_images(task, data["title"], pages, progress))
+            for source, target in zip(ready, targets):
+                progress(dict(type="export_progress", message="保存导出文件"))
+                if os.name == "nt":
+                    os.rename(source, target)
+                else:
+                    os.link(source, target)
+                    source.unlink()
+                committed.append(target)
+        return committed
+    except Exception:
+        for target in committed:
+            target.unlink(missing_ok=True)
+        raise
