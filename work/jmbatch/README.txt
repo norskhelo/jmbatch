@@ -2,16 +2,16 @@ JM Batch 0.2.1 — 当前版本使用说明
 
 安装包下载（含国内镜像，2026-10-14 更新）
 
-当前源码/本地交付版本为 Windows 0.2.1，尚未发布 GitHub 安装包。
-下面是已正式发布的 Windows 0.2.0 完整 ZIP（64 位），已安装更高版本时无需降级。
+当前正式版本为 Windows 0.2.1。
+下面是已正式发布的 Windows 0.2.1 完整 ZIP（64 位），已安装更高版本时无需降级。
 GitHub 无法打开或下载缓慢时，直接在浏览器打开国内镜像；无需登录 GitHub，一条失败可切换另一条。
 国内镜像 1（GHFast）：
-https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.0-0.3.0/JMBatch-0.2.0-Windows-x64.zip
+https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.1-0.3.1/JMBatch-0.2.1-Windows-x64.zip
 国内镜像 2（GH-Proxy）：
-https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.0-0.3.0/JMBatch-0.2.0-Windows-x64.zip
+https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.1-0.3.1/JMBatch-0.2.1-Windows-x64.zip
 GitHub 原始下载：
-https://github.com/norskhelo/jmbatch/releases/download/release-0.2.0-0.3.0/JMBatch-0.2.0-Windows-x64.zip
-上述 ZIP 的 SHA-256：56d2cdfa736e6eeed674fcfc00e01127ed23388820c488279f64bf0e75109066
+https://github.com/norskhelo/jmbatch/releases/download/release-0.2.1-0.3.1/JMBatch-0.2.1-Windows-x64.zip
+上述 ZIP 的 SHA-256：2ab79f30a8b498bc2d0ffa9423bb1c52168c129df3dd5afdaed0a8f043973407
 最新发布列表：https://github.com/norskhelo/jmbatch/releases
 下载后核对 SHA-256，完整解压 ZIP 后运行。镜像转发 GitHub 附件，无需另行上传；可用性随缓存和网络变化。
 镜像用于手动下载，应用内更新仓库仍填写 norskhelo/jmbatch。
@@ -22,14 +22,14 @@ Windows 0.2.1 / Android 0.3.1 — 2026-10-14
 
 • 将 GHFast、GH-Proxy 两条镜像下载入口纳入本版使用说明与应用内公告，保留 GitHub 原始下载地址；一个入口不可用时可切换另一个。
 • 镜像转发 GitHub Release 的安装包，无需向镜像站单独上传。镜像仅用于浏览器手动下载，应用内更新仓库仍为 norskhelo/jmbatch，继续校验更新清单签名及安装包 SHA-256。
-• 公开下载地址当前对应已正式发布的 Windows 0.2.0 / Android 0.3.0；本版安装包在本地交付，尚未发布 GitHub Release。已安装更高版本时无需下载旧版降级，后续下载以 Releases 实际附件为准。
+• 本版 Windows 0.2.1 / Android 0.3.1 安装包已正式发布，公开下载与镜像入口已指向本版附件。已安装更高版本时无需下载旧版降级，后续下载以 Releases 实际附件为准。
 • 目录和安装包内的使用说明保留镜像直链、原始地址及对应 SHA-256，镜像可用性仍取决于网络。
 
 版本与兼容
 
 • Windows 升至 0.2.1；Android 升至 0.3.1（versionCode 301），保留 app.jmbatch.android 包名、原签名身份、更新公钥及已有设置和收藏。
 • 本次维护版本更新下载说明和版本公告，保留排序图片下载、独立 PDF/ZIP 导出及已下载漫画管理行为。
-• 推送源码与更新日志，并提供双端本地安装包、源码包、使用说明、摘要及签名更新清单；本次不创建 Release 或上传安装包。
+• 源码与更新日志已推送，正式发布双端安装包、同版更新日志、SHA-256 校验文件及原发布密钥签署的更新清单。
 
 验证范围
 
