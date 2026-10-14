@@ -2,18 +2,18 @@ JM Batch 0.3.0 — 当前版本使用说明
 
 安装包下载（含国内镜像，2026-10-14 更新）
 
-当前源码/本地交付版本为 Android 0.3.0，尚未发布 GitHub 安装包。
-下面是已正式发布的 Android 0.2.11 APK（Android 8.0 及以上），已安装更高版本时无需降级。
+当前正式版本为 Android 0.3.0。
+下面是已正式发布的 Android 0.3.0 APK（Android 8.0 及以上），已安装更高版本时无需降级。
 GitHub 无法打开或下载缓慢时，直接在浏览器打开国内镜像；无需登录 GitHub，一条失败可切换另一条。
 国内镜像 1（GHFast）：
-https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.2.11-Android.apk
+https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.0-0.3.0/JMBatch-0.3.0-Android.apk
 国内镜像 2（GH-Proxy）：
-https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.2.11-Android.apk
+https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.0-0.3.0/JMBatch-0.3.0-Android.apk
 GitHub 原始下载：
-https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.2.11-Android.apk
-上述 APK 的 SHA-256：496d4784dbd1eb5ab707e665daa3d94023b211ac64c0b354bee02e1d95cc0c51
+https://github.com/norskhelo/jmbatch/releases/download/release-0.2.0-0.3.0/JMBatch-0.3.0-Android.apk
+上述 APK 的 SHA-256：a9155f5d18cf68df2ac464757cbe621628ec48110bcbde41747a7f18da662eba
 最新发布列表：https://github.com/norskhelo/jmbatch/releases
-下载后核对 SHA-256，覆盖安装 APK，保留原应用数据。第三方镜像可用性随网络变化。
+下载后核对 SHA-256，覆盖安装 APK，保留原应用数据。新附件可能需要等待镜像同步，第三方镜像可用性随网络变化。
 镜像用于手动下载，应用内更新仓库仍填写 norskhelo/jmbatch。
 
 Windows 0.2.0 / Android 0.3.0 — 2026-10-14
@@ -36,7 +36,7 @@ Windows 0.2.0 / Android 0.3.0 — 2026-10-14
 版本与交付
 
 • Windows 0.2.0；Android 0.3.0（versionCode 300），保留原包名和签名。
-• 本次按要求推送源码与日志；安装包在本地分版本交付，未创建 GitHub Release 或上传新安装包。
+• 本次正式发布 Windows 完整 ZIP、Android APK 与更新日志，并提供 SHA-256 校验文件、更新清单及原发布密钥的 RSA-SHA256 签名。
 • 离线测试及本地构建用于回归；Android 真机、系统目录提供方及真实网络下载仍需实际设备验证。
 
 以下为历史说明：

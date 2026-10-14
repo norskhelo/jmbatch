@@ -25,7 +25,7 @@
 ## 版本与交付
 
 - Windows 0.2.0；Android 0.3.0（versionCode 300），保留原包名和签名。
-- 本次按要求推送源码与日志；安装包在本地分版本交付，未创建 GitHub Release 或上传新安装包。
+- 本次正式发布 Windows 完整 ZIP、Android APK 与更新日志，并提供 SHA-256 校验文件、更新清单及原发布密钥的 RSA-SHA256 签名。
 - 离线测试及本地构建用于回归；Android 真机、系统目录提供方及真实网络下载仍需实际设备验证。
 
 # Windows 0.1.12 / Android 0.2.12 — 2026-10-14

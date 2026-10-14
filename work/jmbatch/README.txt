@@ -2,18 +2,18 @@ JM Batch 0.2.0 — 当前版本使用说明
 
 安装包下载（含国内镜像，2026-10-14 更新）
 
-当前源码/本地交付版本为 Windows 0.2.0，尚未发布 GitHub 安装包。
-下面是已正式发布的 Windows 0.1.11 完整 ZIP（64 位），已安装更高版本时无需降级。
+当前正式版本为 Windows 0.2.0。
+下面是已正式发布的 Windows 0.2.0 完整 ZIP（64 位），已安装更高版本时无需降级。
 GitHub 无法打开或下载缓慢时，直接在浏览器打开国内镜像；无需登录 GitHub，一条失败可切换另一条。
 国内镜像 1（GHFast）：
-https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.1.11-Windows-x64.zip
+https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.0-0.3.0/JMBatch-0.2.0-Windows-x64.zip
 国内镜像 2（GH-Proxy）：
-https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.1.11-Windows-x64.zip
+https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.0-0.3.0/JMBatch-0.2.0-Windows-x64.zip
 GitHub 原始下载：
-https://github.com/norskhelo/jmbatch/releases/download/release-2026-10-14/JMBatch-0.1.11-Windows-x64.zip
-上述 ZIP 的 SHA-256：f10ba5d05026930f43c5453ffe0e766a46c4ba6aef320025aa4a286cf624eeb9
+https://github.com/norskhelo/jmbatch/releases/download/release-0.2.0-0.3.0/JMBatch-0.2.0-Windows-x64.zip
+上述 ZIP 的 SHA-256：56d2cdfa736e6eeed674fcfc00e01127ed23388820c488279f64bf0e75109066
 最新发布列表：https://github.com/norskhelo/jmbatch/releases
-下载后核对 SHA-256，完整解压 ZIP 后运行。第三方镜像可用性随网络变化。
+下载后核对 SHA-256，完整解压 ZIP 后运行。新附件可能需要等待镜像同步，第三方镜像可用性随网络变化。
 镜像用于手动下载，应用内更新仓库仍填写 norskhelo/jmbatch。
 
 Windows 0.2.0 / Android 0.3.0 — 2026-10-14
@@ -36,7 +36,7 @@ Windows 0.2.0 / Android 0.3.0 — 2026-10-14
 版本与交付
 
 • Windows 0.2.0；Android 0.3.0（versionCode 300），保留原包名和签名。
-• 本次按要求推送源码与日志；安装包在本地分版本交付，未创建 GitHub Release 或上传新安装包。
+• 本次正式发布 Windows 完整 ZIP、Android APK 与更新日志，并提供 SHA-256 校验文件、更新清单及原发布密钥的 RSA-SHA256 签名。
 • 离线测试及本地构建用于回归；Android 真机、系统目录提供方及真实网络下载仍需实际设备验证。
 
 以下为历史说明：
