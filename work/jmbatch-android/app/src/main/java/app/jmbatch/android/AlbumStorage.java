@@ -119,7 +119,7 @@ public final class AlbumStorage {
     public static Uri publish(Context context,File source,String tree,String name,Check check)throws Exception {
         absent(context,tree,name);String tempName=name+"."+UUID.randomUUID()+".partial";
         if(tree.isEmpty()){
-            File root=root(context);if(!root.exists()&&!root.mkdirs())throw new IOException("无法创建保存目录");
+            File root=root(context);if(!root.isDirectory()&&!root.mkdirs()&&!root.isDirectory())throw new IOException("无法创建保存目录");
             File temporary=new File(root,tempName), result=new File(root,name);
             try{copyLocal(source,temporary,check);check.run();absent(context,tree,name);Files.move(temporary.toPath(),result.toPath());return ExportProvider.uri(context,result);}
             finally{if(temporary.exists())Downloader.deleteOwned(temporary,root);}

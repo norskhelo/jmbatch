@@ -7,7 +7,7 @@ from pathlib import Path
 
 from core import Settings, SpeedWatch, Task, explain_error, parse_ids, task_cache
 from diagnostics import FixtureClient, FailingFixtureClient, fixture_worker, stalled_worker
-from engine import Engine
+from engine import Engine, WorkerState
 from worker import parse_cookies, run_download
 
 
@@ -80,11 +80,12 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(cached["image_bytes"], actual_images)
         engine = Engine(self.root / "state")
         engine.tasks = [Task(**task)]
-        engine.current = engine.tasks[0]
+        state = WorkerState(engine.tasks[0])
+        engine.active[state.task.key] = state
         from core import SpeedWatch
-        engine.watch = SpeedWatch(Settings(**task["settings"]), 0)
-        engine._handle(cached, 1)
-        engine._handle(resumed[-1], 2)
+        state.watch = SpeedWatch(Settings(**task["settings"]), 0)
+        engine._handle(state, cached, 1)
+        engine._handle(state, resumed[-1], 2)
         loaded = Engine(self.root / "state").tasks[0]
         self.assertEqual(loaded.image_bytes, actual_images)
         self.assertEqual(loaded.result_bytes, resumed[-1]["result_bytes"])
@@ -289,9 +290,9 @@ class IntegrationTests(unittest.TestCase):
         engine.add(["123456"], Settings(output=str(self.root / "out")))
         engine.start()
         engine.tick()
-        self.assertTrue(engine.process.is_alive())
+        self.assertTrue(engine.active[engine.tasks[0].key].process.is_alive())
         engine.pause()
-        self.assertIsNone(engine.process)
+        self.assertFalse(any(s.process for s in engine.active.values()))
         self.assertEqual(engine.tasks[0].status, "paused")
         engine.worker_target = fixture_worker
         engine.start()
@@ -311,22 +312,22 @@ class IntegrationTests(unittest.TestCase):
         engine.start()
         engine.tick()
         deadline = time.monotonic() + 10
-        while engine.phase != "download" and time.monotonic() < deadline:
+        while engine.active[engine.tasks[0].key].phase != "download" and time.monotonic() < deadline:
             engine.tick()
             time.sleep(.05)
         try:
-            self.assertEqual(engine.phase, "download")
-            engine.watch.last_progress = time.monotonic() - 31
+            self.assertEqual(engine.active[engine.tasks[0].key].phase, "download")
+            engine.active[engine.tasks[0].key].watch.last_progress = time.monotonic() - 31
             engine.tick()
             self.assertEqual(engine.tasks[0].status, "resetting")
-            self.assertIsNone(engine.process)
-            engine.next_start = 0
+            self.assertFalse(any(s.process for s in engine.active.values()))
+            engine.active[engine.tasks[0].key].next_start = 0
             engine.tick()
             deadline = time.monotonic() + 10
-            while engine.phase != "download" and time.monotonic() < deadline:
+            while engine.active[engine.tasks[0].key].phase != "download" and time.monotonic() < deadline:
                 engine.tick()
                 time.sleep(.05)
-            engine.watch.last_progress = time.monotonic() - 31
+            engine.active[engine.tasks[0].key].watch.last_progress = time.monotonic() - 31
             engine.tick()
             self.assertEqual(engine.tasks[0].status, "failed")
             self.assertIn("上限 1 次", engine.tasks[0].error)

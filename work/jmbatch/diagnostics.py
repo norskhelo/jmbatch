@@ -56,7 +56,7 @@ def run_self_test(directory: Path):
     directory.mkdir(parents=True, exist_ok=True)
     report = {"ok": False, "network_used": False, "checks": []}
     try:
-        from engine import Engine
+        from engine import Engine, WorkerState
         from pypdf import PdfReader
         import zipfile
         import curl_cffi
@@ -86,6 +86,9 @@ def run_self_test(directory: Path):
         for fmt in ("pdf", "zip"):
             engine.add(["123456"], Settings(output=str(directory / "artifacts"), format=fmt))
         engine.start()
+        engine.tick()
+        assert len(engine.active) == 2, "Two independent workers must overlap"
+        report["checks"].append("two concurrent download processes admitted with independent task state")
         deadline = time.monotonic() + 90
         while engine.running and time.monotonic() < deadline:
             engine.tick()
@@ -122,9 +125,8 @@ def run_self_test(directory: Path):
         display_task = Task("123456", dict(engine.tasks[0].settings), status="running", done=15, total=20,
                             cached=10, image_bytes=1024 ** 2, speed=2 * 1024 ** 2, phase="正在下载图片")
         application.engine.tasks = [display_task]
-        application.engine.current = display_task
-        application.engine.phase = "download"
-        application.engine.download_started = time.monotonic() - 10
+        display_state = WorkerState(display_task, phase="download", download_started=time.monotonic() - 10)
+        application.engine.active[display_task.key] = display_state
         application.render()
         for geometry in ("1160x850", "1020x780"):
             root.geometry(geometry)
@@ -137,13 +139,27 @@ def run_self_test(directory: Path):
                 assert widget.winfo_ismapped()
                 assert widget.winfo_rootx() + widget.winfo_width() <= root.winfo_rootx() + root.winfo_width()
                 assert widget.winfo_rooty() + widget.winfo_height() <= root.winfo_rooty() + root.winfo_height()
+        second_task = Task("123457", dict(display_task.settings), status="running", done=2, total=5,
+                           image_bytes=1024 ** 2, speed=1024 ** 2, phase="第二本下载中")
+        application.engine.tasks.append(second_task)
+        application.engine.active[second_task.key] = WorkerState(second_task, phase="download", download_started=time.monotonic() - 20)
+        application.render()
+        application.tree.selection_set(second_task.key)
+        application.render()
+        assert "同时下载 2 本" in application.speed_text.get() and "3.0 MB/s" in application.speed_text.get()
+        assert "JM123457" in application.progress_text.get() and "40.0%" in application.progress_text.get()
+        assert "1.0 MB/s" in application.progress_text.get()
+        application.engine.active.pop(second_task.key)
+        application.engine.tasks.remove(second_task)
+        application.tree.selection_set(display_task.key)
+        report["checks"].append("concurrent UI sums speeds and selects each task's own progress and ETA")
         display_task.done = display_task.total
-        application.engine.phase = "export"
+        display_state.phase = "export"
         application.render()
         assert "99.9%" in application.progress_text.get() and "导出" in application.progress_text.get()
         display_task.status = "done"
         display_task.result_bytes = 2 * 1024 ** 2
-        application.engine.current = None
+        application.engine.active.clear()
         application.render()
         assert application.tree.set(display_task.key, "status") == "下载完成"
         assert application.tree.set(display_task.key, "size") == "2.0 MB"

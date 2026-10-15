@@ -1,4 +1,4 @@
-"""Persistent serial queue with killable workers and bounded slow-speed resets."""
+"""Persistent concurrent queue with killable workers and bounded slow-speed resets."""
 from __future__ import annotations
 
 import json
@@ -6,12 +6,26 @@ import multiprocessing as mp
 import queue
 import time
 from pathlib import Path
+from dataclasses import dataclass
 
 from core import Settings, SpeedWatch, Task, atomic_json
 from worker import worker_entry
 from library import Library
 
 ACTIVE = {"running", "resetting"}
+
+
+@dataclass
+class WorkerState:
+    task: Task
+    process: object = None
+    channel: object = None
+    watch: object = None
+    phase: str = "metadata"
+    bytes: int = 0
+    download_started: float = 0
+    next_start: float = 0
+    exit_seen: float | None = None
 
 
 class Engine:
@@ -23,15 +37,7 @@ class Engine:
         self.settings = Settings()
         self.cookie = ""
         self.running = False
-        self.current = None
-        self.process = None
-        self.channel = None
-        self.watch = None
-        self.phase = ""
-        self.bytes = 0
-        self.download_started = 0
-        self.next_start = 0
-        self.exit_seen = None
+        self.active: dict[str, WorkerState] = {}
         self.last_saved = 0
         self.context = mp.get_context("spawn")
         self.load()
@@ -92,12 +98,12 @@ class Engine:
 
     def pause(self):
         self.running = False
-        if self.current:
-            self._stop_process()
-            self.current.status = "paused"
-            self.current.phase = "已暂停，保留已验证图片"
-            self.current.speed = 0
-            self.current = None
+        for state in list(self.active.values()):
+            self._stop_process(state)
+            state.task.status = "paused"
+            state.task.phase = "已暂停，保留已验证图片"
+            state.task.speed = 0
+        self.active.clear()
         for task in self.tasks:
             if task.status == "queued":
                 task.status = "paused"
@@ -108,9 +114,9 @@ class Engine:
         for task in self.tasks:
             if task.key not in keys or task.status in ("done", "cancelled"):
                 continue
-            if task is self.current:
-                self._stop_process()
-                self.current = None
+            state = self.active.pop(task.key, None)
+            if state:
+                self._stop_process(state)
             task.status = "cancelled"
             task.speed = 0
             task.phase = "已取消，缓存保留供重试"
@@ -132,60 +138,61 @@ class Engine:
         self.save()
         return count
 
-    def _stop_process(self):
-        if self.process:
-            if self.process.is_alive():
-                self.process.terminate()
-            self.process.join(timeout=2)
-            if self.process.is_alive():
-                self.process.kill()
-                self.process.join(timeout=1)
-            self.process.close()
-            self.process = None
-        if self.channel:
-            self.channel.close()
-            self.channel = None
-        self.exit_seen = None
+    def _stop_process(self, state):
+        if state.process:
+            if state.process.is_alive():
+                state.process.terminate()
+            state.process.join(timeout=2)
+            if state.process.is_alive():
+                state.process.kill()
+                state.process.join(timeout=1)
+            state.process.close()
+            state.process = None
+        if state.channel:
+            state.channel.close()
+            state.channel = None
+        state.exit_seen = None
 
     def _launch(self, task: Task, now):
-        self.current = task
+        state = WorkerState(task)
+        self.active[task.key] = state
         task.status = "running"
         task.phase = "正在启动下载进程"
         task.done = task.cached = 0
         task.total = task.image_bytes = task.result_bytes = 0
-        self.download_started = 0
+        state.download_started = 0
         task.error = ""
         task.metrics = {}
         task.speed = 0
-        self.phase = "metadata"
-        self.bytes = 0
-        self.watch = SpeedWatch(Settings(**task.settings), now)
-        self.channel = self.context.Queue()
-        self.process = self.context.Process(target=self.worker_target, args=(task.to_dict(), self.cookie, self.channel), daemon=True)
+        state.phase = "metadata"
+        state.bytes = 0
+        state.watch = SpeedWatch(Settings(**task.settings), now)
+        state.channel = self.context.Queue()
+        state.process = self.context.Process(target=self.worker_target, args=(task.to_dict(), self.cookie, state.channel), daemon=True)
         try:
-            self.process.start()
+            state.process.start()
         except Exception as exc:
-            self.process = None
-            self.channel.close()
-            self.channel = None
-            self._fail(f"无法启动下载进程：{type(exc).__name__}: {exc}")
+            state.process = None
+            state.channel.close()
+            state.channel = None
+            self._fail(state, f"无法启动下载进程：{type(exc).__name__}: {exc}")
             return
         self.notify(f"JM{task.album_id} 开始下载（{task.settings['format'].upper()}）")
         self.save()
 
-    def _fail(self, message):
-        task = self.current
-        self._stop_process()
+    def _fail(self, state, message):
+        task = state.task
+        self._stop_process(state)
         task.status = "failed"
         task.error = message
         task.phase = "下载失败，点击任务查看原因"
         task.speed = 0
         self.notify(f"JM{task.album_id} 失败：{message}")
-        self.current = None
+        self.active.pop(task.key, None)
         self.save()
 
-    def _handle(self, event, now):
-        task = self.current
+    def _handle(self, state, event, now):
+        task = state.task
         kind = event.get("type")
         if kind == "title":
             task.title = event["title"]
@@ -193,25 +200,25 @@ class Engine:
             task.phase = event["message"]
         elif kind == "metadata":
             task.phase = event["message"]
-            self.watch.last_progress = now
+            state.watch.last_progress = now
         elif kind == "phase":
-            self.phase = event["phase"]
+            state.phase = event["phase"]
             task.phase = event["message"]
-            if self.phase in ("download", "page_retry"):
+            if state.phase in ("download", "page_retry"):
                 task.total = event["total"]
-                self.watch = SpeedWatch(Settings(**task.settings), now)
-                if self.phase == "download":
-                    self.download_started = now
+                state.watch = SpeedWatch(Settings(**task.settings), now)
+                if state.phase == "download":
+                    state.download_started = now
         elif kind == "progress":
             task.done, task.total, task.cached = event["done"], event["total"], event["cached"]
-            self.bytes = event["bytes"]
+            state.bytes = event["bytes"]
             task.image_bytes = event.get("image_bytes", task.image_bytes)
             task.phase = event["message"]
-            self.watch.last_progress = now
+            state.watch.last_progress = now
         elif kind == "export_progress":
             task.phase = event["message"]
         elif kind == "error":
-            self._fail(event["error"])
+            self._fail(state, event["error"])
         elif kind == "metrics":
             task.metrics = event["metrics"]
         elif kind == "done":
@@ -231,70 +238,80 @@ class Engine:
                 stages = task.metrics.get("stages", {})
                 text = "，".join(f"{labels.get(key, key)} {seconds:.2f}s" for key, seconds in stages.items())
                 self.notify(f"JM{task.album_id} 本轮耗时 {task.metrics['total_seconds']:.2f}s：{text}")
-            self._stop_process()
-            self.current = None
+            self._stop_process(state)
+            self.active.pop(task.key, None)
             self.save()
 
-    def tick(self, now=None):
-        now = time.monotonic() if now is None else now
-        if self.current and self.current.status == "resetting":
-            if now >= self.next_start:
-                self._launch(self.current, now)
+    def _tick_worker(self, state, now):
+        task = state.task
+        if task.status == "resetting":
+            if now >= state.next_start:
+                self._launch(task, now)
             return
-        if self.current and self.channel:
+        if state.channel:
             for _ in range(300):
                 try:
-                    event = self.channel.get_nowait()
+                    event = state.channel.get_nowait()
                 except queue.Empty:
                     break
-                self._handle(event, now)
-                if self.current is None:
-                    break
-        if self.current and self.process:
-            if not self.process.is_alive():
+                self._handle(state, event, now)
+                if task.key not in self.active:
+                    return
+        if state.process:
+            if not state.process.is_alive():
                 # Allow multiprocessing's feeder to deliver its terminal event.
-                if self.exit_seen is None:
-                    self.exit_seen = now
-                elif now - self.exit_seen > 1:
-                    code = self.process.exitcode
-                    self._fail(f"下载进程意外退出（退出码 {code}）。可能是依赖、系统资源或安全软件拦截；已保留缓存，可重试。")
-            elif self.phase == "page_retry":
-                self.current.speed = 0
-                if now - self.watch.last_progress >= max(self.watch.settings.stall_seconds, self.watch.settings.timeout * (self.watch.settings.request_retries + 1) * 2):
-                    self._fail("单页重试超时；已保留其他图片，请查看失败页后重试任务。")
-            elif self.phase in ("metadata", "download"):
-                speed, reason = self.watch.sample(now, self.bytes)
-                self.current.speed = speed
+                if state.exit_seen is None:
+                    state.exit_seen = now
+                elif now - state.exit_seen > 1:
+                    code = state.process.exitcode
+                    self._fail(state, f"下载进程意外退出（退出码 {code}）。可能是依赖、系统资源或安全软件拦截；已保留缓存，可重试。")
+            elif state.phase == "page_retry":
+                task.speed = 0
+                if now - state.watch.last_progress >= max(state.watch.settings.stall_seconds, state.watch.settings.timeout * (state.watch.settings.request_retries + 1) * 2):
+                    self._fail(state, "单页重试超时；已保留其他图片，请查看失败页后重试任务。")
+            elif state.phase in ("metadata", "download"):
+                speed, reason = state.watch.sample(now, state.bytes)
+                task.speed = speed
                 # A slow byte rate is only meaningful in the image phase.
-                if self.phase == "metadata" and now - self.watch.last_progress < self.watch.settings.stall_seconds:
+                if state.phase == "metadata" and now - state.watch.last_progress < state.watch.settings.stall_seconds:
                     reason = None
                 if reason:
-                    task = self.current
                     if task.resets >= task.settings["max_resets"]:
-                        self._fail(f"{reason}；已达到自动重置上限 {task.settings['max_resets']} 次。请检查网络或调低慢速阈值后重试。")
+                        self._fail(state, f"{reason}；已达到自动重置上限 {task.settings['max_resets']} 次。请检查网络或调低慢速阈值后重试。")
                     else:
-                        self._stop_process()
+                        self._stop_process(state)
                         task.resets += 1
                         task.status = "resetting"
                         task.speed = 0
                         delay = min(30, 3 * 2 ** (task.resets - 1))
                         task.phase = f"{reason}；{delay} 秒后重建连接（{task.resets}/{task.settings['max_resets']}）"
                         self.notify(f"JM{task.album_id} 自动重置：{task.phase}")
-                        self.next_start = now + delay
+                        state.next_start = now + delay
                         self.save()
             else:
-                self.current.speed = 0
-        if self.running and self.current is None:
-            task = next((t for t in self.tasks if t.status == "queued"), None)
-            if task:
-                self._launch(task, now)
-            else:
+                task.speed = 0
+
+    def tick(self, now=None):
+        now = time.monotonic() if now is None else now
+        for state in list(self.active.values()):
+            self._tick_worker(state, now)
+        if self.running:
+            for task in self.tasks:
+                if len(self.active) >= self.settings.concurrent_tasks:
+                    break
+                if task.status == "queued" and task.key not in self.active:
+                    self._launch(task, now)
+            if not self.active and not any(t.status == "queued" for t in self.tasks):
                 self.running = False
                 self.notify("下载完成" if self.tasks and all(t.status == "done" for t in self.tasks)
                             else "本轮队列已结束；失败任务可选中后重试。")
                 self.save()
-        if self.current and now - self.last_saved > 5:
+        if self.active and now - self.last_saved > 5:
             self.save()
+
+    def stop_workers(self):
+        for state in list(self.active.values()):
+            self._stop_process(state)
 
     def close(self):
         self.pause()

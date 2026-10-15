@@ -10,21 +10,26 @@ public final class DownloadService extends Service {
     public static final String START="start", PAUSE="pause", CANCEL="cancel";
     private static final String CHANNEL="downloads";
     private Store store;
-    private volatile Thread runner;
-    private volatile Store.Task current;
-    private volatile JmApi.Control control;
+    private final DownloadPool<String,DownloadJob> pool=new DownloadPool<>();
     private ScheduledExecutorService monitor;
     private PowerManager.WakeLock wake;
     private final Handler main=new Handler(Looper.getMainLooper());
-    private JmApi.Control watched;
-    private String watchedStage="";
-    private long phaseStart,lastSave;
-    private final Deque<long[]> samples=new ArrayDeque<>();
+    private boolean accepting, foreground, destroyed;
+    private long lastSave;
+    private final Runnable dispatch=new Runnable(){public void run(){
+        if(destroyed)return;
+        try{dispatch();}catch(Throwable error){
+            store.note="队列异常："+Core.error(error,store.cookie);
+            accepting=false;pool.cancelAll("PAUSE");
+            try{store.pauseQueued();}catch(Exception ignored){}
+        }
+        if(accepting||pool.size()>0)main.postDelayed(this,250);else finishQueue();
+    }};
 
     public void onCreate(){
         super.onCreate();store=Store.get(this);
         NotificationChannel channel=new NotificationChannel(CHANNEL,"下载进度",NotificationManager.IMPORTANCE_LOW);
-        channel.setDescription("显示正在进行的下载，可随时暂停");channel.setShowBadge(false);
+        channel.setDescription("显示同时进行的下载，可随时暂停全部任务");channel.setShowBadge(false);
         getSystemService(NotificationManager.class).createNotificationChannel(channel);
         wake=((PowerManager)getSystemService(POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,getPackageName()+":download");
         monitor=Executors.newSingleThreadScheduledExecutor();
@@ -34,112 +39,166 @@ public final class DownloadService extends Service {
     public int onStartCommand(Intent intent,int flags,int startId){
         String action=intent==null?PAUSE:intent.getAction();
         if(PAUSE.equals(action)){
-            store.running=false;
-            if(control!=null)control.cancel("PAUSE");
-            if(current!=null)current.phase="正在关闭请求并暂停…";
+            accepting=false;pool.cancelAll("PAUSE");
             try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}
-            if(runner==null||!runner.isAlive())stopSelf();
+            if(pool.size()==0)finishQueue();
             return START_NOT_STICKY;
         }
         if(CANCEL.equals(action)){
-            if(current!=null&&current.key.equals(intent.getStringExtra("key"))){current.phase="正在取消…";if(control!=null)control.cancel("CANCEL");}
-            else for(Store.Task task:store.snapshot())if(task.key.equals(intent.getStringExtra("key"))&&!task.status.equals("done")){task.status="cancelled";task.phase="已取消，缓存保留";}
-            saveQuietly();if(runner==null||!runner.isAlive())stopSelf();return START_NOT_STICKY;
+            String key=intent.getStringExtra("key");DownloadJob job=pool.get(key);
+            if(job!=null)job.cancel("CANCEL");
+            else synchronized(store){for(Store.Task task:store.snapshot())if(task.key.equals(key)&&!task.status.equals("done")){task.status="cancelled";task.phase="已取消，缓存保留";}}
+            saveQuietly();if(!accepting&&pool.size()==0)finishQueue();return START_NOT_STICKY;
         }
-        if(runner!=null&&runner.isAlive()){store.note=store.running?"队列已在运行":"正在停止旧请求，请稍后继续";return START_NOT_STICKY;}
-        startForeground(1,notification(null));
+        if(accepting||pool.size()>0){store.note=accepting?"队列已在运行":"正在停止旧请求，请稍后继续";return START_NOT_STICKY;}
+        startForeground(1,notification());foreground=true;
         synchronized(store){
-            if(store.libraryBusy){store.note="正在管理漫画文件，请稍后再开始下载";stopForeground(true);stopSelf();return START_NOT_STICKY;}
+            if(store.libraryBusy||!store.activeKeys.isEmpty()){store.note="正在管理文件或关闭旧请求，请稍后再开始下载";stopForeground(true);foreground=false;stopSelf();return START_NOT_STICKY;}
             store.running=true;
         }
-        try{store.resume();}catch(Exception error){store.running=false;store.note=error.getMessage();stopForeground(true);stopSelf();return START_NOT_STICKY;}
+        try{store.resume();}catch(Exception error){store.note=error.getMessage();finishQueue();return START_NOT_STICKY;}
+        store.note="";accepting=true;
         wake.acquire(6*60*60*1000L);
-        runner=new Thread(this::runQueue,"jm-queue");runner.start();return START_NOT_STICKY;
+        main.removeCallbacks(dispatch);main.post(dispatch);return START_NOT_STICKY;
     }
 
-    private void runQueue(){
-        try{
-            while(store.running){
-                Store.Task task=store.next();if(task==null)break;current=task;
-                task.status="running";task.error="";long begin=SystemClock.elapsedRealtime();saveQuietly();
-                while(store.running){
-                    JmApi.Control attempt=new JmApi.Control();control=attempt;attempt.routeMessage=message->task.phase=message;task.done=0;task.total=0;task.cached=0;task.speed=0;task.bytes=0;
-                    task.imageBytes=0;task.resultBytes=0;task.downloadStarted=0;task.stage="metadata";
+    private void dispatch(){
+        for(String key:pool.reap())store.activeKeys.remove(key);
+        if(!accepting)return;
+        synchronized(store){
+            while(pool.size()<store.settings.concurrentTasks){
+                Store.Task task=store.next();if(task==null)break;
+                task.status="running";task.error="";task.phase="正在启动下载";
+                store.activeKeys.add(task.key);
+                try{
+                    if(!pool.start(task.key,new DownloadJob(task),store.settings.concurrentTasks))throw new IllegalStateException("任务已在运行");
+                }catch(Throwable error){
+                    store.activeKeys.remove(task.key);task.status="failed";task.phase="无法启动下载";task.error=Core.error(error,store.cookie);
+                }
+            }
+            if(pool.size()==0&&store.next()==null)accepting=false;
+        }
+    }
+
+    private void finishQueue(){
+        accepting=false;if(store.activeKeys.isEmpty())store.running=false;
+        try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}
+        if(wake.isHeld())wake.release();saveQuietly();
+        if(foreground){stopForeground(true);foreground=false;}stopSelf();
+    }
+
+    private final class DownloadJob implements DownloadPool.Job {
+        final Store.Task task;
+        volatile JmApi.Control control;
+        volatile String stop="";
+        JmApi.Control watched;
+        String watchedStage="";
+        long phaseStart;
+        final Deque<long[]> samples=new ArrayDeque<>();
+        DownloadJob(Store.Task task){this.task=task;}
+        public synchronized void cancel(String reason){
+            if(stop.isEmpty())stop=reason;
+            if(control!=null)control.cancel(stop);
+            if(task.status.equals("running")||task.status.equals("resetting"))task.phase=stop.equals("CANCEL")?"正在取消…":"正在关闭请求并暂停…";
+        }
+        private synchronized JmApi.Control attempt(){
+            if(!stop.isEmpty())return null;
+            control=new JmApi.Control();control.routeMessage=message->task.phase=message;
+            return control;
+        }
+        private void stopped(){task.status=stop.equals("CANCEL")?"cancelled":"paused";task.phase=stop.equals("CANCEL")?"已取消，缓存保留":"已暂停，缓存保留";}
+        public void run(){
+            long begin=SystemClock.elapsedRealtime();
+            try{
+                while(true){
+                    JmApi.Control attempt=attempt();if(attempt==null){stopped();break;}
+                    task.status="running";task.done=0;task.total=0;task.cached=0;task.speed=0;task.bytes=0;
+                    task.imageBytes=0;task.resultBytes=0;task.downloadStarted=0;task.stage="metadata";saveQuietly();
                     try{
-                        String result=new Downloader(this,store,task,attempt,store.cookie).run();
+                        String result=new Downloader(DownloadService.this,store,task,attempt,store.cookie).run();
+                        // Keep an already committed output successful if cancellation arrived just after publishing it.
                         task.resultUri=result;task.status="done";task.phase="下载完成";task.error="";
-                        try{LibraryStore.get(this).sync(store.snapshot());}catch(Exception indexError){store.note="文件已下载，但漫画列表保存失败："+indexError.getMessage();}
+                        try{LibraryStore.get(DownloadService.this).sync(store.snapshot());}catch(Exception error){store.note="文件已下载，但漫画列表保存失败："+error.getMessage();}
                         break;
                     }catch(Throwable error){
+                        if(!stop.isEmpty()){stopped();break;}
                         String reason=attempt.stop;
-                        if(reason.equals("PAUSE")||!store.running){task.status="paused";task.phase="已暂停，缓存保留";break;}
-                        if(reason.equals("CANCEL")){task.status="cancelled";task.phase="已取消，缓存保留";break;}
                         if(reason.startsWith("RESET:")){
                             if(task.resets>=task.settings.maxResets){task.status="failed";task.error=reason.substring(6)+"；已达到自动重置上限 "+task.settings.maxResets+" 次";task.phase="速度恢复失败";break;}
                             task.resets++;task.status="resetting";task.phase=reason.substring(6)+"；重连 "+task.resets+"/"+task.settings.maxResets;saveQuietly();
                             long wait=SystemClock.elapsedRealtime()+Math.min(30000,3000L<<(task.resets-1));
-                            while(store.running&&SystemClock.elapsedRealtime()<wait&&!attempt.stop.equals("CANCEL")&&!attempt.stop.equals("PAUSE"))Thread.sleep(200);
-                            if(attempt.stop.equals("CANCEL")){task.status="cancelled";task.phase="已取消";break;}
-                            if(!store.running){task.status="paused";task.phase="已暂停";break;}
-                            task.status="running";continue;
+                            while(stop.isEmpty()&&SystemClock.elapsedRealtime()<wait)Thread.sleep(200);
+                            continue;
                         }
                         task.status="failed";task.phase="下载失败，点详情查看原因";
-                        task.error=error instanceof OutOfMemoryError?"手机内存不足，缓存已保留。请关闭其他应用并减少线程后重试。":Core.error(error,store.cookie);break;
+                        task.error=error instanceof OutOfMemoryError?"手机内存不足，缓存已保留。请减少同时下载任务数或图片线程后重试。":Core.error(error,store.cookie);break;
                     }finally{task.elapsed=SystemClock.elapsedRealtime()-begin;task.speed=0;saveQuietly();}
                 }
-                current=null;control=null;
+            }catch(Throwable error){
+                if(!stop.isEmpty())stopped();else{task.status="failed";task.error=Core.error(error,store.cookie);task.phase="任务异常，缓存保留";}
+            }finally{control=null;task.speed=0;saveQuietly();}
+        }
+
+        synchronized void monitor(long now){
+            JmApi.Control active=control;if(active==null)return;
+            long bytes=active.bytes.get();task.bytes=bytes;
+            if(watched!=active||!watchedStage.equals(active.stage)){
+                watched=active;watchedStage=active.stage;phaseStart=now;samples.clear();samples.add(new long[]{now,bytes});
             }
-        }catch(Throwable error){store.note="队列异常："+Core.error(error,store.cookie);if(current!=null){current.status="failed";current.error=store.note;}}
-        finally{
-            current=null;control=null;store.running=false;
-            try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}
-            if(wake.isHeld())wake.release();saveQuietly();
-            Thread finished=Thread.currentThread();
-            main.post(()->{if(runner==finished){stopForeground(true);stopSelf();}});
+            samples.addLast(new long[]{now,bytes});
+            while(samples.size()>2){Iterator<long[]> it=samples.iterator();it.next();long[] second=it.next();if(second[0]<=now-task.settings.window*1000L)samples.removeFirst();else break;}
+            long[] recent=samples.peekFirst();for(long[] sample:samples)if(sample[0]>=now-10000){recent=sample;break;}
+            task.speed=task.status.equals("running")&&active.stop.isEmpty()&&active.stage.equals("download")?Math.max(0,bytes-recent[1])*1000/Math.max(1000,now-recent[0]):0;
+            if(!stop.isEmpty())return;
+            if(active.stage.equals("page_retry")&&active.stop.isEmpty()&&now-active.lastData>=Math.max(task.settings.stall,task.settings.timeout*(task.settings.retries+1)*2)*1000L)
+                active.cancel("单页重试超时；已保留其他图片，请重试任务");
+            if(task.status.equals("running")&&active.stop.isEmpty()&&task.settings.autoReset&&(active.stage.equals("metadata")||active.stage.equals("download"))){
+                String reason="";
+                if(now-active.lastData>=task.settings.stall*1000L)reason="连续 "+task.settings.stall+" 秒没有接收数据或取得进度";
+                else if(active.stage.equals("download")&&task.settings.slowKB>0&&now-phaseStart>=(task.settings.window+30)*1000L){
+                    long[] oldest=samples.peekFirst();long duration=now-oldest[0];
+                    if(duration>=task.settings.window*1000L&&Math.max(0,bytes-oldest[1])*1000/Math.max(1,duration)<task.settings.slowKB*1024L)
+                        reason="最近 "+task.settings.window+" 秒平均速度低于 "+task.settings.slowKB+" KB/s";
+                }
+                if(!reason.isEmpty()){task.phase="正在关闭旧连接："+reason;active.cancel("RESET:"+reason);}
+            }
         }
     }
 
     private void monitor(){
-        Store.Task task=current;JmApi.Control active=control;if(task==null||active==null)return;
-        long now=SystemClock.elapsedRealtime(), bytes=active.bytes.get();task.bytes=bytes;
-        if(watched!=active||!watchedStage.equals(active.stage)){
-            watched=active;watchedStage=active.stage;phaseStart=now;samples.clear();samples.add(new long[]{now,bytes});
-        }
-        samples.addLast(new long[]{now,bytes});
-        while(samples.size()>2){Iterator<long[]> it=samples.iterator();it.next();long[] second=it.next();if(second[0]<=now-task.settings.window*1000L)samples.removeFirst();else break;}
-        long[] recent=samples.peekFirst();for(long[] sample:samples)if(sample[0]>=now-10000){recent=sample;break;}
-        task.speed=task.status.equals("running")&&active.stop.isEmpty()&&active.stage.equals("download")?Math.max(0,bytes-recent[1])*1000/Math.max(1000,now-recent[0]):0;
-        if(active.stage.equals("page_retry")&&active.stop.isEmpty()&&now-active.lastData>=Math.max(task.settings.stall,task.settings.timeout*(task.settings.retries+1)*2)*1000L){
-            active.cancel("单页重试超时；已保留其他图片，请重试任务");
-        }
-        if(task.status.equals("running")&&active.stop.isEmpty()&&task.settings.autoReset&&(active.stage.equals("metadata")||active.stage.equals("download"))){
-            String reason="";
-            if(now-active.lastData>=task.settings.stall*1000L)reason="连续 "+task.settings.stall+" 秒没有接收数据或取得进度";
-            else if(active.stage.equals("download")&&task.settings.slowKB>0&&now-phaseStart>=(task.settings.window+30)*1000L){
-                long[] oldest=samples.peekFirst();long duration=now-oldest[0];
-                if(duration>=task.settings.window*1000L&&Math.max(0,bytes-oldest[1])*1000/Math.max(1,duration)<task.settings.slowKB*1024L)
-                    reason="最近 "+task.settings.window+" 秒平均速度低于 "+task.settings.slowKB+" KB/s";
-            }
-            if(!reason.isEmpty()){task.phase="正在关闭旧连接："+reason;active.cancel("RESET:"+reason);}
-        }
-        getSystemService(NotificationManager.class).notify(1,notification(task));
-        if(now-lastSave>5000){saveQuietly();lastSave=now;}
+        long now=SystemClock.elapsedRealtime();
+        for(DownloadJob job:pool.snapshot())job.monitor(now);
+        main.post(()->{if(!destroyed&&foreground)getSystemService(NotificationManager.class).notify(1,notification());});
+        if(pool.size()>0&&now-lastSave>5000){saveQuietly();lastSave=now;}
     }
 
-    private Notification notification(Store.Task task){
+    private Notification notification(){
         int immutable=Build.VERSION.SDK_INT>=23?PendingIntent.FLAG_IMMUTABLE:0;
         PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_UPDATE_CURRENT|immutable);
         PendingIntent pause=PendingIntent.getService(this,1,new Intent(this,DownloadService.class).setAction(PAUSE),PendingIntent.FLAG_UPDATE_CURRENT|immutable);
-        Notification.Builder builder=new Notification.Builder(this,CHANNEL).setSmallIcon(R.drawable.ic_launcher).setContentTitle("JM Batch 正在下载")
-            .setContentText(task==null?"正在启动队列":task.progressText()+" · "+DownloadDisplay.speed(task.speed))
+        List<DownloadJob> jobs=pool.snapshot();long speed=0;StringBuilder detail=new StringBuilder();
+        for(DownloadJob job:jobs){Store.Task task=job.task;speed+=task.speed;detail.append("JM").append(task.id).append(" · ").append(task.progressText()).append(" · ").append(DownloadDisplay.speed(task.speed)).append("\n").append(task.etaText()).append("\n");}
+        String summary=jobs.isEmpty()?"正在启动队列":"同时下载 "+jobs.size()+" 本 · 总速度 "+DownloadDisplay.speed(speed);
+        return new Notification.Builder(this,CHANNEL).setSmallIcon(R.drawable.ic_launcher).setContentTitle("JM Batch 正在下载")
+            .setContentText(summary).setStyle(new Notification.BigTextStyle().bigText(summary+"\n"+detail))
             .setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PRIVATE)
-            .addAction(new Notification.Action.Builder(null,"暂停",pause).build());
-        if(task!=null){
-            builder.setStyle(new Notification.BigTextStyle().bigText("JM"+task.id+" · "+task.progressText()+" · "+DownloadDisplay.speed(task.speed)+"\n"+task.sizeText()+"\n"+task.etaText()));
-            builder.setProgress(1000,(int)(DownloadDisplay.percent(task.done,task.total,task.status)*10),task.total==0);
-        }return builder.build();
+            .addAction(new Notification.Action.Builder(null,"暂停全部",pause).build()).build();
     }
     private void saveQuietly(){try{store.save();}catch(Exception error){store.note=error.getMessage();}}
-    public void onDestroy(){store.running=false;if(control!=null)control.cancel("PAUSE");if(monitor!=null)monitor.shutdownNow();if(wake!=null&&wake.isHeld())wake.release();super.onDestroy();}
+    public void onDestroy(){
+        destroyed=true;accepting=false;main.removeCallbacks(dispatch);pool.cancelAll("PAUSE");
+        if(monitor!=null)monitor.shutdownNow();if(wake!=null&&wake.isHeld())wake.release();
+        // Retain the busy guard until every old worker has left its cache files.
+        if(pool.size()>0)new Thread(()->{
+            while(true){
+                synchronized(store){
+                    for(String key:pool.reap())store.activeKeys.remove(key);
+                    if(pool.size()==0){store.running=false;try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}break;}
+                }
+                try{Thread.sleep(100);}catch(InterruptedException ignored){}
+            }
+        },"jm-download-cleanup").start();
+        super.onDestroy();
+    }
     public IBinder onBind(Intent intent){return null;}
 }

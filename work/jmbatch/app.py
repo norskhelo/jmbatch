@@ -280,7 +280,7 @@ class App:
             messagebox.showinfo("没有待下载任务", "请添加编号，或选中失败任务后点击“重试选中”。", parent=self.root)
             return
         self.engine.start()
-        self.log("队列开始运行。每次处理一本，图片按设置并发下载。")
+        self.log("队列开始运行，按同时下载任务数调度；每本图片独立并发下载。")
 
     def pause(self):
         self.engine.pause()
@@ -391,16 +391,20 @@ class App:
         failed = sum(t.status == "failed" for t in tasks)
         waiting = sum(t.status in ("queued", "paused") for t in tasks)
         self.summary.set(f"共 {len(tasks)} 本    ·    已完成 {done}    ·    失败 {failed}    ·    待处理 {waiting}")
-        current = self.engine.current
+        active = list(self.engine.active.values())
+        selected = self.selected_task()
+        state = self.engine.active.get(selected.key) if selected else None
+        state = state or (active[0] if active else None)
+        current = state.task if state else None
         self.start_button.configure(state="disabled" if self.engine.running else "normal")
         self.pause_button.configure(state="normal" if self.engine.running else "disabled")
         if current:
-            self.speed_text.set("落盘速度  " + format_speed(current.speed) if self.engine.phase == "download" else "落盘速度  —")
-            estimate = eta_text(current.status, self.engine.phase, current.done, current.total, current.cached,
-                                time.monotonic() - self.engine.download_started, current.speed)
+            self.speed_text.set(f"同时下载 {len(active)} 本 · 总落盘速度  " + format_speed(sum(s.task.speed for s in active)))
+            estimate = eta_text(current.status, state.phase, current.done, current.total, current.cached,
+                                time.monotonic() - state.download_started, current.speed)
             if current.settings["format"] == "images":
                 estimate = estimate.replace("校验 / 导出", "校验 / 保存").replace("导出另计", "保存另计")
-            self.progress_text.set(f"JM{current.album_id} · {progress_text(current.done, current.total, current.status)} · {current.phase[:70]}\n"
+            self.progress_text.set(f"JM{current.album_id} · {progress_text(current.done, current.total, current.status)} · {format_speed(current.speed)} · {current.phase[:70]}\n"
                                    + size_text(current.done, current.total, current.image_bytes, current.result_bytes, current.status) + "\n" + estimate)
             self.progressbar["value"] = percent(current.done, current.total, current.status)
         else:
@@ -420,7 +424,7 @@ class App:
             try:
                 self.engine.pause()
             except Exception:
-                self.engine._stop_process()
+                self.engine.stop_workers()
                 self.engine.running = False
             messagebox.showerror("队列已暂停", f"{type(exc).__name__}: {exc}\n请检查配置目录是否可写。", parent=self.root)
         self.root.after(250, self.tick)
@@ -448,7 +452,8 @@ class App:
         ttk.Label(frame, text="连接与自动恢复", font=("Microsoft YaHei UI", 16, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 16))
         variables = {}
         fields = [
-            ("threads", "图片线程数", "1–16，默认 8；遇限流可调低"),
+            ("concurrent_tasks", "同时下载任务数", "1–4，默认 2；每个任务单独使用下方图片线程"),
+            ("threads", "每个任务图片线程数", "1–16，默认 8；遇限流可调低"),
             ("timeout", "单次请求超时 / 秒", "5–120"),
             ("request_retries", "单次请求重试", "0–5"),
             ("slow_kbps", "慢速阈值 / KB/s", "0 表示仅检测无进度"),
@@ -462,11 +467,11 @@ class App:
             ttk.Entry(frame, textvariable=variables[key], width=9).grid(row=row, column=1, padx=8)
             ttk.Label(frame, text=hint, foreground=MUTED).grid(row=row, column=2, sticky="w")
         auto = tk.BooleanVar(value=self.engine.settings.auto_reset)
-        ttk.Checkbutton(frame, text="启用慢速 / 无进度自动重置", variable=auto).grid(row=8, column=0, columnspan=3, sticky="w", pady=(14, 5))
+        ttk.Checkbutton(frame, text="启用慢速 / 无进度自动重置", variable=auto).grid(row=9, column=0, columnspan=3, sticky="w", pady=(14, 5))
         ttk.Label(frame, text="Cookie（可选，仅本次会话有效，不写入配置或日志）").grid(row=12, column=0, columnspan=3, sticky="w", pady=(15, 6))
         cookie = tk.StringVar(value=self.engine.cookie)
         ttk.Entry(frame, textvariable=cookie, show="●", width=65).grid(row=13, column=0, columnspan=3, sticky="ew")
-        ttk.Label(frame, text="速度按已完成图片的文件大小估算，大图下载期间可能暂时显示 0。\n重置会终止旧进程并重建连接；导出阶段不重置。\n设置用于新任务及手动重试；已在运行的任务保留原设置。", foreground=MUTED, justify="left").grid(row=14, column=0, columnspan=3, sticky="w", pady=15)
+        ttk.Label(frame, text="速度按已完成图片的文件大小估算，大图下载期间可能暂时显示 0。\n重置会终止旧进程并重建连接；导出阶段不重置。\n任务数保存后生效；调低时等待当前任务结束，不中断下载。\n其他设置用于新任务及手动重试；运行中任务保留原设置。", foreground=MUTED, justify="left").grid(row=14, column=0, columnspan=3, sticky="w", pady=15)
 
         def save():
             try:
@@ -489,13 +494,13 @@ class App:
         ttk.Button(frame, text="保存设置", style="Accent.TButton", command=save).grid(row=15, column=0, columnspan=3, sticky="e")
 
     def close(self):
-        if self.engine.current and not messagebox.askyesno("退出 JM Batch", "退出会暂停当前任务并保留已验证图片。下次打开可继续。", parent=self.root):
+        if self.engine.active and not messagebox.askyesno("退出 JM Batch", "退出会暂停全部下载任务并保留已验证图片。下次打开可继续。", parent=self.root):
             return
         try:
             self.engine.settings = self.current_settings()
             self.engine.close()
         except Exception as exc:
-            self.engine._stop_process()
+            self.engine.stop_workers()
             messagebox.showwarning("保存状态失败", str(exc), parent=self.root)
         self.root.destroy()
 

@@ -13,7 +13,8 @@ public final class Store {
     public final Context context;
     public final List<Task> tasks = new ArrayList<>();
     public volatile String cookie = "";
-    public Settings settings = new Settings();
+    public volatile Settings settings = new Settings();
+    public final Set<String> activeKeys = java.util.concurrent.ConcurrentHashMap.newKeySet();
     public volatile boolean running;
     public volatile boolean libraryBusy;
     public volatile String note = "";
@@ -21,10 +22,11 @@ public final class Store {
 
     public static final class Settings {
         public String outputUri = "", outputLabel = "应用下载目录", format = "images";
-        public int threads = 8, timeout = 25, retries = 2, slowKB = 30, window = 90, stall = 180, maxResets = 3;
+        public int concurrentTasks = 2, threads = 8, timeout = 25, retries = 2, slowKB = 30, window = 90, stall = 180, maxResets = 3;
         public boolean autoReset = true, keepImages = false, numericFilename = false, flatZip = false;
         public Settings() {}
         public Settings(JSONObject json) {
+            concurrentTasks = json.optInt("concurrentTasks", 2);
             outputUri = json.optString("outputUri", ""); outputLabel = json.optString("outputLabel", "应用下载目录");
             format = json.optString("format", "images"); threads = json.optInt("threads", 8); timeout = json.optInt("timeout", 25);
             retries = json.optInt("retries", 2); slowKB = json.optInt("slowKB", 30); window = json.optInt("window", 90);
@@ -34,6 +36,7 @@ public final class Store {
             validate();
         }
         public void validate() {
+            check(concurrentTasks, 1, 4, "同时下载任务数");
             if (!format.equals("images") && !format.equals("pdf") && !format.equals("zip")) throw new IllegalArgumentException("输出格式无效");
             check(threads, 1, 16, "图片线程"); check(timeout, 5, 120, "请求超时"); check(retries, 0, 5, "请求重试");
             check(slowKB, 0, 10240, "慢速阈值"); check(window, 15, 600, "观察窗口"); check(stall, 30, 1800, "无进度超时"); check(maxResets, 0, 10, "重置次数");
@@ -42,7 +45,7 @@ public final class Store {
         public JSONObject json() {
             JSONObject json = new JSONObject();
             try { json.put("outputUri", outputUri).put("outputLabel", outputLabel).put("format", format).put("threads", threads).put("timeout", timeout).put("retries", retries)
-                .put("slowKB", slowKB).put("window", window).put("stall", stall).put("maxResets", maxResets).put("autoReset", autoReset).put("keepImages", keepImages).put("numericFilename", numericFilename).put("flatZip", flatZip); }
+                .put("concurrentTasks", concurrentTasks).put("slowKB", slowKB).put("window", window).put("stall", stall).put("maxResets", maxResets).put("autoReset", autoReset).put("keepImages", keepImages).put("numericFilename", numericFilename).put("flatZip", flatZip); }
             catch (JSONException impossible) { throw new IllegalStateException(impossible); }
             return json;
         }
@@ -113,7 +116,7 @@ public final class Store {
         for (String id : ids) if (exists.add(id + "|" + options.format + "|" + options.outputUri)) { tasks.add(new Task(id, options)); count++; }
         settings = new Settings(options.json()); save(); return count;
     }
-    public synchronized Task next() { for (Task t : tasks) if (t.status.equals("queued")) return t; return null; }
+    public synchronized Task next() { for (Task t : tasks) if (t.status.equals("queued") && !activeKeys.contains(t.key)) return t; return null; }
     public synchronized void resume() throws IOException { for (Task t : tasks) if (t.status.equals("paused")) { t.status = "queued"; t.phase = "排队中"; } save(); }
     public synchronized void pauseQueued() throws IOException { for (Task t : tasks) if (t.status.equals("queued")) { t.status = "paused"; t.phase = "已暂停"; } save(); }
     public File cache(Task task) throws IOException {

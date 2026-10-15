@@ -68,7 +68,7 @@ public final class MainActivity extends Activity {
             synchronized(store){
                 if(store.libraryBusy)throw new IOException("正在管理漫画文件，请稍后再清理队列");
                 Iterator<Store.Task> it=store.tasks.iterator();
-                while(it.hasNext()){Store.Task t=it.next();if(t.status.equals("done")||t.status.equals("cancelled"))it.remove();}
+                while(it.hasNext()){Store.Task t=it.next();if(!store.activeKeys.contains(t.key)&&(t.status.equals("done")||t.status.equals("cancelled")))it.remove();}
                 store.save();
             }
             render();
@@ -86,20 +86,20 @@ public final class MainActivity extends Activity {
     private void send(String action,String key){Intent intent=new Intent(this,DownloadService.class).setAction(action);if(key!=null)intent.putExtra("key",key);startService(intent);}
 
     private void render(){
-        if(queue==null)return;List<Store.Task> tasks=store.snapshot();int completed=0,failed=0;long speed=0;Store.Task active=null;
+        if(queue==null)return;List<Store.Task> tasks=store.snapshot();int completed=0,failed=0,active=0;long speed=0;
         Set<String> visible=new HashSet<>();
         for(int i=0;i<tasks.size();i++){
-            Store.Task task=tasks.get(i);if(task.status.equals("done"))completed++;if(task.status.equals("failed"))failed++;if(task.status.equals("running")||task.status.equals("resetting")){active=task;speed=task.speed;}
+            Store.Task task=tasks.get(i);if(task.status.equals("done"))completed++;if(task.status.equals("failed"))failed++;if(task.status.equals("running")||task.status.equals("resetting")){active++;speed+=task.speed;}
             if(i>=limit)continue;visible.add(task.key);Row row=rows.get(task.key);if(row==null){row=new Row(task);rows.put(task.key,row);queue.addView(row.card);}
             row.title.setText("JM"+task.id+" · "+task.title);
             row.state.setText(Store.status(task.status)+" · "+(task.settings.format.equals("images")?"图片":task.settings.format.toUpperCase(Locale.ROOT))+" · "+task.progressText()+" · 重置 "+task.resets);
             row.state.setTextColor(task.status.equals("failed")?Color.rgb(180,35,54):task.status.equals("done")?ACCENT:MUTED);
             row.progress.setIndeterminate(task.status.equals("running")&&task.total==0);row.progress.setProgress((int)(DownloadDisplay.percent(task.done,task.total,task.status)*10));
-            row.phase.setText((task.status.equals("done")?"下载完成":task.phase)+"\n"+task.sizeText()+(task.status.equals("running")||task.status.equals("resetting")?"\n"+task.etaText():""));row.open.setVisibility(task.resultUri.isEmpty()?View.GONE:View.VISIBLE);
+            row.phase.setText((task.status.equals("done")?"下载完成":task.phase)+"\n"+task.sizeText()+(task.status.equals("running")||task.status.equals("resetting")?"\n"+DownloadDisplay.speed(task.speed)+" · "+task.etaText():""));row.open.setVisibility(task.resultUri.isEmpty()?View.GONE:View.VISIBLE);
         }
         Iterator<Map.Entry<String,Row>> iterator=rows.entrySet().iterator();while(iterator.hasNext()){Map.Entry<String,Row> entry=iterator.next();if(!visible.contains(entry.getKey())){queue.removeView(entry.getValue().card);iterator.remove();}}
         summary.setText("共 "+tasks.size()+" 本  ·  完成 "+completed+"  ·  失败 "+failed);
-        global.setText(active==null?(store.running?"正在启动…":store.note.isEmpty()?(completed>0&&completed==tasks.size()?"下载完成":"就绪 / 队列已停止"):store.note):"JM"+active.id+"  ·  "+DownloadDisplay.speed(speed));
+        global.setText(active==0?(store.running?"正在启动…":store.note.isEmpty()?(completed>0&&completed==tasks.size()?"下载完成":"就绪 / 队列已停止"):store.note):"同时下载 "+active+" 本 · 总速度 "+DownloadDisplay.speed(speed));
         start.setEnabled(!store.running);pause.setEnabled(store.running);more.setVisibility(tasks.size()>limit?View.VISIBLE:View.GONE);
     }
 
@@ -115,6 +115,7 @@ public final class MainActivity extends Activity {
     }
 
     private void retry(Store.Task task){
+        if(store.activeKeys.contains(task.key)){toast("旧请求正在结束，请稍后重试");return;}
         if(!Arrays.asList("failed","paused","cancelled").contains(task.status)){toast("仅失败、暂停或取消的任务可重试");return;}
         String outputUri=task.settings.outputUri,outputLabel=task.settings.outputLabel,format=task.settings.format;
         task.settings=new Store.Settings(store.settings.json());task.settings.outputUri=outputUri;task.settings.outputLabel=outputLabel;task.settings.format="images";
@@ -132,7 +133,7 @@ public final class MainActivity extends Activity {
     }
     private void confirmClear(Store.Task task){
         new AlertDialog.Builder(this).setTitle("清理此任务的图片缓存？").setMessage("已导出的文件保留。清理后再次重试需要重新下载图片。").setNegativeButton("返回",null).setPositiveButton("清理",(d,w)->{
-            try{File cache=store.cache(task);Downloader.deleteOwned(cache,cache.getParentFile());toast("缓存已清理");}catch(Exception error){showError(error.getMessage());}
+            try{if(store.activeKeys.contains(task.key)||task.status.equals("queued")||task.status.equals("running")||task.status.equals("resetting"))throw new IOException("请先暂停此任务并等待请求结束");File cache=store.cache(task);Downloader.deleteOwned(cache,cache.getParentFile());toast("缓存已清理");}catch(Exception error){showError(error.getMessage());}
         }).show();
     }
     private LibraryStore.Entry albumEntry(Store.Task task){return new LibraryStore.Entry(task.id,task.title,task.resultUri,task.settings.outputUri,task.settings.outputLabel,task.settings.format,false);}
@@ -166,20 +167,20 @@ public final class MainActivity extends Activity {
 
     private void settings(){
         LinearLayout form=column();form.setPadding(dp(20),dp(12),dp(20),dp(18));ScrollView scroll=new ScrollView(this);scroll.addView(form);
-        String[] names={"图片线程数（1–16）","请求超时 / 秒（5–120）","请求重试（0–5）","慢速阈值 / KB/s（0=仅检测停滞）","慢速观察窗口 / 秒（15–600）","无进度超时 / 秒（30–1800）","每本最大重置次数（0–10）"};
-        int[] values={store.settings.threads,store.settings.timeout,store.settings.retries,store.settings.slowKB,store.settings.window,store.settings.stall,store.settings.maxResets};
+        String[] names={"每个任务图片线程数（1–16）","请求超时 / 秒（5–120）","请求重试（0–5）","慢速阈值 / KB/s（0=仅检测停滞）","慢速观察窗口 / 秒（15–600）","无进度超时 / 秒（30–1800）","每本最大重置次数（0–10）","同时下载任务数（1–4，默认 2）"};
+        int[] values={store.settings.threads,store.settings.timeout,store.settings.retries,store.settings.slowKB,store.settings.window,store.settings.stall,store.settings.maxResets,store.settings.concurrentTasks};
         EditText[] fields=new EditText[names.length];
         for(int i=0;i<names.length;i++){form.addView(text(names[i],13,MUTED));fields[i]=edit("",true);fields[i].setText(Integer.toString(values[i]));form.addView(fields[i]);}
         CheckBox auto=new CheckBox(this);auto.setText("慢速 / 无进度时自动重连");auto.setChecked(store.settings.autoReset);form.addView(auto);
         form.addView(text("Cookie（可选，仅本次应用进程内保存）",13,MUTED));EditText cookie=edit("key=value; key2=value2",false);cookie.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);cookie.setText(store.cookie);form.addView(cookie);
-        form.addView(text("安卓默认 8 线程，可试 12；手机网络、内存和温度与电脑不同。速度统计为图片响应的接收字节，重试流量也计入。\n设置影响新任务和手动重试；已有任务保留原目录和格式。",12,MUTED));
+        form.addView(text("默认同时下载 2 本，每本 8 个图片线程；并行越多，流量和内存占用越高。速度统计为图片响应的接收字节，重试流量也计入。\n任务数保存后用于后续调度；调低不会中断已运行任务。\n其他设置影响新任务和手动重试；已有任务保留原目录和格式。",12,MUTED));
         form.addView(button("运行离线自检（不访问网站）",v->selfTest()));
         form.addView(button("查看本地使用说明",v->new AlertDialog.Builder(this).setTitle("使用说明").setMessage("1. 选择保存目录，添加编号或区间。\n2. 点击开始，图片按章节和页码保存，通知栏可暂停。\n3. 下载后在任务详情或漫画库选择“导出”，再选择 PDF、ZIP、命名方式与保存目录。\n4. 多章节 PDF 可统一导出或分章节导出，导出始终保留原始图片。\n5. 失败任务会保留已验证缓存，可修正后重试。\n6. 应用目录在卸载后会被删除，重要图片请选公共目录或导出备份。\n7. 导出和文件管理前请暂停下载，系统目录授权失效时需重新选择目录。").setPositiveButton("知道了",null).show()));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("下载设置").setView(scroll).setNegativeButton("返回",null).setPositiveButton("保存",null).create();
         dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             try{
                 int[] nums=new int[fields.length];for(int i=0;i<fields.length;i++)nums[i]=Integer.parseInt(fields[i].getText().toString().trim());
-                Store.Settings options=new Store.Settings(store.settings.json());options.threads=nums[0];options.timeout=nums[1];options.retries=nums[2];options.slowKB=nums[3];options.window=nums[4];options.stall=nums[5];options.maxResets=nums[6];options.autoReset=auto.isChecked();options.keepImages=false;options.numericFilename=false;options.flatZip=false;options.format="images";options.validate();
+                Store.Settings options=new Store.Settings(store.settings.json());options.threads=nums[0];options.timeout=nums[1];options.retries=nums[2];options.slowKB=nums[3];options.window=nums[4];options.stall=nums[5];options.maxResets=nums[6];options.concurrentTasks=nums[7];options.autoReset=auto.isChecked();options.keepImages=false;options.numericFilename=false;options.flatZip=false;options.format="images";options.validate();
                 String secret=cookie.getText().toString().trim();if(secret.contains("\n")||secret.contains("\r")||(!secret.isEmpty()&&!secret.contains("=")))throw new IllegalArgumentException("Cookie 格式应为 key=value; key2=value2，不能包含换行");
                 store.settings=options;store.cookie=secret;store.save();toast("设置已保存");dialog.dismiss();
             }catch(Exception error){showError(error instanceof NumberFormatException?"参数必须是整数":error.getMessage());}
