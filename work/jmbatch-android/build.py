@@ -67,6 +67,9 @@ run(java,'-cp',testout,'DownloadDisplayTest')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/DownloadPool.java',ROOT/'tests/DownloadPoolTest.java')
 run(java,'-cp',testout,'DownloadPoolTest')
 
+run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/ResumeCache.java',ROOT/'tests/ResumeCacheTest.java')
+run(java,'-Djava.awt.headless=true','-cp',testout,'ResumeCacheTest',testroot/'resume-cache')
+
 run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/AlbumRules.java',ROOT/'tests/AlbumTest.java')
 run(java,'-Djava.awt.headless=true','-cp',testout,'AlbumTest',testroot/'album-output')
 

@@ -112,8 +112,9 @@ public final class DownloadService extends Service {
             try{
                 while(true){
                     JmApi.Control attempt=attempt();if(attempt==null){stopped();break;}
-                    task.status="running";task.done=0;task.total=0;task.cached=0;task.speed=0;task.bytes=0;
-                    task.imageBytes=0;task.resultBytes=0;task.downloadStarted=0;task.stage="metadata";saveQuietly();
+                    // Retain the last snapshot until the cache scan has reconciled it.
+                    task.status="running";task.speed=0;task.bytes=0;
+                    task.resultBytes=0;task.downloadStarted=0;task.stage="metadata";saveQuietly();
                     try{
                         String result=new Downloader(DownloadService.this,store,task,attempt,store.cookie).run();
                         // Keep an already committed output successful if cancellation arrived just after publishing it.

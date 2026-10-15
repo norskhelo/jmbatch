@@ -252,7 +252,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(len(observed), 5)
         self.assertEqual(len(set(observed)), 1)
         metrics = next(event["metrics"] for event in events if event["type"] == "metrics")
-        self.assertEqual(set(metrics["stages"]), {"startup", "metadata", "download", "verify", "export"})
+        self.assertEqual(set(metrics["stages"]), {"startup", "metadata", "cache", "download", "verify", "export"})
         self.assertGreater(metrics["total_seconds"], 0)
         self.assertGreater(metrics["downloaded_image_bytes"], 0)
 

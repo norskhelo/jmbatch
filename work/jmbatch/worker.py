@@ -113,6 +113,7 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
             self.chapter_numbers = {}
             self.expected_chapters = {}
             self.failed_pages = []
+            self.verified_cache = set()
 
         def create_client(self):
             return client_factory() if client_factory else self.option.new_jm_client(domain_retry_strategy=route_strategy)
@@ -133,7 +134,8 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
                 self.expected_chapters[index] = len(photo)
                 self.expected += len(photo)
                 emit({"type": "metadata", "message": f"读取章节 {index}/{len(photos)}"})
-            emit({"type": "phase", "phase": "download", "message": "正在下载图片", "total": self.expected})
+            self.restore_cache(photos)
+            emit({"type": "phase", "phase": "download", "message": f"继续下载剩余 {self.expected - self.completed} 张图片", "total": self.expected})
             for photo in photos:
                 self.download_by_photo_detail(photo)
             if len(self.failed_pages) == 1:
@@ -167,6 +169,52 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
                 positions = "、".join(f"第 {self.chapter_numbers[str(im.from_photo.id)]} 章第 {im.index} 页" for im, _ in self.failed_pages[:5])
                 raise IOError(f"{len(self.failed_pages)} 页下载失败：{positions}；{self.failed_pages[0][1]}；已保留成功图片，未生成成品")
             self.after_album(album)
+
+        def restore_cache(self, photos):
+            # Cache validation is local work, not a slow network transfer. Publish a
+            # single reconciled snapshot so resumed progress never counts from zero.
+            emit({"type": "phase", "phase": "cache", "message": "正在校验已有图片，保留原进度"})
+            checked = 0
+            last_update = time.monotonic()
+            for photo in photos:
+                chapter = self.chapter_numbers[str(photo.id)]
+                for page in range(1, len(photo) + 1):
+                    target = cache / "images" / f"{chapter:04d}" / f"{page:05d}.jpg"
+                    if target.is_file():
+                        try:
+                            verify_image(target)
+                        except (OSError, ValueError, SyntaxError):
+                            pass  # Missing/broken images are repaired by the download path.
+                        else:
+                            self.verified_cache.add((chapter, page))
+                            self.entries.append({"chapter": chapter, "page": page, "path": str(target)})
+                            self.image_bytes += target.stat().st_size
+                    checked += 1
+                    now = time.monotonic()
+                    if now - last_update >= .25 or checked == self.expected:
+                        emit({"type": "metadata", "message": f"校验已有图片 {checked}/{self.expected}，已确认 {len(self.verified_cache)} 张可复用"})
+                        last_update = now
+            self.completed = self.cached_count = len(self.verified_cache)
+            emit({"type": "progress", "done": self.completed, "total": self.expected,
+                  "cached": self.cached_count, "bytes": 0, "image_bytes": self.image_bytes,
+                  "message": f"已恢复 {self.completed}/{self.expected} 张图片，只下载缺失或损坏页"})
+
+        def do_filter(self, detail):
+            if not detail.is_photo():
+                return super().do_filter(detail)
+            chapter = self.chapter_numbers[str(detail.id)]
+            pending = []
+            for image in detail:
+                if (chapter, image.index) not in self.verified_cache:
+                    pending.append(image)
+                    continue
+                # Preserve jmcomic's success bookkeeping without scheduling cached pages.
+                target = cache / "images" / f"{chapter:04d}" / f"{image.index:05d}.jpg"
+                image.save_path = str(target)
+                image.cache = image.exists = True
+                self.before_image(image, str(target))
+                self.after_image(image, str(target))
+            return pending
 
         def download_by_image_detail(self, image):
             try:

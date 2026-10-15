@@ -40,6 +40,8 @@ def eta_text(status, stage, done, total, cached, elapsed, speed, now=None):
     if status != "running":
         return {"done": "下载完成", "paused": "已暂停", "resetting": "重连后重新估算",
                 "failed": "下载失败", "cancelled": "已取消"}.get(status, "等待下载")
+    if stage == "cache":
+        return "正在校验已有图片，完成后继续下载"
     if total > 0 and done >= total or stage in ("verify", "export"):
         return "正在校验 / 导出，预计完成时间待定"
     if stage == "page_retry":

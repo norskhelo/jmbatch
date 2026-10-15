@@ -36,6 +36,7 @@ public final class DownloadDisplay {
                 default: return "等待下载";
             }
         }
+        if (stage.equals("cache")) return "正在校验已有图片，完成后继续下载";
         if (total > 0 && done >= total || stage.equals("verify") || stage.equals("export")) return "正在校验 / 导出，预计完成时间待定";
         if (stage.equals("page_retry")) return "正在重试失败页，预计完成时间待定";
         if (!stage.equals("download") || done <= cached || total <= 0 || elapsed <= 0 || speed <= 0) return "预计完成时间：计算中";

@@ -84,19 +84,30 @@ public final class Downloader {
                 if (jobs.size() > 20000) throw new IOException("单本超过 20000 张图片，请拆分任务");
             }
         }
-        task.total = jobs.size(); task.done = 0; task.cached = 0; task.bytes = 0; task.imageBytes = 0;
+        task.stage = control.stage = "cache"; task.speed = 0;
+        task.phase = "正在校验已有图片，保留原进度";
+        ResumeCache.Result<ImageJob> restored = ResumeCache.scan(jobs, control::check,
+            job -> job.target.isFile() && validImage(job.target) ? job.target.length() : -1,
+            (checked, total, cached) -> {
+                control.lastData = SystemClock.elapsedRealtime();
+                task.phase = "校验已有图片 " + checked + "/" + total + "，已确认 " + cached + " 张可复用";
+            });
+        synchronized (task) {
+            task.total = jobs.size(); task.done = task.cached = restored.cached;
+            task.bytes = 0; task.imageBytes = restored.imageBytes;
+        }
         task.stage = control.stage = "download"; task.downloadStarted = control.lastData = SystemClock.elapsedRealtime();
-        task.phase = "正在下载图片";
+        task.phase = "已恢复 " + task.done + "/" + task.total + " 张图片，继续下载剩余 " + restored.pending.size() + " 张";
         ExecutorService pool = Executors.newFixedThreadPool(task.settings.threads);
         CompletionService<SinglePageRecovery.Failure<ImageJob>> completion = new ExecutorCompletionService<>(pool);
         List<SinglePageRecovery.Failure<ImageJob>> failed = new ArrayList<>();
         boolean collected = false;
         try {
-            for (ImageJob job : jobs) completion.submit(() -> {
+            for (ImageJob job : restored.pending) completion.submit(() -> {
                 try { downloadImage(api, job, 0); return null; }
                 catch (Exception error) { control.check(); return new SinglePageRecovery.Failure<>(job,error,"第 "+job.chapter+" 章第 "+job.page+" 页"); }
             });
-            for (int i = 0; i < jobs.size(); i++) { control.check(); SinglePageRecovery.Failure<ImageJob> failure=completion.take().get(); if(failure!=null)failed.add(failure); }
+            for (int i = 0; i < restored.pending.size(); i++) { control.check(); SinglePageRecovery.Failure<ImageJob> failure=completion.take().get(); if(failure!=null)failed.add(failure); }
             collected = true;
         } finally {
             pool.shutdownNow();

@@ -157,9 +157,9 @@ class Engine:
         state = WorkerState(task)
         self.active[task.key] = state
         task.status = "running"
-        task.phase = "正在启动下载进程"
-        task.done = task.cached = 0
-        task.total = task.image_bytes = task.result_bytes = 0
+        task.phase = "正在恢复下载，保留原进度" if task.done else "正在启动下载进程"
+        # Keep the persisted snapshot until the worker reconciles actual cache files.
+        task.result_bytes = 0
         state.download_started = 0
         task.error = ""
         task.metrics = {}
@@ -234,7 +234,7 @@ class Engine:
             except OSError as exc:
                 self.notify(f"文件已下载，但漫画列表保存失败：{exc}")
             if task.metrics:
-                labels = {"startup": "准备", "metadata": "连接/元数据", "download": "图片下载与处理", "verify": "导出前校验", "export": "导出与清理"}
+                labels = {"startup": "准备", "metadata": "连接/元数据", "cache": "已有图片校验", "download": "图片下载与处理", "verify": "导出前校验", "export": "导出与清理"}
                 stages = task.metrics.get("stages", {})
                 text = "，".join(f"{labels.get(key, key)} {seconds:.2f}s" for key, seconds in stages.items())
                 self.notify(f"JM{task.album_id} 本轮耗时 {task.metrics['total_seconds']:.2f}s：{text}")

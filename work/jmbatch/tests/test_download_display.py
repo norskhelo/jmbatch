@@ -32,3 +32,5 @@ class DownloadDisplayTests(unittest.TestCase):
         self.assertIn("计算中", eta_text("running", "download", 15, 20, 10, 10, 0, 0))
         self.assertIn("导出", eta_text("running", "export", 20, 20, 10, 10, 2048, 0))
         self.assertIn("重试", eta_text("running", "page_retry", 19, 20, 10, 10, 2048, 0))
+        self.assertIn("校验已有图片", eta_text("running", "cache", 15, 20, 10, 10, 2048, 0))
+        self.assertNotIn("约剩", eta_text("running", "cache", 15, 20, 10, 10, 2048, 0))

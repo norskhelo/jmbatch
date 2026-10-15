@@ -23,6 +23,8 @@ public class DownloadDisplayTest {
         check(DownloadDisplay.eta("running", "download", 15, 20, 10, 10, 0, 0).contains("计算中"), "stalled");
         check(DownloadDisplay.eta("running", "export", 20, 20, 10, 10, 2048, 0).contains("导出"), "export phase");
         check(DownloadDisplay.eta("running", "page_retry", 19, 20, 10, 10, 2048, 0).contains("重试"), "page recovery");
+        String scanning = DownloadDisplay.eta("running", "cache", 15, 20, 10, 10, 2048, 0);
+        check(scanning.contains("校验已有图片") && !scanning.contains("约剩"), "cache validation is not downloading");
         System.out.println("DownloadDisplayTest: " + checks + " checks passed");
     }
 }
