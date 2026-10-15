@@ -19,8 +19,8 @@ public final class AlbumStorage {
         Node(String n, Uri u, boolean d, long s) { name=n;uri=u;directory=d;size=s; }
     }
     public static final class Image {
-        public final int chapter,page; public final Uri uri; public final long size;
-        Image(int c,int p,Uri u,long s){chapter=c;page=p;uri=u;size=s;}
+        public final int chapter,page; public final Uri uri; public final long size; public final String file;
+        Image(int c,int p,Uri u,long s,String f){chapter=c;page=p;uri=u;size=s;file=f;}
     }
     public static final class Album {
         public final String id,title; public final List<Image> images;
@@ -63,25 +63,67 @@ public final class AlbumStorage {
         Node found=null;for(Node node:children(context,parent))if(node.name.equals(name)){if(found!=null)throw new IOException("目录含同名文件");found=node;}
         if(found==null)throw new FileNotFoundException(name);return found;
     }
+    private static File index(Context context,Uri folder)throws Exception {
+        byte[] digest=java.security.MessageDigest.getInstance("SHA-256").digest(folder.toString().getBytes(StandardCharsets.UTF_8));
+        StringBuilder name=new StringBuilder();for(byte b:digest)name.append(String.format(Locale.ROOT,"%02x",b&255));
+        return new File(new File(context.getFilesDir(),"albums"),name+".json");
+    }
+    public static void remember(Context context,Uri folder,JSONObject metadata)throws Exception {
+        File file=index(context,folder);if(!file.getParentFile().isDirectory()&&!file.getParentFile().mkdirs()&&!file.getParentFile().isDirectory())throw new IOException("无法保存图片索引");
+        Downloader.writeTextAtomic(file,metadata.toString());
+    }
+    private static JSONObject scan(Context context,Uri folder)throws Exception {
+        File local=local(context,folder);String name;
+        if(local!=null)name=local.getName();
+        else try(Cursor c=context.getContentResolver().query(folder,new String[]{"_display_name"},null,null,null)){
+            if(c==null||!c.moveToFirst())throw new IOException("无法读取图片目录名称");name=c.getString(0);
+        }
+        java.util.regex.Matcher match=java.util.regex.Pattern.compile("JM([0-9]{1,10})-(.*)-[0-9a-f]{8}").matcher(name);
+        if(!match.matches())throw new IOException("无法识别图片目录名称");
+        JSONArray records=new JSONArray();Map<Integer,SortedSet<Integer>> order=new TreeMap<>();
+        for(Node node:children(context,folder)){
+            if(!node.directory&&node.name.matches("[0-9]{5,}\\.jpg"))scanImage(context,records,order,node,1,node.name);
+            else if(node.directory&&node.name.matches("[0-9]{4,}"))for(Node image:children(context,node.uri))
+                if(!image.directory&&image.name.matches("[0-9]{5,}\\.jpg"))scanImage(context,records,order,image,Integer.parseInt(node.name),node.name+"/"+image.name);
+        }
+        int chapter=0;for(Map.Entry<Integer,SortedSet<Integer>> group:order.entrySet()){
+            if(group.getKey()!=++chapter)throw new IOException("章节不连续");int page=0;for(int p:group.getValue())if(p!=++page)throw new IOException("页码不连续");
+        }
+        return new JSONObject().put("version",AlbumRules.LAYOUT_VERSION).put("id",match.group(1)).put("title",match.group(2)).put("entries",records);
+    }
+    private static void scanImage(Context context,JSONArray records,Map<Integer,SortedSet<Integer>> order,Node image,int chapter,String relative)throws Exception {
+        int page=Integer.parseInt(image.name.substring(0,image.name.length()-4));
+        if(!order.computeIfAbsent(chapter,k->new TreeSet<>()).add(page)||records.length()>=20000)throw new IOException("图片数量或页码无效");
+        long size=image.size;if(size<0){size=0;try(InputStream in=open(context,image.uri)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)size+=n;}}
+        records.put(new JSONObject().put("chapter",chapter).put("page",page).put("file",relative).put("size",size));
+    }
     public static Album load(Context context,Uri folder)throws Exception {
-        Node marker=child(context,folder,AlbumRules.MANIFEST);
-        if(marker.directory||marker.size>8*1024*1024)throw new IOException("图片清单无效");
-        ByteArrayOutputStream buffer=new ByteArrayOutputStream();
-        try(InputStream in=open(context,marker.uri)){byte[] bytes=new byte[8192];int n;while((n=in.read(bytes))!=-1){buffer.write(bytes,0,n);if(buffer.size()>8*1024*1024)throw new IOException("图片清单过大");}}
-        JSONObject json=new JSONObject(buffer.toString("UTF-8"));
-        String id=json.getString("id");if(json.getInt("version")!=1||!id.matches("[0-9]{1,10}"))throw new IOException("图片清单版本无效");
+        Node marker=null;for(Node node:children(context,folder))if(node.name.equals(AlbumRules.MANIFEST)){if(marker!=null)throw new IOException("重复图片清单");marker=node;}
+        File stored=index(context,folder);JSONObject json;
+        if(marker!=null){
+            if(marker.directory||marker.size>8*1024*1024)throw new IOException("图片清单无效");
+            ByteArrayOutputStream buffer=new ByteArrayOutputStream();
+            try(InputStream in=open(context,marker.uri)){byte[] bytes=new byte[8192];int n;while((n=in.read(bytes))!=-1){buffer.write(bytes,0,n);if(buffer.size()>8*1024*1024)throw new IOException("图片清单过大");}}
+            json=new JSONObject(buffer.toString("UTF-8"));
+        }else if(stored.isFile()){
+            if(stored.length()>8*1024*1024)throw new IOException("图片索引过大");json=new JSONObject(new String(Files.readAllBytes(stored.toPath()),StandardCharsets.UTF_8));
+        }else json=scan(context,folder);
+        int version=json.getInt("version");String id=json.getString("id");if((version!=1&&version!=AlbumRules.LAYOUT_VERSION)||!id.matches("[0-9]{1,10}"))throw new IOException("图片清单版本无效");
         JSONArray entries=json.getJSONArray("entries");List<Image> images=new ArrayList<>();Set<String> seen=new HashSet<>();Map<Integer,Map<String,Node>> chapters=new HashMap<>();
         if(entries.length()==0||entries.length()>20000)throw new IOException("图片数量无效");
+        Set<Integer> chapterIds=new HashSet<>();for(int i=0;i<entries.length();i++)chapterIds.add(entries.getJSONObject(i).getInt("chapter"));
+        boolean flat=version==AlbumRules.LAYOUT_VERSION&&chapterIds.size()==1;
         for(int i=0;i<entries.length();i++){
-            JSONObject item=entries.getJSONObject(i);int c=item.getInt("chapter"),p=item.getInt("page");String name=AlbumRules.imageName(c,p);
+            JSONObject item=entries.getJSONObject(i);int c=item.getInt("chapter"),p=item.getInt("page");String name=version==1?AlbumRules.imageName(c,p):AlbumRules.imageName(c,p,chapterIds.size());
             if(!name.equals(item.getString("file"))||!seen.add(name))throw new IOException("图片顺序或路径无效");
             if(!chapters.containsKey(c)){
-                Node chapter=child(context,folder,name.split("/")[0]);if(!chapter.directory)throw new IOException("章节不是目录");
-                Map<String,Node> nodes=new HashMap<>();for(Node n:children(context,chapter.uri))if(nodes.put(n.name,n)!=null)throw new IOException("章节有同名文件");chapters.put(c,nodes);
+                Uri directory=folder;
+                if(!flat){Node chapter=child(context,folder,name.split("/")[0]);if(!chapter.directory)throw new IOException("章节不是目录");directory=chapter.uri;}
+                Map<String,Node> nodes=new HashMap<>();for(Node n:children(context,directory))if(nodes.put(n.name,n)!=null)throw new IOException("章节有同名文件");chapters.put(c,nodes);
             }
-            Node image=chapters.get(c).get(name.split("/")[1]);long size=item.getLong("size");
+            Node image=chapters.get(c).get(flat?name:name.split("/")[1]);long size=item.getLong("size");
             if(image==null||image.directory||size<=0||image.size>=0&&image.size!=size)throw new IOException("图片缺失或大小变化："+name);
-            images.add(new Image(c,p,image.uri,size));
+            images.add(new Image(c,p,image.uri,size,name));
         }
         images.sort(Comparator.comparingInt((Image i)->i.chapter).thenComparingInt(i->i.page));return new Album(id,json.getString("title"),images);
     }
@@ -137,10 +179,11 @@ public final class AlbumStorage {
         File file=local(context,uri);if(file!=null)Downloader.deleteOwned(file,root(context));else if(!DocumentsContract.deleteDocument(context.getContentResolver(),uri))throw new IOException("删除失败");
     }
     public static void validateForDeletion(Context context,Uri folder)throws Exception {
-        Album album=load(context,folder);Map<String,Set<String>> allowed=new HashMap<>();
-        for(Image image:album.images){String[] path=AlbumRules.imageName(image.chapter,image.page).split("/");allowed.computeIfAbsent(path[0],k->new HashSet<>()).add(path[1]);}
+        Album album=load(context,folder);Map<String,Set<String>> allowed=new HashMap<>();Set<String> flat=new HashSet<>();
+        for(Image image:album.images){String[] path=image.file.split("/");if(path.length==1)flat.add(path[0]);else allowed.computeIfAbsent(path[0],k->new HashSet<>()).add(path[1]);}
         for(Node node:children(context,folder)){
             if(node.name.equals(AlbumRules.MANIFEST)&&!node.directory)continue;
+            if(!node.directory&&flat.contains(node.name))continue;
             if(!node.directory||!allowed.containsKey(node.name))throw new IOException("图片目录含额外文件，已停止删除");
             for(Node image:children(context,node.uri))if(image.directory||!allowed.get(node.name).contains(image.name))throw new IOException("章节内含额外文件，已停止删除");
         }

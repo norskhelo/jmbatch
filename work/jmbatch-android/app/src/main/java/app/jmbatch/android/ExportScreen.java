@@ -30,9 +30,9 @@ public final class ExportScreen {
         TextView hint=new TextView(activity);hint.setText("导出保留原始图片，可重复导出。多章节 PDF 可合并为一本或每章一个文件。");form.addView(hint);
         RadioGroup formats=new RadioGroup(activity);RadioButton pdf=new RadioButton(activity),zip=new RadioButton(activity);pdf.setId(android.view.View.generateViewId());zip.setId(android.view.View.generateViewId());pdf.setText("PDF");zip.setText("ZIP 图片包");formats.addView(pdf);formats.addView(zip);formats.check(pdf.getId());form.addView(formats);
         CheckBox numeric=new CheckBox(activity);numeric.setText("文件名仅编号（分章节时附章节序号）");form.addView(numeric);
-        CheckBox flat=new CheckBox(activity);flat.setText("单章节 ZIP 图片平铺；多章节分目录，不含信息文件");flat.setEnabled(false);form.addView(flat);
+        TextView layout=new TextView(activity);layout.setText("ZIP：单章节图片平铺，多章节分目录；仅包含图片。");form.addView(layout);
         CheckBox split=new CheckBox(activity);split.setText("PDF 分章节导出（不勾选则统一导出）");form.addView(split);
-        formats.setOnCheckedChangeListener((g,id)->{flat.setEnabled(id==zip.getId());split.setEnabled(id==pdf.getId());});
+        formats.setOnCheckedChangeListener((g,id)->split.setEnabled(id==pdf.getId()));
         destination=new TextView(activity);destination.setText(label);form.addView(destination);
         Button choose=new Button(activity);choose.setText("选择导出目录");choose.setOnClickListener(v->{pending=this;try{activity.startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION|Intent.FLAG_GRANT_PREFIX_URI_PERMISSION),DIRECTORY_REQUEST);}catch(Exception e){pending=null;error("系统目录选择器不可用");}});form.addView(choose);
         Button app=new Button(activity);app.setText("导出到应用目录");app.setOnClickListener(v->{tree="";label="应用下载目录";destination.setText(label);});form.addView(app);
@@ -41,7 +41,7 @@ public final class ExportScreen {
         dialog.setOnDismissListener(d->{if(pending==this)pending=null;});
         dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             synchronized(store){if(store.running||store.libraryBusy){error("请先暂停下载，并等待其他文件操作完成");return;}for(Store.Task t:store.snapshot())if(t.status.equals("running")||t.status.equals("resetting")){error("下载正在停止，请稍后重试");return;}store.libraryBusy=true;}
-            String format=pdf.isChecked()?"pdf":"zip",outputTree=tree,outputLabel=label;boolean numbered=numeric.isChecked(),flatten=flat.isChecked(),separate=split.isChecked();dialog.dismiss();
+            String format=pdf.isChecked()?"pdf":"zip",outputTree=tree,outputLabel=label;boolean numbered=numeric.isChecked(),flatten=true,separate=split.isChecked();dialog.dismiss();
             AtomicBoolean cancelled=new AtomicBoolean();ProgressDialog progress=new ProgressDialog(activity);progress.setTitle("导出漫画");progress.setMessage("正在读取原始图片…");progress.setCancelable(false);progress.setButton(DialogInterface.BUTTON_NEGATIVE,"取消",(x,w)->cancelled.set(true));progress.show();
             new Thread(()->{
                 String result;

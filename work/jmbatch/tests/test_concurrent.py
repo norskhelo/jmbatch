@@ -118,7 +118,9 @@ class ConcurrentQueueTests(unittest.TestCase):
         self.assertEqual([t.status for t in (a, b, c)], ['done'] * 3)
         self.assertEqual(len({t.result for t in (a, b, c)}), 3)
         for task in (a, b, c):
-            self.assertTrue((Path(task.result) / '.jmbatch-album.json').is_file())
+            from albums import read_album
+            self.assertFalse((Path(task.result) / '.jmbatch-album.json').exists())
+            self.assertEqual(len(read_album(task.result)[1]), 5)
             self.assertEqual(task.done, 5)
         recovered = Engine(self.root / 'state')
         self.assertEqual([t.result for t in recovered.tasks], [t.result for t in self.engine.tasks])

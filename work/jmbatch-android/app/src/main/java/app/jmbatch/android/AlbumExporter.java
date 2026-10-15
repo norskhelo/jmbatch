@@ -39,9 +39,9 @@ public final class AlbumExporter {
                             check.run();AlbumStorage.Image image=images.get(i);zip.putNextEntry(new ZipEntry(Core.zipImageName(flat,chapters.size(),i+1,image.chapter,image.page)));
                             try(InputStream in=new FileInputStream(files.get(i))){AlbumStorage.copy(in,zip,check);}zip.closeEntry();progress.accept("打包图片 "+(i+1)+"/"+images.size());
                         }
-                        if(!flat){zip.putNextEntry(new ZipEntry("下载信息.json"));zip.write(new org.json.JSONObject().put("id",album.id).put("title",album.title).put("images",images.size()).toString().getBytes(StandardCharsets.UTF_8));zip.closeEntry();}
                     }
                     try(ZipFile zip=new ZipFile(output)){
+                        if(zip.size()!=images.size())throw new IOException("ZIP 文件数量不一致");
                         Enumeration<? extends ZipEntry> entries=zip.entries();while(entries.hasMoreElements()){ZipEntry entry=entries.nextElement();CRC32 crc=new CRC32();try(InputStream in=zip.getInputStream(entry)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1){check.run();crc.update(b,0,n);}}if(crc.getValue()!=entry.getCrc())throw new IOException("ZIP 校验失败");}
                     }
                 }

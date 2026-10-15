@@ -32,6 +32,32 @@ public class AlbumTest {
             check(new String(Files.readAllBytes(pdf.toPath()),StandardCharsets.ISO_8859_1).contains("/Count "+group.getValue().size()),"split chapter page count");
         }
         check(all.stream().allMatch(page->page.jpeg.isFile()),"original images remain");
+        for(int chapters:new int[]{1,2}){
+            File album=new File(root,"clean-"+chapters);album.mkdirs();List<String> expected=new ArrayList<>();
+            for(int c=1;c<=chapters;c++)for(int p=1;p<=2;p++){
+                String name=AlbumRules.imageName(c,p,chapters);File image=new File(album,name);image.getParentFile().mkdirs();
+                ImageIO.write(new BufferedImage(12,16,BufferedImage.TYPE_INT_RGB),"jpg",image);
+                expected.add(chapters==1?String.format("%05d.jpg",p):String.format("%04d/%05d.jpg",c,p));
+            }
+            List<String> actual=new ArrayList<>();try(java.util.stream.Stream<java.nio.file.Path> paths=Files.walk(album.toPath())){
+                paths.filter(Files::isRegularFile).forEach(p->actual.add(album.toPath().relativize(p).toString().replace('\\','/')));
+            }
+            Collections.sort(actual);check(actual.equals(expected),"image-only directory tree "+chapters);
+            for(boolean legacyFlat:new boolean[]{false,true}){
+                File zipped=new File(root,"clean-"+chapters+"-"+legacyFlat+".zip");
+                try(java.util.zip.ZipOutputStream out=new java.util.zip.ZipOutputStream(new FileOutputStream(zipped))){
+                    int sequence=0;for(int c=1;c<=chapters;c++)for(int p=1;p<=2;p++){
+                        out.putNextEntry(new java.util.zip.ZipEntry(Core.zipImageName(legacyFlat,chapters,++sequence,c,p)));
+                        try(InputStream in=new FileInputStream(new File(album,AlbumRules.imageName(c,p,chapters)))){Core.copy(in,out);}out.closeEntry();
+                    }
+                }
+                try(java.util.zip.ZipFile zip=new java.util.zip.ZipFile(zipped)){
+                    List<String> names=new ArrayList<>();Enumeration<? extends java.util.zip.ZipEntry> entries=zip.entries();
+                    while(entries.hasMoreElements()){java.util.zip.ZipEntry entry=entries.nextElement();names.add(entry.getName());try(InputStream in=zip.getInputStream(entry)){check(ImageIO.read(in)!=null,"clean archive image readable");}}
+                    check(names.equals(expected),"ZIP matches directory without metadata "+chapters+" "+legacyFlat);
+                }
+            }
+        }
         System.out.println("AlbumTest: "+checks+" checks passed");
     }
 }

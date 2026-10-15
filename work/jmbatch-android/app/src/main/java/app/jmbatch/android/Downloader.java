@@ -37,14 +37,13 @@ public final class Downloader {
             try {
                 JSONObject finished = new JSONObject(readText(marker)); Uri uri = Uri.parse(finished.getString("uri"));
                 if(task.settings.format.equals("images")) {
-                    if(!finished.optString("format").equals("images"))throw new IOException("旧版成品需重新保存图片");
+                    if(!finished.optString("format").equals("images")||finished.optInt("albumLayoutVersion")!=AlbumRules.LAYOUT_VERSION)throw new IOException("旧版成品需重新保存图片");
                     AlbumStorage.Album album=AlbumStorage.load(context,uri);task.total=task.done=album.images.size();task.resultBytes=0;
                     for(AlbumStorage.Image image:album.images)task.resultBytes+=image.size;
                     return uri.toString();
                 }
                 if (finished.optBoolean("numericFilename", false) != task.settings.numericFilename ||
-                    (task.settings.format.equals("zip") && (finished.optBoolean("flatZip", false) != task.settings.flatZip ||
-                    (task.settings.flatZip && finished.optInt("zipLayoutVersion", 0) != Core.ZIP_LAYOUT_VERSION)))) throw new IOException("导出设置已变化");
+                    (task.settings.format.equals("zip") && finished.optInt("zipLayoutVersion", 0) != Core.ZIP_LAYOUT_VERSION)) throw new IOException("导出设置已变化");
                 try (InputStream input = context.getContentResolver().openInputStream(uri)) {
                     if (input != null && input.read() >= 0) {
                         task.total = task.done = finished.getInt("images");
@@ -128,16 +127,17 @@ public final class Downloader {
             try {
                 JSONArray entries=new JSONArray();
                 for(ImageJob job:jobs){
-                    control.check();String relative=AlbumRules.imageName(job.chapter,job.page);File target=new File(staging,relative);
+                    control.check();String relative=AlbumRules.imageName(job.chapter,job.page,chapterIds.size());File target=new File(staging,relative);
                     if(!target.getParentFile().exists()&&!target.getParentFile().mkdirs())throw new IOException("无法创建章节目录");
                     Files.copy(job.target.toPath(),target.toPath());
                     entries.put(new JSONObject().put("chapter",job.chapter).put("page",job.page).put("file",relative).put("size",target.length()));
                 }
-                writeTextAtomic(new File(staging,AlbumRules.MANIFEST),new JSONObject().put("version",1).put("id",task.id).put("title",task.title).put("entries",entries).toString());
                 String filename=Core.outputName(task.id,task.title,"images",false);String folderName=filename.substring(0,filename.length()-7);
                 String uri=AlbumStorage.publish(context,staging,task.settings.outputUri,folderName,control::check).toString();
+                AlbumStorage.remember(context,Uri.parse(uri),new JSONObject().put("version",AlbumRules.LAYOUT_VERSION).put("id",task.id).put("title",task.title).put("entries",entries));
+                AlbumStorage.load(context,Uri.parse(uri));
                 task.resultBytes=totalSize;
-                writeTextAtomic(marker,new JSONObject().put("uri",uri).put("images",jobs.size()).put("format","images").put("resultBytes",totalSize).toString());
+                writeTextAtomic(marker,new JSONObject().put("uri",uri).put("images",jobs.size()).put("format","images").put("resultBytes",totalSize).put("albumLayoutVersion",AlbumRules.LAYOUT_VERSION).toString());
                 if(!task.settings.keepImages)try{deleteOwned(new File(cache,"images"),cache);}catch(IOException ignored){}
                 return uri;
             } finally { if(staging.exists())deleteOwned(staging,cache); }
@@ -157,13 +157,9 @@ public final class Downloader {
                     try (InputStream input = new FileInputStream(job.target)) { copyChecked(input, zip); }
                     zip.closeEntry();
                 }
-                if (!task.settings.flatZip) {
-                zip.putNextEntry(new ZipEntry("下载信息.json"));
-                zip.write(new JSONObject().put("id", task.id).put("title", task.title).put("images", jobs.size()).toString(2).getBytes(StandardCharsets.UTF_8)); zip.closeEntry();
-                }
             }
             try (ZipFile zip = new ZipFile(partial)) {
-                if (zip.size() != jobs.size() + (task.settings.flatZip ? 0 : 1)) throw new IOException("ZIP 文件数量不一致");
+                if (zip.size() != jobs.size()) throw new IOException("ZIP 文件数量不一致");
                 Enumeration<? extends ZipEntry> entries = zip.entries();
                 while (entries.hasMoreElements()) {
                     control.check(); ZipEntry entry = entries.nextElement(); CRC32 crc = new CRC32();

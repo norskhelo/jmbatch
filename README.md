@@ -2,19 +2,19 @@
 
 支持 Windows 和 Android 的批量漫画下载工具。下载默认保存排序图片；需要 PDF 或 ZIP 时，在下载完成后单独导出。
 
-当前源码及正式版本：**Windows 0.2.3 / Android 0.3.3（versionCode 303）**。本版支持多个下载任务同时进行，默认 2 个，可在下载设置中调整为 1–4 个；每本图片线程数独立设置。安装包、更新日志与镜像入口见下方。
+当前源码及正式版本：**Windows 0.2.4 / Android 0.3.4（versionCode 304）**。本版统一图片文件夹和 ZIP 结构：单章节图片平铺，多章节分目录；成品不含下载信息文件。安装包、更新日志与镜像入口见下方。
 
 ## 下载安装包（含国内镜像）
 
 GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
 
-当前正式版为 **Windows 0.2.3 / Android 0.3.3**（[发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.2.3-0.3.3)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+当前正式版为 **Windows 0.2.4 / Android 0.3.4**（[发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.2.4-0.3.4)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
 
 | 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
 | --- | --- | --- | --- |
-| Windows 0.2.3 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.3-0.3.3/JMBatch-0.2.3-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.3-0.3.3/JMBatch-0.2.3-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.2.3-0.3.3/JMBatch-0.2.3-Windows-x64.zip) |
-| Android 0.3.3 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.3-0.3.3/JMBatch-0.3.3-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.3-0.3.3/JMBatch-0.3.3-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.2.3-0.3.3/JMBatch-0.3.3-Android.apk) |
-| 上述版本的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.3-0.3.3/SHA256-release-0.2.3-0.3.3.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.3-0.3.3/SHA256-release-0.2.3-0.3.3.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.2.3-0.3.3/SHA256-release-0.2.3-0.3.3.txt) |
+| Windows 0.2.4 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.4-0.3.4/JMBatch-0.2.4-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.4-0.3.4/JMBatch-0.2.4-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.2.4-0.3.4/JMBatch-0.2.4-Windows-x64.zip) |
+| Android 0.3.4 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.4-0.3.4/JMBatch-0.3.4-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.4-0.3.4/JMBatch-0.3.4-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.2.4-0.3.4/JMBatch-0.3.4-Android.apk) |
+| 上述版本的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.4-0.3.4/SHA256-release-0.2.4-0.3.4.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.2.4-0.3.4/SHA256-release-0.2.4-0.3.4.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.2.4-0.3.4/SHA256-release-0.2.4-0.3.4.txt) |
 
 镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像用于手动下载，应用内更新仓库仍填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
 
@@ -23,19 +23,18 @@ GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或�
 ## 下载与导出
 
 1. 选择保存目录，输入编号、多个编号或区间，加入队列并开始。
-2. 下载结果为图片文件夹。章节目录和图片名称补零排序，例如：
+2. 下载结果为仅含图片的文件夹。单章节根目录直接是 `00001.jpg`、`00002.jpg`；多章节结构如下，ZIP 使用相同规则：
 
        JM123456-标题-任务标识/
          0001/00001.jpg
          0001/00002.jpg
          0002/00001.jpg
-         .jmbatch-album.json
 
 3. 在任务详情或“已下载漫画”选择图片漫画，点击“导出”。
-4. 选择 PDF / ZIP、导出目录、纯编号命名及 ZIP 布局。多章节 PDF 可统一导出一本，或分章节导出；分章文件名附带章节序号。
+4. 选择 PDF / ZIP、导出目录、纯编号命名；ZIP 结构自动按章节数确定。多章节 PDF 可统一导出一本，或分章节导出；分章文件名附带章节序号。
 5. 导出不删除图片，可离线重复导出。同名输出会停止并提示，不覆盖已有文件。
 
-图片保存为下载处理后的原分辨率 JPG；保存、ZIP 打包及 PDF 嵌入不额外缩放。上游图片的必要解码/还原沿用原实现，不保证与网站原始响应逐字节相同。请保留图片目录中的清单和排序结构，供校验、恢复、扫描和导出使用。
+图片保存为下载处理后的原分辨率 JPG；保存、ZIP 打包及 PDF 嵌入不额外缩放。上游图片的必要解码/还原沿用原实现，不保证与网站原始响应逐字节相同。请保留漫画文件夹名称和图片排序结构，便于重新扫描与导出。恢复与校验信息保存在应用内部，成品目录不附带信息文件；旧版带清单的图片目录仍可读取。
 
 ## 其他功能
 

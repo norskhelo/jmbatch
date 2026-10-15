@@ -175,7 +175,7 @@ class IntegrationTests(unittest.TestCase):
                 with zipfile.ZipFile(result) as archive:
                     expected = [
                         "0001/00001.jpg", "0001/00002.jpg", "0001/00003.jpg",
-                        "0002/00001.jpg", "0002/00002.jpg"] + ([] if flat else ["下载信息.json"])
+                        "0002/00001.jpg", "0002/00002.jpg"]
                     self.assertEqual(archive.namelist(), expected)
                     self.assertIsNone(archive.testzip())
                 events.clear()
@@ -207,21 +207,20 @@ class IntegrationTests(unittest.TestCase):
             events = []
             run_download(task, "", events.append, SingleChapter)
             result = Path(events[-1]["path"])
-            expected = [f"{i:05d}.jpg" for i in range(1,4)] if flat else [f"0001/{i:05d}.jpg" for i in range(1,4)] + ["下载信息.json"]
+            expected = [f"{i:05d}.jpg" for i in range(1,4)]
             with zipfile.ZipFile(result) as archive:
                 self.assertEqual(archive.namelist(), expected)
                 self.assertIsNone(archive.testzip())
-            if flat:
-                marker = task_cache(task) / "completed.json"
-                data = json.loads(marker.read_text(encoding="utf-8"))
-                data.pop("zip_layout_version")
-                marker.write_text(json.dumps(data),encoding="utf-8")
-                saved = result.read_bytes()
-                events.clear()
-                run_download(task, "", events.append, SingleChapter)
-                self.assertNotEqual(events[-1]["path"],str(result))
-                self.assertEqual(result.read_bytes(),saved)
-                self.assertEqual([e for e in events if e["type"]=="progress"][-1]["cached"],3)
+            marker = task_cache(task) / "completed.json"
+            data = json.loads(marker.read_text(encoding="utf-8"))
+            data.pop("zip_layout_version")
+            marker.write_text(json.dumps(data),encoding="utf-8")
+            saved = result.read_bytes()
+            events.clear()
+            run_download(task, "", events.append, SingleChapter)
+            self.assertNotEqual(events[-1]["path"],str(result))
+            self.assertEqual(result.read_bytes(),saved)
+            self.assertEqual([e for e in events if e["type"]=="progress"][-1]["cached"],3)
 
     def test_export_preferences_persist_and_old_settings_default(self):
         self.assertFalse(Settings().numeric_filename)

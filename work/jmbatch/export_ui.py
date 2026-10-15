@@ -25,12 +25,10 @@ def show_export(library_window, key):
         ttk.Radiobutton(panel, text=label, value=value, variable=fmt).pack(anchor="w")
     numeric_button = ttk.Checkbutton(panel, text="文件名仅编号（分章节时附章节序号）", variable=numeric)
     numeric_button.pack(anchor="w", pady=4)
-    flat_button = ttk.Checkbutton(panel, text="单章节 ZIP 图片平铺；多章节按目录排序，不含信息文件", variable=flat)
-    flat_button.pack(anchor="w", pady=4)
+    ttk.Label(panel, text="ZIP：单章节图片平铺，多章节分目录；仅包含图片。").pack(anchor="w", pady=4)
     split_button = ttk.Checkbutton(panel, text="PDF 分章节导出（不勾选则统一导出为一本）", variable=split)
     split_button.pack(anchor="w", pady=4)
     def mode(*_):
-        flat_button.configure(state="normal" if fmt.get() == "zip" else "disabled")
         split_button.configure(state="normal" if fmt.get() == "pdf" and chapters > 1 else "disabled")
     fmt.trace_add("write", mode)
     mode()

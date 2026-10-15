@@ -33,7 +33,7 @@ public class CoreTest {
         check(Core.zipImageName(true,2,4,2,1).equals("0002/00001.jpg"),"multi-chapter overrides flat setting");
         check(Core.zipImageName(false,2,4,2,1).equals("0002/00001.jpg"),"chapter ZIP hierarchy");
         check(Core.zipImageName(true,1,20000,1,20000).equals("20000.jpg"),"single-chapter flat sequence");
-        check(Core.zipImageName(false,1,1,1,1).equals("0001/00001.jpg"),"single-chapter non-flat");
+        check(Core.zipImageName(false,1,1,1,1).equals("00001.jpg"),"single-chapter ignores legacy setting");
         check(Core.parseIds("JM123456，123457\n123456;123458 至 JM123460").equals(Arrays.asList("123456","123457","123458","123459","123460")),"parse and deduplicate");
         for(String invalid:new String[]{"","000","123456-123400","123456-9000000000","12","123456/path"}){
             boolean rejected=false;try{Core.parseIds(invalid);}catch(IllegalArgumentException expected){rejected=true;}check(rejected,"reject "+invalid);

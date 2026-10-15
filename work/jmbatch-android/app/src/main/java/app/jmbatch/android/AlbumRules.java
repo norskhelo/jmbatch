@@ -6,6 +6,11 @@ import java.util.*;
 /** Shared ordering and naming rules, independent of Android storage APIs. */
 public final class AlbumRules {
     public static final String MANIFEST = ".jmbatch-album.json";
+    public static final int LAYOUT_VERSION = 2;
+    public static String imageName(int chapter, int page, int chapterCount) throws IOException {
+        if (chapter < 1 || page < 1 || chapterCount < 1) throw new IOException("章节或页码无效");
+        return chapterCount == 1 ? String.format(Locale.ROOT, "%05d.jpg", page) : imageName(chapter, page);
+    }
     public static String imageName(int chapter, int page) throws IOException {
         if (chapter < 1 || page < 1) throw new IOException("章节或页码无效");
         return String.format(Locale.ROOT, "%04d/%05d.jpg", chapter, page);

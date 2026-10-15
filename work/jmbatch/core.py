@@ -12,8 +12,8 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-VERSION = "0.2.3"
-ZIP_LAYOUT_VERSION = 2
+VERSION = "0.2.4"
+ZIP_LAYOUT_VERSION = 3
 MAX_TASKS = 2000
 
 
@@ -234,7 +234,7 @@ def export_images(task: dict, title: str, entries: list[dict], emit) -> Path:
     numeric = task["settings"].get("numeric_filename", False)
     flat = task["settings"].get("flat_zip", False)
     chapter_count = len({entry["chapter"] for entry in entries})
-    flatten_images = flat and chapter_count == 1
+    flatten_images = chapter_count == 1
     album_id = str(task["album_id"])
     if not re.fullmatch(r"[0-9]{1,10}", album_id):
         raise ValueError("编号无效，无法生成文件名。")
@@ -255,10 +255,8 @@ def export_images(task: dict, title: str, entries: list[dict], emit) -> Path:
                 name = f'{n:05d}{path.suffix.lower()}' if flatten_images else f'{entry["chapter"]:04d}/{entry["page"]:05d}{path.suffix.lower()}'
                 archive.write(path, name)
                 emit({"type": "export_progress", "message": f"打包图片 {n}/{len(paths)}"})
-            if not flat:
-                archive.writestr("下载信息.json", json.dumps({"id": task["album_id"], "title": title, "images": len(paths), "chapters": len({e["chapter"] for e in entries})}, ensure_ascii=False, indent=2))
         with zipfile.ZipFile(temporary) as archive:
-            if archive.testzip() is not None or len(archive.infolist()) != len(paths) + (0 if flat else 1):
+            if archive.testzip() is not None or len(archive.infolist()) != len(paths):
                 raise ValueError("ZIP 完整性校验失败，成品未保存。")
     # Windows rename fails atomically if the destination exists, including races.
     if os.name == "nt":

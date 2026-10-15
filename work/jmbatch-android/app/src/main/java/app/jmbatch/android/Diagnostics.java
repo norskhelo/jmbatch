@@ -28,17 +28,19 @@ public final class Diagnostics {
         }
         File zip=new File(root,"test.zip");try(ZipOutputStream out=new ZipOutputStream(new FileOutputStream(zip))){out.putNextEntry(new ZipEntry("0001/00001.jpg"));try(InputStream in=new FileInputStream(jpeg)){Core.copy(in,out);}out.closeEntry();}
         try(ZipFile archive=new ZipFile(zip)){require(archive.size()==1,"ZIP 导出");}
-        // On-device coverage of app-folder publication, manifest reads and offline export.
+        // On-device coverage of clean publication, private indices and offline export.
         File albumStage=new File(root,"album-stage-"+UUID.randomUUID());albumStage.mkdirs();
         org.json.JSONArray images=new org.json.JSONArray();
         for(int chapter=1;chapter<=2;chapter++){
             String relative=AlbumRules.imageName(chapter,1);File image=new File(albumStage,relative);image.getParentFile().mkdirs();java.nio.file.Files.copy(jpeg.toPath(),image.toPath());
             images.put(new org.json.JSONObject().put("chapter",chapter).put("page",1).put("file",relative).put("size",image.length()));
         }
-        Downloader.writeTextAtomic(new File(albumStage,AlbumRules.MANIFEST),new org.json.JSONObject().put("version",1).put("id","123456").put("title","offline-album-test").put("entries",images).toString());
         android.net.Uri albumUri=null;List<LibraryStore.Entry> exported=new ArrayList<>();
         try{
-            albumUri=AlbumStorage.publish(context,albumStage,"","JM123456-self-test-"+UUID.randomUUID(),()->{});
+            albumUri=AlbumStorage.publish(context,albumStage,"","JM123456-self-test-"+UUID.randomUUID().toString().substring(0,8),()->{});
+            require(AlbumStorage.load(context,albumUri).images.size()==2,"无清单目录扫描");
+            AlbumStorage.remember(context,albumUri,new org.json.JSONObject().put("version",AlbumRules.LAYOUT_VERSION).put("id","123456").put("title","offline-album-test").put("entries",images));
+            require(AlbumStorage.children(context,albumUri).size()==2,"图片目录不含清单");
             require(AlbumStorage.load(context,albumUri).images.size()==2,"图片目录保存和读取");
             exported.addAll(AlbumExporter.export(context,albumUri,"","自检","pdf",false,false,true,()->{},message->{}));
             require(exported.size()==2,"分章节 PDF 文件数");
@@ -47,10 +49,26 @@ public final class Diagnostics {
             File zipResult=AlbumStorage.local(context,android.net.Uri.parse(exported.get(exported.size()-1).uri));
             try(ZipFile archive=new ZipFile(zipResult)){require(archive.size()==2&&archive.getEntry("0002/00001.jpg")!=null,"多章节 ZIP 顺序");}
             require(AlbumStorage.load(context,albumUri).images.size()==2,"导出保留原始图片");
+            AlbumStorage.validateForDeletion(context,albumUri);
         }finally{
             for(LibraryStore.Entry entry:exported)AlbumStorage.remove(context,android.net.Uri.parse(entry.uri));
             if(albumUri!=null)AlbumStorage.remove(context,albumUri);
             Downloader.deleteOwned(albumStage,root);
+        }
+        File singleStage=new File(root,"single-stage-"+UUID.randomUUID());singleStage.mkdirs();android.net.Uri singleUri=null;
+        exported.clear();
+        try{
+            java.nio.file.Files.copy(jpeg.toPath(),new File(singleStage,"00001.jpg").toPath());
+            singleUri=AlbumStorage.publish(context,singleStage,"","JM123457-single-test-"+UUID.randomUUID().toString().substring(0,8),()->{});
+            require(AlbumStorage.children(context,singleUri).size()==1&&AlbumStorage.load(context,singleUri).images.size()==1,"单章节无清单图片平铺和扫描");
+            for(boolean flat:new boolean[]{false,true}){
+                List<LibraryStore.Entry> files=AlbumExporter.export(context,singleUri,"","自检","zip",false,flat,false,()->{},message->{});exported.addAll(files);
+                try(ZipFile archive=new ZipFile(AlbumStorage.local(context,android.net.Uri.parse(files.get(0).uri)))){require(archive.size()==1&&archive.getEntry("00001.jpg")!=null,"单章节 ZIP 仅含平铺图片");}
+            }
+            AlbumStorage.validateForDeletion(context,singleUri);
+        }finally{
+            for(LibraryStore.Entry entry:exported)AlbumStorage.remove(context,android.net.Uri.parse(entry.uri));
+            if(singleUri!=null)AlbumStorage.remove(context,singleUri);Downloader.deleteOwned(singleStage,root);
         }
         String report="离线自检通过\n\n编号与区间解析、API 解密对照、图片分段和重排、JPEG 保存、PDF 系统渲染、排序图片目录保存、分章节 PDF 和多章节 ZIP 导出、导出保留原始图片均通过。\n\n没有请求漫画网站；不代表真实网络和账号访问已经验证。";
         Downloader.writeTextAtomic(new File(root,"report.txt"),report);return report;

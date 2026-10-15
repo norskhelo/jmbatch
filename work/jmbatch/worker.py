@@ -60,7 +60,7 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
     if marker.exists():
         completed = json.loads(marker.read_text(encoding="utf-8"))
         artifact = Path(completed["path"])
-        if settings.format == "images" and completed.get("format") == "images" and artifact.parent.resolve() == output.resolve():
+        if settings.format == "images" and completed.get("format") == "images" and completed.get("album_layout_version") == 2 and artifact.parent.resolve() == output.resolve():
             from albums import read_album
             try:
                 _, saved = read_album(artifact, verify=True)
@@ -73,8 +73,7 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
         if (artifact.is_file() and artifact.parent.resolve() == output.resolve()
                 and settings.format != "images"
                 and completed.get("numeric_filename", False) == settings.numeric_filename
-                and (settings.format != "zip" or (completed.get("flat_zip", False) == settings.flat_zip
-                     and (not settings.flat_zip or completed.get("zip_layout_version", 0) == ZIP_LAYOUT_VERSION)))):
+                and (settings.format != "zip" or completed.get("zip_layout_version", 0) == ZIP_LAYOUT_VERSION)):
             if artifact.suffix == ".pdf":
                 from pypdf import PdfReader
                 with artifact.open("rb") as stream:
@@ -82,7 +81,7 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
             else:
                 import zipfile
                 with zipfile.ZipFile(artifact) as archive:
-                    valid = archive.testzip() is None and len(archive.infolist()) == completed["images"] + (0 if settings.flat_zip else 1)
+                    valid = archive.testzip() is None and len(archive.infolist()) == completed["images"]
             if valid:
                 emit({"type": "done", "path": str(artifact), "total": completed["images"], "result_bytes": artifact.stat().st_size, "message": "下载完成"})
                 return

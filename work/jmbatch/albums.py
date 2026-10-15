@@ -1,5 +1,6 @@
 """Ordered image albums and explicit, offline PDF/ZIP export."""
 import json
+import hashlib
 import os
 import re
 import shutil
@@ -10,6 +11,43 @@ from pathlib import Path
 from core import atomic_json, export_images, safe_name, task_cache, verify_image, Settings
 
 MANIFEST = ".jmbatch-album.json"
+LAYOUT_VERSION = 2
+
+
+def album_index(folder):
+    """Keep recovery metadata in application state, never in the delivered album."""
+    home = Path(os.environ.get("JM_BATCH_HOME") or (Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "JMBatch"))
+    identity = os.path.normcase(str(Path(folder).resolve())).encode("utf-8")
+    return home / "albums" / (hashlib.sha256(identity).hexdigest() + ".json")
+
+
+def image_name(chapter, page, chapter_count):
+    return f"{page:05d}.jpg" if chapter_count == 1 else f"{chapter:04d}/{page:05d}.jpg"
+
+
+def scan_album(folder):
+    """Recover portable image-only albums after moving them or clearing app state."""
+    match = re.fullmatch(r"JM([0-9]{1,10})-(.*)-[0-9a-f]{8}", folder.name)
+    if not match:
+        raise ValueError("无法识别图片目录名称")
+    records = []
+    for path in folder.iterdir():
+        if path.is_symlink():
+            raise ValueError("图片目录含链接")
+        if path.is_file() and re.fullmatch(r"[0-9]{5,}\.jpg", path.name):
+            records.append(dict(chapter=1, page=int(path.stem), file=path.name, size=path.stat().st_size))
+        elif path.is_dir() and re.fullmatch(r"[0-9]{4,}", path.name):
+            for image in path.iterdir():
+                if image.is_symlink():
+                    raise ValueError("图片目录含链接")
+                if image.is_file() and re.fullmatch(r"[0-9]{5,}\.jpg", image.name):
+                    records.append(dict(chapter=int(path.name), page=int(image.stem), file=path.name + "/" + image.name, size=image.stat().st_size))
+    groups = {}
+    for item in records:
+        groups.setdefault(item["chapter"], []).append(item["page"])
+    if sorted(groups) != list(range(1, len(groups) + 1)) or any(sorted(pages) != list(range(1, len(pages) + 1)) for pages in groups.values()):
+        raise ValueError("图片章节或页码不连续")
+    return dict(version=LAYOUT_VERSION, id=match[1], title=match[2], entries=records)
 
 
 def read_album(folder, verify=False):
@@ -17,15 +55,21 @@ def read_album(folder, verify=False):
     if folder.is_symlink() or not folder.is_dir():
         raise ValueError("图片目录不存在或为链接")
     marker = folder / MANIFEST
-    if marker.is_symlink() or marker.stat().st_size > 8 * 1024 * 1024:
-        raise ValueError("图片目录信息无效")
-    data = json.loads(marker.read_text(encoding="utf-8"))
-    if data.get("version") != 1 or not re.fullmatch(r"[0-9]{1,10}", str(data.get("id", ""))):
+    if not marker.exists() and not marker.is_symlink():
+        marker = album_index(folder)
+    if marker.exists() or marker.is_symlink():
+        if marker.is_symlink() or marker.stat().st_size > 8 * 1024 * 1024:
+            raise ValueError("图片目录信息无效")
+        data = json.loads(marker.read_text(encoding="utf-8"))
+    else:
+        data = scan_album(folder)
+    if data.get("version") not in (1, LAYOUT_VERSION) or not re.fullmatch(r"[0-9]{1,10}", str(data.get("id", ""))):
         raise ValueError("图片目录信息无效")
     entries, seen = [], set()
+    chapter_count = len({int(item["chapter"]) for item in data["entries"]})
     for item in data["entries"]:
         chapter, page = int(item["chapter"]), int(item["page"])
-        relative = f"{chapter:04d}/{page:05d}.jpg"
+        relative = f"{chapter:04d}/{page:05d}.jpg" if data["version"] == 1 else image_name(chapter, page, chapter_count)
         if chapter <= 0 or page <= 0 or item["file"] != relative or relative in seen:
             raise ValueError("图片顺序或路径无效")
         path = folder / relative
@@ -47,12 +91,13 @@ def save_album(task, title, entries, emit):
     # A unique staging directory allows retry without removing an earlier partial.
     staging = Path(tempfile.mkdtemp(prefix="album.partial-", dir=cache))
     records = []
+    chapter_count = len({entry["chapter"] for entry in entries})
     try:
         emit(dict(type="phase", phase="verify", message="校验并保存排序图片"))
         for entry in sorted(entries, key=lambda e: (e["chapter"], e["page"])):
             source = Path(entry["path"])
             verify_image(source)
-            relative = f"{entry['chapter']:04d}/{entry['page']:05d}.jpg"
+            relative = image_name(entry["chapter"], entry["page"], chapter_count)
             target = staging / relative
             target.parent.mkdir(exist_ok=True)
             shutil.copyfile(source, target)
@@ -60,10 +105,12 @@ def save_album(task, title, entries, emit):
                 raise OSError("图片保存不完整")
             records.append(dict(chapter=entry["chapter"], page=entry["page"], file=relative, size=target.stat().st_size))
             emit(dict(type="export_progress", message=f"保存图片 {len(records)}/{len(entries)}"))
-        atomic_json(staging / MANIFEST, dict(version=1, id=task["album_id"], title=title, entries=records))
-        read_album(staging)
+        if not records:
+            raise ValueError("没有可用图片")
         os.rename(staging, final)
-        atomic_json(cache / "completed.json", dict(path=str(final), images=len(entries), format="images"))
+        atomic_json(album_index(final), dict(version=LAYOUT_VERSION, id=task["album_id"], title=title, entries=records))
+        read_album(final)
+        atomic_json(cache / "completed.json", dict(path=str(final), images=len(entries), format="images", album_layout_version=LAYOUT_VERSION))
         return final, sum(item["size"] for item in records)
     finally:
         # Only the newly created staging directory is owned by this operation.
