@@ -8,12 +8,13 @@ import android.widget.*;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.2.1 / Android 0.3.1 — 2026-10-14\n\n国内镜像下载说明\n\n• 将 GHFast、GH-Proxy 两条镜像下载入口纳入本版使用说明与应用内公告，保留 GitHub 原始下载地址；一个入口不可用时可切换另一个。\n• 镜像转发 GitHub Release 的安装包，无需向镜像站单独上传。镜像仅用于浏览器手动下载，应用内更新仓库仍为 norskhelo/jmbatch，继续校验更新清单签名及安装包 SHA-256。\n• 公开下载地址当前对应已正式发布的 Windows 0.2.0 / Android 0.3.0；本版安装包在本地交付，尚未发布 GitHub Release。已安装更高版本时无需下载旧版降级，后续下载以 Releases 实际附件为准。\n• 目录和安装包内的使用说明保留镜像直链、原始地址及对应 SHA-256，镜像可用性仍取决于网络。\n\n版本与兼容\n\n• Windows 升至 0.2.1；Android 升至 0.3.1（versionCode 301），保留 app.jmbatch.android 包名、原签名身份、更新公钥及已有设置和收藏。\n• 本次维护版本更新下载说明和版本公告，保留排序图片下载、独立 PDF/ZIP 导出及已下载漫画管理行为。\n• 推送源码与更新日志，并提供双端本地安装包、源码包、使用说明、摘要及签名更新清单；本次不创建 Release 或上传安装包。\n\n验证范围\n\n• 执行 Windows 单元测试、源码与成品离线自检，以及 Android 宿主测试、编译和签名校验。\n• Android 真机运行、系统目录提供方与各地区网络可用性仍需实际设备验证。\n";
+    private static final String CURRENT_NOTES="Windows 0.2.2 / Android 0.3.2 — 2026-10-15\n\n完整跨版本更新日志\n\n• “软件更新 / 公告”汇总当前已安装版本之后、直至最新适用正式版本的全部已发布更新日志，按版本号从旧到新分段显示。例如从 0.3.0 升至 0.3.2，可查看 0.3.1 和 0.3.2 的完整日志。\n• Windows 和 Android 分别按本平台安装包确定版本范围，忽略草稿、预发布和其他平台版本；同版本重复发布采用发布时间较新的日志。\n• 自动读取后续发布列表页，取消原先只查前 20 条发布及单篇日志 8000 字的截断。长日志可在“完整更新公告”中滚动查看；发布者未填写内容时明确提示。\n• 完整日志按仓库和版本范围缓存，离线仍可查看。升级后自动去掉已经安装版本及更早的日志；当前已是最新版时显示该版本公告。\n• 网络超时、分页失败或响应超限时提示未取得完整日志，保留上次离线公告，不把部分内容当作完整结果。旧版单篇缓存会提示重新检查更新。\n\n版本与发布\n\n• Windows 升至 0.2.2；Android 升至 0.3.2（versionCode 302）。保留 app.jmbatch.android 包名、原签名身份、更新公钥及已有设置和收藏。\n• 发布双端安装包、同版日志、SHA-256 校验文件及签名更新清单；GitHub 原始下载与国内镜像入口同步到本版。\n\n验证范围\n\n• 验证跨版本排序、分页、重复发布、长日志、平台筛选、离线缓存及失败回退；执行 Windows 单元测试和源码/成品离线自检、Android 宿主测试、编译及原证书签名验证。\n• Android 真机界面与安装行为未在本次验证；镜像可用性仍取决于地区和网络。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;
@@ -25,7 +26,6 @@ public final class GithubUpdates {
     private TextView announcementView;
     private Button downloadButton;
     private String status="尚未配置更新仓库", latestVersion="", latestUrl="";
-    private String latestNotes="";
     private long generation;
     private boolean downloading;
     private final AtomicBoolean cancel=new AtomicBoolean();
@@ -64,60 +64,76 @@ public final class GithubUpdates {
         AtomicBoolean delivered=new AtomicBoolean();
         status="正在后台检查，最多等待 8 秒…";refresh();
         Runnable timeout=()->{
-            if(delivered.compareAndSet(false,true)&&ticket==generation){latestUrl="";status="检查失败或超时，已跳过";refresh();}
+            if(delivered.compareAndSet(false,true)&&ticket==generation){latestUrl="";status="未能取得完整更新日志，已保留离线公告，请稍后重试";refresh();}
         };
         main.postDelayed(timeout,8000);
         Thread worker=new Thread(()->{
-            String[] answer=null;boolean success=false;
+            UpdateHistory.Selection answer=null;boolean success=false;
             try{answer=fetch(repo);success=true;}catch(Exception ignored){/* Silent failure, no task changes. */}
             finally{busy.set(false);}
-            final String[] result=answer;final boolean ok=success;
+            final UpdateHistory.Selection result=answer;final boolean ok=success;
             main.post(()->{
                 if(!delivered.compareAndSet(false,true))return;
                 main.removeCallbacks(timeout);
                 if(ticket!=generation||!repo.equals(prefs.getString("repository","")))return;
-                boolean newer=result!=null&&UpdateRules.compare(result[0],Core.VERSION)>0;
-                latestUrl=newer?result[1]:"";latestVersion=newer?result[0]:"";
-                latestNotes=result==null?"":result[2];
-                if(ok&&result!=null)prefs.edit().putString("announcement_repo",repo).putString("announcement_version",result[0]).putString("announcement_notes",result[2]).apply();
-                status=!ok?"检查失败或超时，已跳过":!newer?"当前已是适用版本，可查看下方更新公告":"发现新版 "+latestVersion;
+                boolean newer=result!=null&&UpdateRules.compare(result.latest.version,Core.VERSION)>0;
+                latestUrl=newer?result.latest.url:"";latestVersion=newer?result.latest.version:"";
+                if(ok&&result!=null){
+                    JSONArray history=new JSONArray();
+                    for(UpdateHistory.Entry entry:result.history)
+                        history.put(new JSONArray().put(entry.version).put(entry.notes));
+                    prefs.edit().putString("announcement_repo",repo).putString("announcement_version",result.latest.version)
+                        .putString("announcement_notes",result.latest.notes).putString("announcement_from",result.fromVersion)
+                        .putString("announcement_history",history.toString()).putInt("announcement_schema",2).apply();
+                }
+                status=!ok?"未能取得完整更新日志，已保留离线公告，请稍后重试":!newer?"当前已是适用版本，可查看下方更新公告":"发现新版 "+latestVersion;
                 refresh();
             });
         },"github-update-check");
         worker.setDaemon(true);worker.start();
     }
-    private static String[] fetch(String repo) throws Exception {
-        HttpURLConnection connection=(HttpURLConnection)new URL("https://api.github.com/repos/"+repo+"/releases?per_page=20").openConnection();
-        connection.setConnectTimeout(4000);connection.setReadTimeout(4000);connection.setInstanceFollowRedirects(false);
+    static UpdateHistory.Selection fetch(String repo) throws Exception {
+        final String repository=UpdateRules.repository(repo);
+        if(repository.isEmpty())return null;
+        long deadline=SystemClock.elapsedRealtime()+8000;
+        int[] total={0};
+        return UpdateHistory.load(page->fetchPage(repository,page,deadline,total),Core.VERSION);
+    }
+    private static UpdateHistory.Page fetchPage(String repo,int page,long deadline,int[] total) throws Exception {
+        long remaining=deadline-SystemClock.elapsedRealtime();
+        if(remaining<=0)throw new IOException("完整更新日志读取超时");
+        HttpURLConnection connection=(HttpURLConnection)new URL("https://api.github.com/repos/"+repo+"/releases?per_page="+UpdateHistory.PAGE_SIZE+"&page="+page).openConnection();
+        int timeout=(int)Math.max(1,Math.min(4000,remaining));
+        connection.setConnectTimeout(timeout);connection.setReadTimeout(timeout);connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("User-Agent","JMBatch-Updater");connection.setRequestProperty("Accept","application/vnd.github+json");
         connection.setRequestProperty("X-GitHub-Api-Version","2022-11-28");
-        long deadline=SystemClock.elapsedRealtime()+8000;
         try {
             if(connection.getResponseCode()!=200)throw new IOException("GitHub 暂不可用");
             ByteArrayOutputStream bytes=new ByteArrayOutputStream();
             try(InputStream input=connection.getInputStream()){
                 byte[] buffer=new byte[8192];int count;
                 while((count=input.read(buffer))!=-1){
-                    if(SystemClock.elapsedRealtime()>=deadline||bytes.size()+count>1024*1024)throw new IOException("检查超时或响应过大");
+                    total[0]+=count;
+                    if(SystemClock.elapsedRealtime()>=deadline||total[0]>UpdateHistory.MAX_BYTES)throw new IOException("完整更新日志读取超时或响应过大");
                     bytes.write(buffer,0,count);
                 }
             }
             JSONArray releases=new JSONArray(new String(bytes.toByteArray(),StandardCharsets.UTF_8));
-            String[] best=null;
-            for(int i=0;i<Math.min(releases.length(),20);i++){
-                JSONObject release=releases.getJSONObject(i);
+            List<UpdateHistory.Entry> entries=new ArrayList<>();
+            for(int i=0;i<releases.length();i++){
+                JSONObject release=releases.optJSONObject(i);if(release==null)continue;
                 if(release.optBoolean("draft")||release.optBoolean("prerelease"))continue;
                 JSONArray assets=release.optJSONArray("assets");if(assets==null)continue;
                 for(int j=0;j<assets.length();j++){
-                    JSONObject asset=assets.getJSONObject(j);String name=asset.optString("name"),version=UpdateRules.assetVersion(name),url=asset.optString("browser_download_url");
-                    if(version==null||!asset.optString("state").equals("uploaded")||asset.optLong("size")<=0||!UpdateRules.validUrl(url,repo,name))continue;
-                    if(UpdateRules.compare(version,Core.VERSION)>=0&&(best==null||UpdateRules.compare(version,best[0])>0)){
-                        String notes=release.optString("body","");if(notes.isEmpty()||notes.equals("null"))notes="发布者未填写更新日志。";
-                        best=new String[]{version,url,notes.substring(0,Math.min(notes.length(),8000))};
-                    }
+                    JSONObject asset=assets.optJSONObject(j);if(asset==null)continue;
+                    String notes=release.isNull("body")?"":release.optString("body","");
+                    UpdateHistory.Entry entry=UpdateHistory.candidate(repo,asset.optString("name"),asset.optString("browser_download_url"),
+                        asset.optString("state"),asset.optLong("size"),false,false,notes,
+                        release.optString("published_at","")+"\n"+release.optString("tag_name",""));
+                    if(entry!=null)entries.add(entry);
                 }
             }
-            return best;
+            return new UpdateHistory.Page(releases.length(),entries);
         }finally{connection.disconnect();}
     }
     public void show() {
@@ -142,6 +158,18 @@ public final class GithubUpdates {
         });dialog.show();refresh();
     }
     private String notesText(){
+        if(prefs.getInt("announcement_schema",0)==2){
+            try{
+                JSONArray saved=new JSONArray(prefs.getString("announcement_history","[]"));
+                List<UpdateHistory.Entry> history=new ArrayList<>();
+                for(int i=0;i<saved.length();i++){
+                    JSONArray item=saved.getJSONArray(i);
+                    history.add(new UpdateHistory.Entry(item.getString(0),"","",item.getString(1),""));
+                }
+                return UpdateHistory.announcement(prefs.getString("announcement_repo",""),prefs.getString("repository",""),
+                    prefs.getString("announcement_from",""),prefs.getString("announcement_version",""),Core.VERSION,history,CURRENT_NOTES);
+            }catch(JSONException error){return CURRENT_NOTES;}
+        }
         return UpdateRules.announcement(prefs.getString("announcement_repo",""),prefs.getString("repository",""),
             prefs.getString("announcement_version",""),Core.VERSION,prefs.getString("announcement_notes",""),CURRENT_NOTES);
     }

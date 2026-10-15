@@ -9,10 +9,12 @@ import time
 import urllib.parse
 import urllib.request
 
-LIMIT = 1024 * 1024
+LIMIT = 8 * 1024 * 1024
+PAGE_SIZE = 100
+MAX_PAGES = 10
 TIMEOUT = 8
 DEFAULT_REPOSITORY = "norskhelo/jmbatch"
-CURRENT_NOTES = 'Windows 0.2.1 / Android 0.3.1 — 2026-10-14\n\n国内镜像下载说明\n\n• 将 GHFast、GH-Proxy 两条镜像下载入口纳入本版使用说明与应用内公告，保留 GitHub 原始下载地址；一个入口不可用时可切换另一个。\n• 镜像转发 GitHub Release 的安装包，无需向镜像站单独上传。镜像仅用于浏览器手动下载，应用内更新仓库仍为 norskhelo/jmbatch，继续校验更新清单签名及安装包 SHA-256。\n• 公开下载地址当前对应已正式发布的 Windows 0.2.0 / Android 0.3.0；本版安装包在本地交付，尚未发布 GitHub Release。已安装更高版本时无需下载旧版降级，后续下载以 Releases 实际附件为准。\n• 目录和安装包内的使用说明保留镜像直链、原始地址及对应 SHA-256，镜像可用性仍取决于网络。\n\n版本与兼容\n\n• Windows 升至 0.2.1；Android 升至 0.3.1（versionCode 301），保留 app.jmbatch.android 包名、原签名身份、更新公钥及已有设置和收藏。\n• 本次维护版本更新下载说明和版本公告，保留排序图片下载、独立 PDF/ZIP 导出及已下载漫画管理行为。\n• 推送源码与更新日志，并提供双端本地安装包、源码包、使用说明、摘要及签名更新清单；本次不创建 Release 或上传安装包。\n\n验证范围\n\n• 执行 Windows 单元测试、源码与成品离线自检，以及 Android 宿主测试、编译和签名校验。\n• Android 真机运行、系统目录提供方与各地区网络可用性仍需实际设备验证。\n'
+CURRENT_NOTES = 'Windows 0.2.2 / Android 0.3.2 — 2026-10-15\n\n完整跨版本更新日志\n\n• “软件更新 / 公告”汇总当前已安装版本之后、直至最新适用正式版本的全部已发布更新日志，按版本号从旧到新分段显示。例如从 0.3.0 升至 0.3.2，可查看 0.3.1 和 0.3.2 的完整日志。\n• Windows 和 Android 分别按本平台安装包确定版本范围，忽略草稿、预发布和其他平台版本；同版本重复发布采用发布时间较新的日志。\n• 自动读取后续发布列表页，取消原先只查前 20 条发布及单篇日志 8000 字的截断。长日志可在“完整更新公告”中滚动查看；发布者未填写内容时明确提示。\n• 完整日志按仓库和版本范围缓存，离线仍可查看。升级后自动去掉已经安装版本及更早的日志；当前已是最新版时显示该版本公告。\n• 网络超时、分页失败或响应超限时提示未取得完整日志，保留上次离线公告，不把部分内容当作完整结果。旧版单篇缓存会提示重新检查更新。\n\n版本与发布\n\n• Windows 升至 0.2.2；Android 升至 0.3.2（versionCode 302）。保留 app.jmbatch.android 包名、原签名身份、更新公钥及已有设置和收藏。\n• 发布双端安装包、同版日志、SHA-256 校验文件及签名更新清单；GitHub 原始下载与国内镜像入口同步到本版。\n\n验证范围\n\n• 验证跨版本排序、分页、重复发布、长日志、平台筛选、离线缓存及失败回退；执行 Windows 单元测试和源码/成品离线自检、Android 宿主测试、编译及原证书签名验证。\n• Android 真机界面与安装行为未在本次验证；镜像可用性仍取决于地区和网络。\n'
 
 
 def update_settings(data):
@@ -43,30 +45,58 @@ def version(value):
     return tuple(map(int, value.split(".")))
 
 
-def select_release(releases, repo, current):
-    best = None
+def select_release(releases, repo, current, include_current=False):
+    """Select the installer and every applicable bulletin in its upgrade range."""
+    candidates = {}
     current_version = version(current)
     if not isinstance(releases, list):
         raise ValueError("无效的 GitHub 响应")
-    for release in releases[:20]:
+    for release in releases:
         if not isinstance(release, dict) or release.get("draft") or release.get("prerelease"):
             continue
-        for asset in release.get("assets", []):
+        assets = release.get("assets")
+        if not isinstance(assets, list):
+            continue
+        for asset in assets:
+            if not isinstance(asset, dict):
+                continue
             name = asset.get("name", "")
+            if not isinstance(name, str):
+                continue
             match = re.fullmatch(r"JMBatch-([0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6})-Windows-x64\.zip", name)
-            if not match or asset.get("state") != "uploaded" or asset.get("size", 0) <= 0:
+            if (not match or asset.get("state") != "uploaded"
+                    or not isinstance(asset.get("size"), (int, float)) or asset["size"] <= 0):
                 continue
             url = asset.get("browser_download_url", "")
-            parsed = urllib.parse.urlsplit(url)
+            if not isinstance(url, str):
+                continue
+            try:
+                parsed = urllib.parse.urlsplit(url)
+            except ValueError:
+                continue
             path = urllib.parse.unquote(parsed.path)
             if (parsed.scheme != "https" or parsed.netloc != "github.com" or parsed.query or parsed.fragment
                     or not path.lower().startswith("/" + repo.lower() + "/releases/download/")
                     or path.rsplit("/", 1)[-1] != name or any(p in (".", "..") for p in path.split("/"))):
                 continue
             candidate = version(match[1])
-            if candidate > current_version and (best is None or candidate > version(best["version"])):
-                notes = release.get("body") or "发布者未填写更新日志。"
-                best = {"version": match[1], "name": name, "url": url, "repository": repo, "notes": str(notes)[:8000]}
+            if candidate < current_version or (candidate == current_version and not include_current):
+                continue
+            notes = release.get("body")
+            if not isinstance(notes, str) or not notes.strip():
+                notes = "发布者未填写更新日志。"
+            rank = (str(release.get("published_at") or ""), str(release.get("tag_name") or ""))
+            if candidate not in candidates or rank > candidates[candidate][0]:
+                candidates[candidate] = (rank, {"version": match[1], "name": name, "url": url,
+                                               "repository": repo, "notes": notes})
+    if not candidates:
+        return None
+    latest = max(candidates)
+    best = dict(candidates[latest][1])
+    best.update(history_schema=2, from_version=current, history=[
+        {"version": candidates[v][1]["version"], "notes": candidates[v][1]["notes"]}
+        for v in sorted(candidates) if v > current_version or v == latest
+    ])
     return best
 
 
@@ -75,27 +105,42 @@ def fetch_release(repo, current, include_current=False):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None
 
-    url = f"https://api.github.com/repos/{repo}/releases?per_page=20"
-    request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "JMBatch-Updater",
-                                                  "X-GitHub-Api-Version": "2022-11-28"})
+    repo = normalize_repo(repo)
+    if not repo:
+        return None
     # urllib uses Windows system proxy settings as well as environment proxies.
     opener = urllib.request.build_opener(NoRedirect)
     deadline = time.monotonic() + TIMEOUT
-    with opener.open(request, timeout=TIMEOUT) as response:
-        if response.status != 200:
-            raise ValueError("GitHub 暂不可用")
-        data = bytearray()
-        while True:
-            chunk = response.read(65536)
-            if time.monotonic() >= deadline:
-                raise TimeoutError("更新检查超时")
-            if not chunk:
-                break
-            data.extend(chunk)
-            if len(data) > LIMIT:
-                raise ValueError("更新响应过大")
-        result = select_release(json.loads(data), repo, "0.0.0" if include_current else current)
-        return result if result is None or version(result["version"]) >= version(current) else None
+    releases, total = [], 0
+    for page in range(1, MAX_PAGES + 1):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("完整更新日志读取超时")
+        url = f"https://api.github.com/repos/{repo}/releases?per_page={PAGE_SIZE}&page={page}"
+        request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "JMBatch-Updater",
+                                                      "X-GitHub-Api-Version": "2022-11-28"})
+        with opener.open(request, timeout=remaining) as response:
+            if response.status != 200:
+                raise ValueError("GitHub 暂不可用")
+            data = bytearray()
+            while True:
+                chunk = response.read(65536)
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("完整更新日志读取超时")
+                if not chunk:
+                    break
+                data.extend(chunk)
+                total += len(chunk)
+                if total > LIMIT:
+                    raise ValueError("完整更新日志响应过大")
+        batch = json.loads(data)
+        if not isinstance(batch, list):
+            raise ValueError("无效的 GitHub 响应")
+        releases.extend(batch)
+        if len(batch) < PAGE_SIZE:
+            return select_release(releases, repo, current, include_current)
+    # Never label a truncated set of releases as a complete upgrade history.
+    raise ValueError("完整更新日志超过读取页数上限")
 
 
 def fetch_bulletin(repo, current):
@@ -105,9 +150,33 @@ def fetch_bulletin(repo, current):
 def announcement_text(bulletin, repo, current, local_notes):
     try:
         if bulletin.get("repository") == repo and version(bulletin["version"]) >= version(current):
+            latest = bulletin["version"]
+            if bulletin.get("history_schema") == 2:
+                baseline = version(bulletin["from_version"])
+                history = bulletin["history"]
+                if baseline > version(current) or not isinstance(history, list) or not history:
+                    return local_notes
+                previous = None
+                for entry in history:
+                    number = version(entry["version"])
+                    if (number < baseline or number > version(latest)
+                            or (previous is not None and number <= previous)
+                            or not isinstance(entry["notes"], str)):
+                        return local_notes
+                    previous = number
+                if previous != version(latest):
+                    return local_notes
+                if version(latest) == version(current):
+                    notes = history[-1]["notes"]
+                    return local_notes if notes == "发布者未填写更新日志。" else "版本 " + latest + " 更新公告\n\n" + notes
+                sections = ["版本 " + entry["version"] + "\n\n" + entry["notes"]
+                            for entry in history if version(entry["version"]) > version(current)]
+                return ("从当前版本 " + current + " → 最新版本 " + latest
+                        + " 的全部更新（不含当前版，按版本升序）\n\n" + "\n\n────────\n\n".join(sections))
             notes = bulletin.get("notes", "")
             if isinstance(notes, str) and notes.strip() and notes != "发布者未填写更新日志。":
-                return "版本 " + bulletin["version"] + " 更新公告\n\n" + notes[:8000]
+                warning = "旧缓存仅包含最新版日志；请检查更新以获取完整升级日志。\n\n" if version(latest) > version(current) else ""
+                return warning + "版本 " + latest + " 更新公告\n\n" + notes
     except (AttributeError, KeyError, ValueError, TypeError):
         pass
     return local_notes
@@ -228,7 +297,7 @@ class UpdateUI:
                     atomic_json(self.bulletin_path, bulletin)
                 except OSError:
                     pass
-            self.status = ("检查失败或超时，已跳过" if state == "skipped" else
+            self.status = ("未能取得完整更新日志，已保留离线公告，请稍后重试" if state == "skipped" else
                            "发现新版 " + self.latest["version"] if self.latest else "当前已是适用版本，可查看下方更新公告")
             self.app.update_button.configure(text="发现新版 " + self.latest["version"] if self.latest else "软件更新 / 公告")
             self.refresh()

@@ -38,6 +38,8 @@ testout=testroot/'tests';testout.mkdir(parents=True,exist_ok=True)
 core=ROOT/'app/src/main/java/app/jmbatch/android/Core.java'
 run(javac,'-encoding','UTF-8','-d',testout,core,ROOT/'app/src/main/java/app/jmbatch/android/UpdateRules.java',ROOT/'tests/CoreTest.java')
 run(java,'-Djava.awt.headless=true','-cp',testout,'CoreTest',testroot/'test-output')
+run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/UpdateHistory.java',ROOT/'tests/UpdateHistoryTest.java')
+run(java,'-cp',testout,'UpdateHistoryTest')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/UpdateTrust.java',ROOT/'app/src/main/java/app/jmbatch/android/UpdateCrypto.java',ROOT/'tests/UpdateCryptoTest.java')
 run(java,'-cp',testout,'UpdateCryptoTest',ROOT/'tests/fixtures')
 run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/SinglePageRecovery.java',ROOT/'tests/RecoveryTest.java')

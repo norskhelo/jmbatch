@@ -3,7 +3,7 @@ import io
 import json
 import unittest
 from unittest.mock import patch
-from updates import Checker, normalize_repo, select_release, update_settings, DEFAULT_REPOSITORY, fetch_release, LIMIT
+from updates import Checker, normalize_repo, select_release, update_settings, DEFAULT_REPOSITORY, fetch_release, LIMIT, announcement_text
 
 
 def release(version, *, prerelease=False, draft=False, host="github.com", platform="Windows-x64.zip"):
@@ -30,13 +30,122 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(announcement_text(bulletin,"owner/app","0.1.8","local"),"local")
         self.assertEqual(announcement_text(None,"owner/app","0.1.7","local"),"local")
 
-    def test_notes_belong_to_selected_release_and_are_bounded(self):
+    def test_history_contains_every_newer_release_and_preserves_long_notes(self):
         older=release("0.1.5"); older["body"]="Old release"
         newer=release("0.1.6"); newer["body"]="# New release\n" + "x"*9000
         selected=select_release([older,newer],"owner/app","0.1.4")
         self.assertEqual(selected["version"],"0.1.6")
         self.assertTrue(selected["notes"].startswith("# New release\n"))
-        self.assertEqual(len(selected["notes"]),8000)
+        self.assertEqual(selected["notes"],newer["body"])
+        self.assertEqual([item["version"] for item in selected["history"]],["0.1.5","0.1.6"])
+        text=announcement_text(selected,"owner/app","0.1.4","local")
+        self.assertIn(newer["body"],text)
+        self.assertLess(text.index("Old release"),text.index("# New release"))
+
+    def test_range_excludes_current_and_other_platform_and_sorts_numerically(self):
+        rows=[]
+        for number in ("0.1.10","0.1.8","0.1.9","0.1.7"):
+            item=release(number);item["body"]="changes-"+number;rows.append(item)
+        rows.extend([release("9.0.0",platform="Android.apk"),release("8.0.0",draft=True),
+                     release("7.0.0",prerelease=True),release("6.0.0",host="bad.example")])
+        selected=select_release(rows,"owner/app","0.1.8",include_current=True)
+        self.assertEqual([e["version"] for e in selected["history"]],["0.1.9","0.1.10"])
+        self.assertEqual(selected["url"],rows[0]["assets"][0]["browser_download_url"])
+        text=announcement_text(selected,"owner/app","0.1.8","local")
+        self.assertNotIn("changes-0.1.8",text)
+        self.assertNotIn("changes-0.1.7",text)
+        self.assertLess(text.index("changes-0.1.9"),text.index("changes-0.1.10"))
+
+    def test_duplicate_versions_choose_latest_published_bulletin(self):
+        old=release("0.1.9");old.update(body="superseded",published_at="2026-10-13T00:00:00Z")
+        new=release("0.1.9");new.update(body="corrected",published_at="2026-10-14T00:00:00Z")
+        for rows in ([old,new],[new,old]):
+            selected=select_release(rows,"owner/app","0.1.8")
+            self.assertEqual(selected["history"],[{"version":"0.1.9","notes":"corrected"}])
+
+    def test_missing_notes_are_visible_and_malformed_assets_are_skipped(self):
+        rows=[None,{"assets":None},{"assets":[None,{"name":None}]},release("0.1.9"),release("0.1.10")]
+        rows[-1]["body"]=" \n"
+        selected=select_release(rows,"owner/app","0.1.8")
+        self.assertEqual(len(selected["history"]),2)
+        text=announcement_text(selected,"owner/app","0.1.8","local")
+        self.assertEqual(text.count("发布者未填写更新日志。"),2)
+        same=select_release([release("0.1.8")],"owner/app","0.1.8",True)
+        self.assertEqual(announcement_text(same,"owner/app","0.1.8","local"),"local")
+
+    def test_more_than_twenty_releases_are_not_dropped(self):
+        selected=select_release([release(f"0.1.{i}") for i in range(1,32)],"owner/app","0.1.1")
+        self.assertEqual(selected["version"],"0.1.31")
+        self.assertEqual(len(selected["history"]),30)
+
+    @staticmethod
+    def response(data):
+        response=io.BytesIO(json.dumps(data).encode());response.status=200
+        return response
+
+    def test_pagination_keeps_intermediate_versions_even_after_an_older_release(self):
+        batches=[[release("0.1.10"),release("0.1.1")],[release("0.1.9"),release("0.1.8")],[]]
+        responses=[self.response(data) for data in batches]
+        with patch("updates.PAGE_SIZE",2),patch("updates.urllib.request.build_opener") as factory:
+            factory.return_value.open.side_effect=responses
+            selected=fetch_release("owner/app","0.1.8",True)
+            urls=[call.args[0].full_url for call in factory.return_value.open.call_args_list]
+        self.assertEqual([entry["version"] for entry in selected["history"]],["0.1.9","0.1.10"])
+        self.assertEqual(urls,[f"https://api.github.com/repos/owner/app/releases?per_page=2&page={i}" for i in (1,2,3)])
+        self.assertTrue(all(response.closed for response in responses))
+
+    def test_later_page_failure_never_returns_a_partial_history(self):
+        for failure in (OSError("offline"),self.response({"message":"limited"})):
+            with patch("updates.PAGE_SIZE",1),patch("updates.urllib.request.build_opener") as factory:
+                factory.return_value.open.side_effect=[self.response([release("0.1.10")]),failure]
+                with self.assertRaises((OSError,ValueError)):
+                    fetch_release("owner/app","0.1.8")
+
+    def test_page_limit_and_total_response_limit_reject_partial_history(self):
+        with patch("updates.PAGE_SIZE",1),patch("updates.MAX_PAGES",2),patch("updates.urllib.request.build_opener") as factory:
+            factory.return_value.open.side_effect=[self.response([release("0.1.10")]),self.response([release("0.1.9")])]
+            with self.assertRaisesRegex(ValueError,"页数"):
+                fetch_release("owner/app","0.1.8")
+        batch=[release("0.1.10")]
+        limit=len(json.dumps(batch).encode())+1
+        with patch("updates.PAGE_SIZE",1),patch("updates.LIMIT",limit),patch("updates.urllib.request.build_opener") as factory:
+            factory.return_value.open.side_effect=[self.response(batch),self.response([release("0.1.9")])]
+            with self.assertRaisesRegex(ValueError,"响应过大"):
+                fetch_release("owner/app","0.1.8")
+
+    def test_cached_history_rebases_after_upgrade_and_isolates_repository(self):
+        rows=[]
+        for number in ("0.1.9","0.1.10","0.1.11"):
+            item=release(number);item["body"]="body-"+number;rows.append(item)
+        cached=json.loads(json.dumps(select_release(rows,"owner/app","0.1.8")))
+        text=announcement_text(cached,"owner/app","0.1.9","local")
+        self.assertNotIn("body-0.1.9",text)
+        self.assertIn("body-0.1.10",text)
+        self.assertIn("body-0.1.11",text)
+        self.assertEqual(announcement_text(cached,"owner/app","0.1.11","local"),"版本 0.1.11 更新公告\n\nbody-0.1.11")
+        for repo,current in (("other/app","0.1.8"),("owner/app","0.1.12"),("owner/app","0.1.7")):
+            self.assertEqual(announcement_text(cached,repo,current,"local"),"local")
+
+    def test_invalid_or_legacy_cache_is_not_presented_as_complete(self):
+        cached=select_release([release("0.1.9"),release("0.1.10")],"owner/app","0.1.8")
+        for history in ([],list(reversed(cached["history"])),cached["history"][:-1],[None]):
+            self.assertEqual(announcement_text(dict(cached,history=history),"owner/app","0.1.8","local"),"local")
+        legacy=dict(repository="owner/app",version="0.1.10",notes="old cache")
+        self.assertIn("旧缓存仅包含最新版",announcement_text(legacy,"owner/app","0.1.8","local"))
+
+    def test_failed_check_preserves_complete_offline_bulletin(self):
+        from types import SimpleNamespace
+        from updates import UpdateUI
+        from core import VERSION
+        cached=select_release([release("9.0.0")],"owner/app",VERSION)
+        ui=UpdateUI.__new__(UpdateUI)
+        ui.repo=ui.checked_repo="owner/app";ui.bulletin=cached
+        ui.checker=SimpleNamespace(poll=lambda:("skipped",None))
+        ui.app=SimpleNamespace(update_button=SimpleNamespace(configure=lambda **kwargs:None))
+        ui.refresh=lambda:None
+        ui.poll()
+        self.assertIs(ui.bulletin,cached)
+        self.assertIn("保留离线公告",ui.status)
 
     def test_http_response_selection_and_size_limit(self):
         for payload, oversized in ((json.dumps([release("0.1.5")]).encode(), False), (b" " * (LIMIT + 1), True)):
