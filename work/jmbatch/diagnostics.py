@@ -173,6 +173,13 @@ def run_self_test(directory: Path):
         root.update()
         library_ui = application.library_window
         assert len(library_ui.tree.get_children()) == 2
+        deadline = time.monotonic() + 10
+        while len(library_ui.cover_images) < 2 and time.monotonic() < deadline:
+            root.update()
+            time.sleep(0.05)
+        assert len(library_ui.cover_images) == 2
+        assert all(photo != library_ui.cover_placeholder for photo in library_ui.cover_images.values())
+        report["checks"].append("First-page PDF/ZIP covers load asynchronously in the actual library UI")
         selected = library_ui.tree.get_children()[0]
         library_ui.tree.selection_set(selected)
         library_ui.action("favorite")

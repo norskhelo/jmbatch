@@ -3,6 +3,10 @@ package app.jmbatch.android;
 import android.app.*;
 import android.content.*;
 import android.net.Uri;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.content.res.TypedArray;
+import android.util.LruCache;
 import android.os.*;
 import android.text.*;
 import android.view.*;
@@ -26,7 +30,12 @@ public final class LibraryScreen {
     private TextView status;
     private ListView list;
     private Button stop;
-    private ArrayAdapter<String> adapter;
+    private BaseAdapter adapter;
+    private final ThreadPoolExecutor coverWorker=new ThreadPoolExecutor(1,1,0L,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(24));
+    private static final class Cover {final Bitmap bitmap;Cover(Bitmap bitmap){this.bitmap=bitmap;}}
+    private final LruCache<String,Cover> coverCache=new LruCache<String,Cover>(8*1024*1024){protected int sizeOf(String key,Cover cover){return cover.bitmap==null?1024:cover.bitmap.getByteCount();}};
+    private final Set<String> coverPending=new HashSet<>();
+    private int coverGeneration;
     private List<LibraryStore.Entry> entries=new ArrayList<>();
     private boolean busy;
     private int generation;
@@ -41,12 +50,13 @@ public final class LibraryScreen {
     public void show(){
         LinearLayout body=new LinearLayout(activity);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(12),dp(12),dp(12),dp(8));
         TextView heading=new TextView(activity);heading.setText("已下载漫画 / 收藏");heading.setTextSize(21);body.addView(heading);
-        TextView hint=new TextView(activity);hint.setText("图片目录 / PDF / ZIP。选择图片漫画可导出，长按可打开或分享。");hint.setTextSize(12);body.addView(hint);
+        TextView hint=new TextView(activity);hint.setText("封面默认取第一页。选择图片漫画可导出，长按可打开或分享。");hint.setTextSize(12);body.addView(hint);
         query=new EditText(activity);query.setSingleLine(true);query.setHint("搜索编号 / 标题");body.addView(query);
         LinearLayout tools=new LinearLayout(activity);favorites=new CheckBox(activity);favorites.setText("只看收藏");tools.addView(favorites,new LinearLayout.LayoutParams(0,-2,1));tools.addView(button("扫描目录",this::scan));tools.addView(button("刷新",this::load));body.addView(tools);
         row(body,button("全选结果",()->select(0)),button("反选",()->select(1)),button("清空选择",()->select(2)));
         status=new TextView(activity);status.setTextSize(12);body.addView(status);
-        list=new ListView(activity);list.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);adapter=new ArrayAdapter<>(activity,android.R.layout.simple_list_item_multiple_choice,new ArrayList<>());list.setAdapter(adapter);
+        list=new ListView(activity);list.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);adapter=new CoverAdapter();list.setAdapter(adapter);
+        list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScroll(AbsListView v,int first,int count,int total){}public void onScrollStateChanged(AbsListView v,int state){if(state==SCROLL_STATE_IDLE)adapter.notifyDataSetChanged();}});
         body.addView(list,new LinearLayout.LayoutParams(-1,0,1));
         list.setOnItemClickListener((p,v,position,id)->{if(busy||position>=entries.size())return;String uri=entries.get(position).uri;if(list.isItemChecked(position))selected.add(uri);else selected.remove(uri);counts();});
         list.setOnItemLongClickListener((p,v,position,id)->{if(!busy&&position<entries.size())details(entries.get(position));return true;});
@@ -55,9 +65,40 @@ public final class LibraryScreen {
         stop=new Button(activity);stop.setText("停止操作");stop.setTextSize(12);stop.setEnabled(false);stop.setOnClickListener(v->cancel());
         row(body,stop,button("关闭",()->dialog.dismiss()));
         dialog=new Dialog(activity);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);dialog.setContentView(body);
-        dialog.setOnDismissListener(d->{generation++;cancel();worker.shutdown();});dialog.show();dialog.getWindow().setLayout(-1,(int)(activity.getResources().getDisplayMetrics().heightPixels*0.93));dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        dialog.setOnDismissListener(d->{generation++;resetCovers();cancel();worker.shutdown();coverWorker.shutdownNow();});dialog.show();dialog.getWindow().setLayout(-1,(int)(activity.getResources().getDisplayMetrics().heightPixels*0.93));dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int before,int count){load();}public void afterTextChanged(Editable e){}});
         favorites.setOnCheckedChangeListener((b,c)->load());load();
+    }
+    private void resetCovers(){coverGeneration++;coverWorker.getQueue().clear();coverPending.clear();coverCache.evictAll();}
+    private final class CoverRow extends LinearLayout implements Checkable {
+        final ImageView image;final TextView placeholder;final CheckedTextView text;
+        CoverRow(){
+            super(activity);setGravity(Gravity.CENTER_VERTICAL);setPadding(dp(4),dp(8),dp(4),dp(8));
+            FrameLayout frame=new FrameLayout(activity);frame.setBackgroundColor(Color.rgb(232,237,241));
+            image=new ImageView(activity);image.setScaleType(ImageView.ScaleType.FIT_CENTER);frame.addView(image,new FrameLayout.LayoutParams(-1,-1));
+            placeholder=new TextView(activity);placeholder.setText("暂无\n封面");placeholder.setTextSize(12);placeholder.setGravity(Gravity.CENTER);placeholder.setTextColor(Color.rgb(97,115,135));frame.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
+            addView(frame,new LinearLayout.LayoutParams(dp(64),dp(86)));
+            text=new CheckedTextView(activity);text.setTextSize(14);text.setMaxLines(4);text.setEllipsize(TextUtils.TruncateAt.END);text.setPadding(dp(12),0,0,0);
+            TypedArray attrs=activity.obtainStyledAttributes(new int[]{android.R.attr.listChoiceIndicatorMultiple});text.setCheckMarkDrawable(attrs.getDrawable(0));attrs.recycle();
+            addView(text,new LinearLayout.LayoutParams(0,-2,1));
+        }
+        public boolean isChecked(){return text.isChecked();}public void setChecked(boolean value){text.setChecked(value);}public void toggle(){setChecked(!isChecked());}
+    }
+    private final class CoverAdapter extends BaseAdapter {
+        public int getCount(){return entries.size();}public Object getItem(int position){return entries.get(position);}public long getItemId(int position){return position;}
+        public View getView(int position,View recycled,ViewGroup parent){
+            CoverRow row=recycled instanceof CoverRow?(CoverRow)recycled:new CoverRow();LibraryStore.Entry entry=entries.get(position);
+            row.text.setText((entry.favorite?"★ ":"")+title(entry)+"\n"+entry.format.toUpperCase(Locale.ROOT)+" · "+entry.label);row.setChecked(selected.contains(entry.uri));
+            Cover cover=coverCache.get(entry.uri);Bitmap bitmap=cover==null?null:cover.bitmap;
+            row.image.setImageBitmap(bitmap);row.image.setContentDescription(bitmap==null?"暂无封面":"第一页封面");row.placeholder.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
+            if(cover==null&&!coverPending.contains(entry.uri)&&!coverWorker.isShutdown()){
+                final int ticket=coverGeneration;coverPending.add(entry.uri);
+                try{coverWorker.execute(()->{Bitmap result=LibraryCover.load(activity.getApplicationContext(),entry);main.post(()->{
+                    if(!visible()||ticket!=coverGeneration)return;coverPending.remove(entry.uri);coverCache.put(entry.uri,new Cover(result));adapter.notifyDataSetChanged();
+                });});}catch(RejectedExecutionException error){coverPending.remove(entry.uri);}
+            }
+            return row;
+        }
     }
     private void cancel(){cancelled.set(true);if(scanSignal!=null)scanSignal.cancel();}
     private void counts(){status.setText("共 "+entries.size()+" 项，已选 "+selected.size()+" 项"+(report.isEmpty()?"":"\n"+report));}
@@ -70,7 +111,7 @@ public final class LibraryScreen {
         worker.execute(()->{
             try{
                 library=LibraryStore.get(activity);library.sync(store.snapshot());List<LibraryStore.Entry> result=library.list(search,only);
-                main.post(()->{if(!visible()||ticket!=generation)return;entries=result;Set<String> present=new HashSet<>();adapter.clear();list.clearChoices();for(LibraryStore.Entry e:result){present.add(e.uri);adapter.add((e.favorite?"★ ":"")+title(e)+"\n"+e.format.toUpperCase(Locale.ROOT)+" · "+e.label);}selected.retainAll(present);for(int i=0;i<entries.size();i++)list.setItemChecked(i,selected.contains(entries.get(i).uri));adapter.notifyDataSetChanged();list.setEnabled(true);counts();});
+                main.post(()->{if(!visible()||ticket!=generation)return;resetCovers();entries=result;Set<String> present=new HashSet<>();list.clearChoices();for(LibraryStore.Entry e:result)present.add(e.uri);selected.retainAll(present);for(int i=0;i<entries.size();i++)list.setItemChecked(i,selected.contains(entries.get(i).uri));adapter.notifyDataSetChanged();list.setEnabled(true);counts();});
             }catch(Exception error){main.post(()->{if(visible()&&ticket==generation){list.setEnabled(true);status.setText(error.getMessage());}});}
         });
     }

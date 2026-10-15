@@ -2,6 +2,7 @@ jmcomic==2.7.8
 img2pdf==0.6.3
 pypdf==6.20.0
 Pillow==12.3.0
+pypdfium2==5.14.0
 commonX==0.6.40
 curl_cffi==0.16.3
 pycryptodome==3.24.1

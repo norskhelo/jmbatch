@@ -6,6 +6,9 @@ datas = []
 binaries = []
 hiddenimports = []
 hiddenimports += collect_submodules('Crypto')
+for module in ('pypdfium2', 'pypdfium2_raw'):
+    pdf_data, pdf_binaries, pdf_imports = collect_all(module)
+    datas += pdf_data; binaries += pdf_binaries; hiddenimports += pdf_imports
 tmp_ret = collect_all('jmcomic')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('commonx')

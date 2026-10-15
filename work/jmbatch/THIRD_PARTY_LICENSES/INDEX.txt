@@ -78,3 +78,6 @@ MIT
 
 setuptools 84.0.0
 MIT
+
+pypdfium2 5.14.0 / PDFium
+See pypdfium2/LICENSES and pypdfium2/data/windows_x64/BUILD_LICENSES for wrapper and bundled binary licenses.

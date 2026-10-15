@@ -49,6 +49,8 @@ run(java,'-cp',testout,'CertificateTest')
 
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/LibraryRules.java',ROOT/'tests/LibraryTest.java')
 run(java,'-cp',testout,'LibraryTest',testroot/'test-output')
+run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/CoverRules.java',ROOT/'tests/CoverTest.java')
+run(java,'-cp',testout,'CoverTest',testroot/'test-output')
 
 run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/BatchOperations.java',ROOT/'tests/BatchTest.java')
 run(java,'-cp',testout,'BatchTest',testroot/'test-output')

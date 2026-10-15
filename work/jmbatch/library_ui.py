@@ -1,6 +1,7 @@
 """Library UI. Slow directory and batch operations run outside Tk's thread."""
 import queue
 import threading
+from collections import OrderedDict
 from pathlib import Path
 
 
@@ -13,6 +14,11 @@ class LibraryWindow:
         self.busy = False
         self.cancelled = threading.Event()
         self.events = queue.Queue()
+        from covers import CoverWorker
+        self.cover_worker = CoverWorker()
+        self.cover_generation = 0
+        self.cover_pending = set()
+        self.cover_images = OrderedDict()
         self.window = tk.Toplevel(app.root)
         self.window.title("已下载漫画")
         self.window.geometry("1000x640")
@@ -22,7 +28,7 @@ class LibraryWindow:
         body.pack(fill="both", expand=True)
         body.columnconfigure(0, weight=1)
         body.rowconfigure(3, weight=1)
-        ttk.Label(body, text="图片目录 / PDF / ZIP · Ctrl / Shift 多选 · 原始图片可重复导出").grid(row=0, column=0, sticky="w")
+        ttk.Label(body, text="图片目录 / PDF / ZIP · 默认以第一页为封面 · Ctrl / Shift 多选").grid(row=0, column=0, sticky="w")
         bar = ttk.Frame(body)
         bar.grid(row=1, column=0, sticky="ew", pady=8)
         bar.columnconfigure(1, weight=1)
@@ -42,8 +48,18 @@ class LibraryWindow:
         self.stop_button.pack(side="right")
         holder = ttk.Frame(body)
         holder.grid(row=3, column=0, sticky="nsew")
-        self.tree = ttk.Treeview(holder, columns=("favorite", "id", "title", "format"), height=1, show="headings", selectmode="extended")
-        for name, label, width in (("favorite", "收藏", 65), ("id", "编号", 100), ("title", "标题 / 文件名", 590), ("format", "格式", 75)):
+        ttk.Style(self.window).configure("Library.Treeview", rowheight=106)
+        self.tree = ttk.Treeview(holder, columns=("favorite", "id", "title", "format"), height=1, show="tree headings", selectmode="extended", style="Library.Treeview")
+        self.tree.heading("#0", text="封面")
+        self.tree.column("#0", width=92, minwidth=92, stretch=False)
+        from PIL import Image, ImageDraw, ImageTk
+        placeholder = Image.new("RGB", (72, 96), "#e8edf1")
+        draw = ImageDraw.Draw(placeholder)
+        draw.rectangle((19, 22, 53, 74), outline="#96a6b2", width=2)
+        for y in (38, 48, 58):
+            draw.line((26, y, 46, y), fill="#96a6b2", width=2)
+        self.cover_placeholder = ImageTk.PhotoImage(placeholder, master=self.window)
+        for name, label, width in (("favorite", "收藏", 55), ("id", "编号", 90), ("title", "标题 / 文件名", 490), ("format", "格式", 75)):
             self.tree.heading(name, text=label)
             self.tree.column(name, width=width, stretch=name == "title")
         scroll = ttk.Scrollbar(holder, orient="vertical", command=self.tree.yview)
@@ -78,6 +94,49 @@ class LibraryWindow:
         fixed_height = body.winfo_reqheight() - holder.winfo_reqheight()
         min_width = max(850, bar.winfo_reqwidth() + 32, select_bar.winfo_reqwidth() + 32, footer.winfo_reqwidth() + 32)
         self.window.minsize(min_width, max(520, fixed_height + 100))
+        self.cover_timer = self.window.after(100, self.poll_covers)
+        self.window.bind("<Destroy>", self.cover_destroyed, add="+")
+
+    def cover_destroyed(self, event):
+        if event.widget == self.window:
+            self.cover_worker.close()
+            self.window.after_cancel(self.cover_timer)
+            self.cover_images.clear()
+
+    def poll_covers(self):
+        from PIL import ImageTk
+        try:
+            while True:
+                generation, key, result = self.cover_worker.results.get_nowait()
+                if generation != self.cover_generation:
+                    continue
+                self.cover_pending.discard(key)
+                if not self.tree.exists(key):
+                    continue
+                photo = ImageTk.PhotoImage(result, master=self.window) if result is not None else self.cover_placeholder
+                self.cover_images[key] = photo
+                self.tree.item(key, image=photo)
+                while len(self.cover_images) > 64:
+                    old, _ = self.cover_images.popitem(last=False)
+                    if self.tree.exists(old):
+                        self.tree.item(old, image=self.cover_placeholder)
+        except queue.Empty:
+            pass
+        # Request only visible rows; Tk images are created only on Tk's thread.
+        visible = dict.fromkeys(self.tree.identify_row(y) for y in range(0, self.tree.winfo_height(), 20))
+        for key in visible:
+            if not key:
+                continue
+            if key in self.cover_images:
+                self.cover_images.move_to_end(key)
+            elif key not in self.cover_pending and key in self.library.entries:
+                item = self.library.entries[key]
+                try:
+                    self.cover_worker.jobs.put_nowait((self.cover_generation, key, item["path"], item["format"]))
+                    self.cover_pending.add(key)
+                except queue.Full:
+                    break
+        self.cover_timer = self.window.after(100, self.poll_covers)
 
     def close(self):
         if self.busy:
@@ -106,9 +165,13 @@ class LibraryWindow:
         if self.busy:
             return
         selected = self.tree.selection()
+        self.cover_generation += 1
+        self.cover_worker.clear()
+        self.cover_pending.clear()
+        self.cover_images.clear()
         self.tree.delete(*self.tree.get_children())
         for key, item in self.library.select(self.query.get(), self.only_favorites.get()):
-            self.tree.insert("", "end", iid=key, values=("★" if item["favorite"] else "", item["id"] or "未识别", item["title"], item["format"].upper()))
+            self.tree.insert("", "end", iid=key, image=self.cover_placeholder, values=("★" if item["favorite"] else "", item["id"] or "未识别", item["title"], item["format"].upper()))
         self.tree.selection_set([k for k in selected if self.tree.exists(k)])
         self.details()
 

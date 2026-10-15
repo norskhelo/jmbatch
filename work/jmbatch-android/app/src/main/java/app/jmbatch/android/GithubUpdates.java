@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.2.4 / Android 0.3.4 — 2026-10-15\n\n图片目录与 ZIP 统一结构\n\n• 新下载的图片文件夹和新导出的 ZIP 只包含图片，不再附带“下载信息.json”或“.jmbatch-album.json”等下载信息文件。\n• 单章节直接平铺为 00001.jpg、00002.jpg……；多章节先按 0001、0002……分文件夹，每章内再平铺按页码排序的图片。\n• 移除导出窗口中的 ZIP 平铺开关，自动按章节数选择上述结构；旧设置不会改变新规则。\n• 排序、恢复与完整性校验信息保存在应用内部。保留名称与页码结构的新版图片目录复制或移动后可重新扫描、离线导出。\n• 旧版图片目录仍可读取并导出为新结构；已有文件不会被批量改写，需获得新结构时可重新下载或重新导出 ZIP。\n\n版本与交付\n\n• Windows 升至 0.2.4；Android 升至 0.3.4（versionCode 304），沿用 app.jmbatch.android 包名、原 APK 签名与更新公钥。\n• 同步双端使用说明、源码、更新日志、安装包、SHA-256 校验文件和签名更新清单。\n• 验证采用隔离离线素材、Windows 自动检查及 Android 宿主测试和编译；不将这些检查视为 Android 真机、SAF 厂商兼容性或真实网站下载验证。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.0 / Android 0.4.0 — 2026-10-15\n\n收藏列表显示封面\n\n• 已下载漫画 / 收藏界面新增封面缩略图，默认取漫画第一页；多章节取第一章第一页，按章节和页码顺序读取。\n• 同时支持图片文件夹、ZIP 和 PDF。封面按比例缩放，保留完整页面；ZIP 内的下载信息、隐藏文件不作为封面。\n• 封面在后台按可见列表加载，滚动和搜索时复用有限内存缓存，保留搜索、收藏、多选和批量操作。\n• 文件缺失、损坏、加密或目录权限失效时显示占位图，不妨碍管理记录；恢复文件或授权后点击“刷新”可重试。\n• 缩略图不写入漫画文件夹或 ZIP，保留既有纯图片成品结构。Android 读取系统目录中的 ZIP 时仅在应用缓存临时读取，完成后清理；超过 512 MB 的外部 ZIP 显示占位图。\n\n版本与交付\n\n• 按 0.x.0 递增：Windows 0.2.4 → 0.3.0；Android 0.3.4 → 0.4.0（versionCode 400）。保留 app.jmbatch.android 包名、原 APK 签名和更新公钥。\n• 同步源码、使用说明、更新日志、安装包、SHA-256 校验文件和签名更新清单。\n• 验证使用隔离素材、Windows 实际界面与成品自检、Android 宿主测试和编译；尚未连接 Android 真机验证厂商目录权限和界面显示。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;
