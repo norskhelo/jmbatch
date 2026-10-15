@@ -18,7 +18,7 @@ latest=fetch_release(DEFAULT_REPOSITORY,'0.2.3')
 assert latest and latest['version']=='0.2.4'
 assert fetch_release(DEFAULT_REPOSITORY,'0.2.4') is None
 notes=(ROOT/'work/release-024-034/release-notes.md').read_text(encoding='utf-8').strip()
-assert latest['history'][-1]['notes'].strip()==notes
+assert latest['history'][-1]['notes'].replace('\r\n', '\n').strip()==notes
 current=fetch_bulletin(DEFAULT_REPOSITORY,'0.2.4')
 assert current['version']=='0.2.4' and '图片目录与 ZIP 统一结构' in current['notes']
 print('Public update selection and complete notes verified',flush=True)
