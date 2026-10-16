@@ -80,7 +80,7 @@ class LibraryWindow:
         self.status = tk.StringVar()
         ttk.Label(footer, textvariable=self.status, width=1).grid(row=2, column=0, sticky="ew", pady=(3, 5))
         self.action_buttons = {}
-        for row, pairs in enumerate(((("打开图片 / 文件", "open"), ("导出", "export"), ("打开保存目录", "folder")),
+        for row, pairs in enumerate(((("软件内阅读", "open"), ("导出", "export"), ("打开保存目录", "folder")),
                       (("批量收藏", "favorite_on"), ("取消收藏", "favorite_off"), ("批量删除文件", "delete"), ("仅移除记录", "forget"))), start=3):
             actions = ttk.Frame(footer)
             actions.grid(row=row, column=0, sticky="ew", pady=3)
@@ -260,7 +260,10 @@ class LibraryWindow:
                 if len(selected) != 1:
                     self.messagebox.showinfo("请选择一项", "打开文件或目录时请选择一项。", parent=self.window)
                     return
-                self.app._open(self.library.checked_path(selected[0]) if action == "open" else Path(self.library.entries[selected[0]]["root"]))
+                if action == "open":
+                    self.app.read_comic(selected[0])
+                else:
+                    self.app._open(Path(self.library.entries[selected[0]]["root"]))
             else:
                 delete = action == "delete"
                 preview = "\n".join(self.library.entries[k]["path"] for k in selected[:8])

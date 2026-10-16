@@ -60,7 +60,7 @@ public final class LibraryScreen {
         body.addView(list,new LinearLayout.LayoutParams(-1,0,1));
         list.setOnItemClickListener((p,v,position,id)->{if(busy||position>=entries.size())return;String uri=entries.get(position).uri;if(list.isItemChecked(position))selected.add(uri);else selected.remove(uri);counts();});
         list.setOnItemLongClickListener((p,v,position,id)->{if(!busy&&position<entries.size())details(entries.get(position));return true;});
-        row(body,button("批量收藏",()->favorite(true)),button("取消收藏",()->favorite(false)),button("打开 / 详情",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)details(items.get(0));else message("请选择一项查看详情");}));
+        row(body,button("批量收藏",()->favorite(true)),button("取消收藏",()->favorite(false)),button("软件内阅读",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1){dialog.dismiss();ReaderActivity.open(activity,items.get(0));}else message("请选择一本漫画阅读");}));
         row(body,button("导出",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)new ExportScreen(activity,store,items.get(0)).show();else message("请选择一本 PDF、ZIP 或文件夹导出");}),button("删除文件",()->confirmRemove(true)),button("仅移除记录",()->confirmRemove(false)));
         stop=new Button(activity);stop.setText("停止操作");stop.setTextSize(12);stop.setEnabled(false);stop.setOnClickListener(v->cancel());
         row(body,stop,button("关闭",()->dialog.dismiss()));
@@ -142,8 +142,9 @@ public final class LibraryScreen {
         },null)).show();
     }
     private void details(LibraryStore.Entry entry){
-        if(entry.format.equals("images")){AlbumScreen.show(activity,store,entry);return;}
-        new AlertDialog.Builder(activity).setTitle(title(entry)).setItems(new String[]{"打开文件","分享文件",entry.favorite?"取消收藏":"加入收藏","系统文件管理器打开目录","软件内查看目录","格式互转 / 导出"},(d,index)->{
+        new AlertDialog.Builder(activity).setTitle(title(entry)).setItems(new String[]{"软件内阅读","分享文件",entry.favorite?"取消收藏":"加入收藏","系统文件管理器打开目录","软件内查看目录","格式互转 / 导出"},(d,index)->{
+            if(index==0){dialog.dismiss();ReaderActivity.open(activity,entry);return;}
+            if(index==1&&entry.format.equals("images")){message("图片文件夹请先导出为 ZIP 或 PDF 后分享。");return;}
             if(index==5){new ExportScreen(activity,store,entry).show();return;}
             if(index==0||index==1)perform(()->{library.check(entry);return "";},()->open(entry,index==1));
             else if(index==2)perform(()->{library.favorite(entry);return "已更新收藏";},null);
@@ -152,6 +153,7 @@ public final class LibraryScreen {
         }).setNegativeButton("关闭",null).show();
     }
     private void open(LibraryStore.Entry entry,boolean share){
+        if(!share){ReaderActivity.open(activity,entry);return;}
         Uri uri=Uri.parse(entry.uri);String mime=entry.format.equals("pdf")?"application/pdf":"application/zip";
         Intent intent=new Intent(share?Intent.ACTION_SEND:Intent.ACTION_VIEW).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.setClipData(ClipData.newRawUri("漫画",uri));
         if(share){intent.setType(mime);intent.putExtra(Intent.EXTRA_STREAM,uri);}else intent.setDataAndType(uri,mime);

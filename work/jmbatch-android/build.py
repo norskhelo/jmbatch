@@ -76,6 +76,8 @@ run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java
 run(java,'-cp',testout,'ArchivePagesTest',testroot/'archive-output')
 
 resources=build/'resources.zip';generated=build/'generated';generated.mkdir(exist_ok=True)
+run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/ReaderRules.java',ROOT/'tests/ReaderTest.java')
+run(java,'-cp',testout,'ReaderTest')
 run(buildtools/'aapt2.exe','compile','--dir',ROOT/'app/src/main/res','-o',resources)
 run(buildtools/'aapt2.exe','link','-I',platform,'--manifest',ROOT/'app/src/main/AndroidManifest.xml','--java',generated,'--min-sdk-version','26','--target-sdk-version','34','--version-code',VERSION_CODE,'--version-name',VERSION,'-o',build/'resources.apk',resources)
 classes=build/'classes';classes.mkdir(exist_ok=True)

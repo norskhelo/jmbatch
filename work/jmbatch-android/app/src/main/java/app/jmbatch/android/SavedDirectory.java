@@ -148,6 +148,11 @@ public final class SavedDirectory {
     }
 
     private void open(Item item, boolean share) {
+        String name=item.name.toLowerCase(Locale.ROOT);
+        if(!share&&(name.endsWith(".pdf")||name.endsWith(".zip"))){
+            ReaderActivity.open(activity,new LibraryStore.Entry(LibraryRules.idFromName(item.name),item.name,item.uri.toString(),tree==null?"":tree.toString(),label,name.endsWith(".pdf")?"pdf":"zip",false));
+            return;
+        }
         Intent intent=new Intent(share?Intent.ACTION_SEND:Intent.ACTION_VIEW).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         intent.setClipData(ClipData.newRawUri("文件",item.uri));
         if(share){intent.setType(item.mime);intent.putExtra(Intent.EXTRA_STREAM,item.uri);}else intent.setDataAndType(item.uri,item.mime);

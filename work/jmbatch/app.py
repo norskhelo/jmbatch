@@ -156,7 +156,7 @@ class App:
         ttk.Button(bar, text="取消选中", command=self.cancel).pack(side="left", padx=7)
         ttk.Button(bar, text="移除记录", command=self.remove).pack(side="left")
         ttk.Button(bar, text="已下载漫画", command=self.show_library).pack(side="left", padx=6)
-        ttk.Button(bar, text="打开文件", command=self.open_selected).pack(side="right")
+        ttk.Button(bar, text="软件内阅读", command=self.open_selected).pack(side="right")
         ttk.Button(bar, text="打开目录", command=self.open_output).pack(side="right", padx=7)
 
         stats = ttk.Frame(outer)
@@ -348,9 +348,17 @@ class App:
     def open_selected(self):
         task = self.selected_task()
         if task and task.result:
-            self._open(Path(task.result))
+            try:
+                self.engine.library.sync(self.engine.tasks)
+                self.read_comic(self.engine.library.key(task.result))
+            except Exception as exc:
+                messagebox.showerror("无法阅读", str(exc), parent=self.root)
         else:
             self.update_details()
+
+    def read_comic(self, key):
+        from reader_ui import open_reader
+        return open_reader(self, key)
 
     def _open(self, path):
         if not path.exists():
@@ -506,6 +514,8 @@ class App:
     def close(self):
         if self.engine.active and not messagebox.askyesno("退出 JM Batch", "退出会暂停全部下载任务并保留已验证图片。下次打开可继续。", parent=self.root):
             return
+        for reader in list(getattr(self, "readers", {}).values()):
+            reader.close()
         try:
             self.engine.settings = self.current_settings()
             self.engine.close()

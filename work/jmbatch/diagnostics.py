@@ -280,6 +280,59 @@ def run_self_test(directory: Path):
             other_format = "pdf" if source.suffix == ".zip" else "zip"
             assert export_album(source, directory / ("converted-to-" + other_format), other_format)[0].is_file()
         report["checks"].append("All six folder/ZIP/PDF conversion directions succeed offline and retain sources")
+        # Exercise the shipped reader on real folder, ZIP and PDF fixtures.
+        from reader import ReaderState
+        def reader_wait(predicate):
+            deadline = time.monotonic() + 15
+            while not predicate() and time.monotonic() < deadline:
+                root.update()
+                time.sleep(.025)
+            assert predicate(), "Reader operation timed out"
+        for source, fmt in ((Path(image_task.result), "images"), (zipped, "zip"), (exports[0], "pdf")):
+            reader_key = application.engine.library.key(source)
+            if reader_key not in application.engine.library.entries:
+                application.engine.library.import_found([dict(id="123459", title="Reader fixture", path=str(source), root=str(source.parent), format=fmt, favorite=False, added=0)])
+            reader = application.read_comic(reader_key)
+            reader_wait(lambda: len(reader.pages) == 5 and bool(reader.images))
+            assert application.read_comic(reader_key) is reader
+            reader.mode.set("左右翻页")
+            reader.relayout()
+            reader.go(3)
+            reader_wait(lambda: 3 in reader.images)
+            assert reader.current == 3 and "4/5" in reader.status.get()
+            if fmt != "pdf":
+                assert len(reader.starts) == 2
+                reader.chapter_step(-1)
+                assert reader.current == 0
+                reader.chapter_step(1)
+                assert reader.current == reader.starts[1]
+                reader.go(3)
+            else:
+                assert len(reader.starts) == 1
+            reader.mark()
+            assert 3 in reader.marks
+            reader.favorite()
+            assert Library(application.home).entries[reader_key]["favorite"]
+            for geometry in ("1000x820", "740x520"):
+                reader.window.geometry(geometry)
+                root.update()
+                for control in (reader.chapter_box, reader.favorite_button, reader.mark_button, reader.canvas):
+                    assert control.winfo_ismapped()
+                    assert control.winfo_rootx() + control.winfo_width() <= reader.window.winfo_rootx() + reader.window.winfo_width()
+            reader.close()
+            assert ReaderState(application.home).get(reader_key, 5) == dict(page=3, mode="paged", bookmarks=[3])
+            reader = application.read_comic(reader_key)
+            reader_wait(lambda: len(reader.pages) == 5 and 3 in reader.images)
+            assert reader.current == 3 and 3 in reader.marks and not reader.is_scroll()
+            reader.mode.set("滚动阅读")
+            reader.relayout()
+            reader.go(4)
+            reader_wait(lambda: 4 in reader.images)
+            reader_wait(lambda: reader.current == 4)
+            assert len(reader.images) <= 6
+            reader.close()
+        report["checks"].append("Internal folder/ZIP/PDF reader: render, chapters, page count, favorite, bookmark and restart restore")
+        report["checks"].append("Reader scroll/paged switching, last-page navigation, single-window reuse and controls at minimum size")
         image_library.window.destroy()
         report["checks"].append("Default ordered-image download, library recognition and explicit PDF export dialog preserve originals")
         report["checks"].append("Library UI: scan orphan export, select all/invert, batch favorite/unfavorite, search and persistence")

@@ -144,7 +144,8 @@ public final class MainActivity extends Activity {
     }
     private LibraryStore.Entry albumEntry(Store.Task task){return new LibraryStore.Entry(task.id,task.title,task.resultUri,task.settings.outputUri,task.settings.outputLabel,task.settings.format,false);}
     private void open(Store.Task task,boolean share){
-        if(task.settings.format.equals("images")){if(!task.resultUri.isEmpty())AlbumScreen.show(this,store,albumEntry(task));return;}
+        if(!share){if(!task.resultUri.isEmpty())ReaderActivity.open(this,albumEntry(task));return;}
+        if(task.settings.format.equals("images")){if(!task.resultUri.isEmpty())ReaderActivity.open(this,albumEntry(task));return;}
         if(task.resultUri.isEmpty())return;Uri uri=Uri.parse(task.resultUri);String mime=task.settings.format.equals("pdf")?"application/pdf":"application/zip";
         Intent intent=new Intent(share?Intent.ACTION_SEND:Intent.ACTION_VIEW).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         if(share){intent.setType(mime);intent.putExtra(Intent.EXTRA_STREAM,uri);intent.setClipData(ClipData.newRawUri("文件",uri));}else intent.setDataAndType(uri,mime);
