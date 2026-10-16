@@ -23,7 +23,7 @@ public final class JmApi {
     private final Store.Settings settings;
     private final String userCookie;
     private List<String> domains = new ArrayList<>(Arrays.asList(DEFAULT_API));
-    private int preferred;
+    private volatile int preferred;
     public final Control control;
 
     public static final class Control {

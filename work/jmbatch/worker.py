@@ -10,6 +10,7 @@ from pathlib import Path
 
 from core import Settings, ZIP_LAYOUT_VERSION, atomic_json, explain_error, export_images, task_cache, verify_image
 from chapters import ChapterChoiceRequired, resolve_chapters
+from chapter_metadata import MetadataCache, cache_scope, hydrate
 
 
 def parse_cookies(text: str):
@@ -133,20 +134,25 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
             emit({"type": "chapter_plan", "chapters": chosen})
             available = {str(photo.id): photo for photo in photos}
             photos = [available[item["id"]] for item in chosen]
-            # Hydrate all chapter metadata before displaying an exact total.
+            details = MetadataCache(cache / 'chapters', cache_scope(album, cookie))
+            hydrate(photos, details, self.client.check_photo,
+                    lambda done, total, cached: emit({'type': 'metadata',
+                        'message': f'读取所选章节 {done}/{total}（复用 {cached} 章，最多 4 章并行）'}))
             for item, photo in zip(chosen, photos):
                 index = item["number"]
-                self.client.check_photo(photo)
                 if len(photo) == 0:
                     raise ValueError(f"第 {index} 章没有图片，可能是访问权限或服务端数据异常。")
                 self.chapter_numbers[str(photo.id)] = index
                 self.expected_chapters[index] = len(photo)
                 self.expected += len(photo)
-                emit({"type": "metadata", "message": f"读取所选章节 {len(self.expected_chapters)}/{len(photos)}"})
             self.restore_cache(photos)
             emit({"type": "phase", "phase": "download", "message": f"继续下载剩余 {self.expected - self.completed} 张图片", "total": self.expected})
             for photo in photos:
                 self.download_by_photo_detail(photo)
+            if self.failed_pages:
+                # A stale image list/CDN may be responsible. Refresh only failed
+                # chapters on retry; successful chapters keep their metadata.
+                details.invalidate({str(im.from_photo.id): im.from_photo for im, _ in self.failed_pages}.values())
             if len(self.failed_pages) == 1:
                 image, error = self.failed_pages[0]
                 chapter = self.chapter_numbers[str(image.from_photo.id)]

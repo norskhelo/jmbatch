@@ -318,6 +318,9 @@ def run_self_test(directory: Path):
             assert session is not None
         assert AES.new(b"0" * 16, AES.MODE_ECB).encrypt(b"0" * 16)
         report["checks"].append("native HTTP session and AES initialized without network")
+        from chapter_metadata_checks import check_metadata_resume
+        check_metadata_resume(directory / 'chapter-metadata')
+        report["checks"].append("Bounded chapter metadata: four workers, persisted records, restart reuses all 12 chapters without detail requests")
         from network_routes import run_routes, RoutesExhausted
         route_calls = []
         def simulated_connection(host):

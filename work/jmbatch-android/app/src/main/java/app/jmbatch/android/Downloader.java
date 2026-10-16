@@ -75,19 +75,37 @@ public final class Downloader {
         }
         List<ChapterRules.Chapter> chosen=ChapterRules.resolve(catalog,task.selectedChapters,task.settings.downloadAllChapters);
         task.selectedChapters=Collections.unmodifiableList(new ArrayList<>(chosen));store.save();control.check();
-        List<ImageJob> jobs = new ArrayList<>(); Set<String> chapterIds = new HashSet<>(); long scramble = -1;
+        StringBuilder stamp=new StringBuilder(album.optString("total_photos"));
+        for(ChapterRules.Chapter c:catalog)stamp.append('\n').append(c.id).append(':').append(c.title.length()).append(':').append(c.title);
+        ChapterMetadata.Cache metadata=new ChapterMetadata.Cache(new File(cache,"chapters"),ChapterMetadata.scope(task.id,cookie,stamp.toString()));
+        List<String> selectedIds=new ArrayList<>();for(ChapterRules.Chapter c:chosen)selectedIds.add(c.id);
+        ChapterMetadata.Fetch fetch=new ChapterMetadata.Fetch(){
+            private long scramble=-1;
+            private synchronized long decodeParameter(String id)throws Exception{
+                control.check();if(scramble<0)scramble=api.scramble(id);return scramble;
+            }
+            public ChapterMetadata.Detail get(String id)throws Exception{
+                JSONObject detail=api.detail("chapter",id);JSONArray array=detail.optJSONArray("images");
+                if(array==null||array.length()==0)throw new IOException("章节没有图片，可能需要登录");
+                List<String> images=new ArrayList<>();for(int p=0;p<array.length();p++)images.add(array.getString(p));
+                return new ChapterMetadata.Detail(images,decodeParameter(id));
+            }
+        };
+        List<ChapterMetadata.Detail> details;
+        try{details=ChapterMetadata.load(selectedIds,metadata,fetch,control::check,
+            ()->{if(control.stop.isEmpty())control.cancel("ABORT");},
+            (done,total,cached)->{control.lastData=SystemClock.elapsedRealtime();task.phase="读取所选章节 "+done+"/"+total+"（复用 "+cached+" 章，最多 4 章并行）";},task.settings.timeout);}
+        catch(ChapterMetadata.UnstoppedWorkers error){control.cancel("FATAL");throw error;}
+        List<ImageJob> jobs = new ArrayList<>(); Set<String> chapterIds = new HashSet<>(); int detailIndex=0;
         for (ChapterRules.Chapter chapter : chosen) {
             control.check(); String id = chapter.id;
             if (!id.matches("[0-9]{1,10}")) throw new IOException("服务端章节编号无效");
             if (!chapterIds.add(id)) continue;
-            int index = chapter.number; task.phase = "读取所选章节 " + chapterIds.size() + "/" + chosen.size();
-            JSONObject detail = api.detail("chapter", id); JSONArray files = detail.optJSONArray("images");
-            if (files == null || files.length() == 0) throw new IOException("第 " + index + " 章没有图片，可能需要登录");
-            if (scramble < 0) scramble = api.scramble(id);
+            int index = chapter.number; ChapterMetadata.Detail detail=details.get(detailIndex++); List<String> files=detail.images;
             File directory = new File(new File(cache, "images"), String.format(Locale.ROOT, "%04d", index));
             if (!directory.exists() && !directory.mkdirs()) throw new IOException("无法创建图片目录");
-            for (int p = 0; p < files.length(); p++) {
-                ImageJob job = new ImageJob(); job.chapterId = id; job.filename = files.getString(p); job.chapter = index; job.page = p + 1; job.scramble = scramble;
+            for (int p = 0; p < files.size(); p++) {
+                ImageJob job = new ImageJob(); job.chapterId = id; job.filename = files.get(p); job.chapter = index; job.page = p + 1; job.scramble = detail.scramble;
                 job.target = new File(directory, String.format(Locale.ROOT, "%05d.jpg", p + 1)); jobs.add(job);
                 if (jobs.size() > 20000) throw new IOException("单本超过 20000 张图片，请拆分任务");
             }
@@ -127,6 +145,7 @@ public final class Downloader {
             }
         }
         control.check();
+        for(SinglePageRecovery.Failure<ImageJob> failure:failed)metadata.invalidate(failure.page.chapterId);
         SinglePageRecovery.recover(failed,(job,round)->downloadImage(api,job,round),control::check,
             message->{task.stage=control.stage="page_retry";control.lastData=SystemClock.elapsedRealtime();task.phase=message;},
             error->!(error instanceof NetworkRoutes.HttpFailure && ((NetworkRoutes.HttpFailure)error).code<500)

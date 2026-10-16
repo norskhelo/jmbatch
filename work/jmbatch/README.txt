@@ -1,4 +1,4 @@
-JM Batch 0.3.6 — Windows 使用说明
+JM Batch 0.3.7 — Windows 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每个任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.3.6 — Windows 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-16）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.6-0.4.6/JMBatch-0.3.6-Windows-x64.zip
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.6-0.4.6/JMBatch-0.3.6-Windows-x64.zip
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.6-0.4.6/JMBatch-0.3.6-Windows-x64.zip
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.6-0.4.6/SHA256-release-0.3.6-0.4.6.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.3.7-Windows-x64.zip
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.3.7-Windows-x64.zip
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.3.7-Windows-x64.zip
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/SHA256-release-0.3.7-0.4.7.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -24,7 +24,7 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.6-0
 
 10. 点击主界面“检查更新 / 公告”立即联网检查，更新窗口与完整公告也可手动检查。关闭启动自动检查后仍可使用。检查采用已保存仓库；修改后先保存。检查失败保留离线公告，可再次点击重试。下载和安装新版需要手动确认。
 
-Windows 0.3.6 / Android 0.4.6 — 2026-10-16
+Windows 0.3.7 / Android 0.4.7 — 2026-10-16
 
 下载章节选择
 
@@ -36,7 +36,9 @@ Windows 0.3.6 / Android 0.4.6 — 2026-10-16
 
 版本与验证
 
-• Windows 升至 0.3.6；Android 升至 0.4.6（versionCode 406），沿用原包名、APK 签名身份和更新公钥。
+• Windows 升至 0.3.7；Android 升至 0.4.7（versionCode 407），沿用原包名、APK 签名身份和更新公钥。
 • 使用离线章节素材验证选择、默认全选、缓存续传、队列调度和三种成品；Windows 源码与冻结成品执行实际界面自检。
 • Android 执行宿主测试、编译和签名核验；未进行 Android 真机界面或真实网站下载验证。
 • 同步源码、使用说明、同版日志、双端安装包、SHA-256 校验文件和签名更新清单。
+
+章节读取提速：每任务最多 4 章并行读取，图片线程数不影响此上限。成功读取的章节在任务内部缓存 24 小时，暂停/重启/重试可复用；过期、损坏、Cookie 或目录信息变化会重新获取。进度显示复用章数；每次开始仍会联网确认漫画目录。旧任务首次使用新版需读取一次，缓存不会出现在导出的漫画中。
