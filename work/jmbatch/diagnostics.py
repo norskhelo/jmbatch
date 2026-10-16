@@ -623,6 +623,9 @@ def run_self_test(directory: Path):
         report["checks"].append("Manual check works from main/update/announcement buttons with automatic checks off and settings unchanged")
         report["checks"].append("Manual check coalesces clicks, shows async result, preserves offline notes and allows failure retry")
         report["checks"].append("Check controls fit minimum window; empty repo and update install/download prevent requests")
+        from cleanup_checks import check_cleanup_ui
+        check_cleanup_ui(application, directory)
+        report["checks"].append("cache cleanup UI: real button, background work, accurate result, resume protection and start exclusion")
         root.destroy()
         report["ok"] = True
     except Exception:

@@ -42,6 +42,7 @@ public final class MainActivity extends Activity {
         add(text("安卓独立下载  /  "+Core.VERSION,12,MUTED),0,4);
         Button updateButton=button("检查更新 / 公告",v->{});add(updateButton,0,10);updates=new GithubUpdates(this,updateButton);handler.postDelayed(()->updates.startup(),1500);
         add(button("已下载漫画 / 收藏",v->new LibraryScreen(this,store).show()),0,6);
+        add(button("清理下载缓存",v->CleanupScreen.show(this,store,null)),0,6);
 
         LinearLayout target=card();target.addView(text("新增任务保存到",13,MUTED));
         output=text(store.settings.outputLabel,14,INK);output.setPadding(0,dp(8),0,dp(6));target.addView(output);
@@ -104,12 +105,13 @@ public final class MainActivity extends Activity {
             row.state.setText(Store.status(task.status)+" · "+(task.settings.format.equals("images")?"图片":task.settings.format.toUpperCase(Locale.ROOT))+" · "+task.progressText()+" · 重置 "+task.resets);
             row.state.setTextColor(task.status.equals("failed")?Color.rgb(180,35,54):task.status.equals("done")?ACCENT:MUTED);
             row.progress.setIndeterminate(task.status.equals("running")&&task.total==0);row.progress.setProgress((int)(DownloadDisplay.percent(task.done,task.total,task.status)*10));
-            row.phase.setText((task.status.equals("done")?"下载完成":task.phase)+"\n"+task.sizeText()+(task.status.equals("running")||task.status.equals("resetting")?"\n"+DownloadDisplay.speed(task.speed)+" · "+task.etaText():""));row.open.setVisibility(task.resultUri.isEmpty()?View.GONE:View.VISIBLE);
+            row.phase.setText(task.phase+"\n"+task.sizeText()+(task.status.equals("running")||task.status.equals("resetting")?"\n"+DownloadDisplay.speed(task.speed)+" · "+task.etaText():""));row.open.setVisibility(task.resultUri.isEmpty()?View.GONE:View.VISIBLE);
             downloadCovers.bind(task,row.cover);
         }
         Iterator<Map.Entry<String,Row>> iterator=rows.entrySet().iterator();while(iterator.hasNext()){Map.Entry<String,Row> entry=iterator.next();if(!visible.contains(entry.getKey())){entry.getValue().cover.remove();queue.removeView(entry.getValue().card);iterator.remove();}}
         summary.setText("共 "+tasks.size()+" 本  ·  完成 "+completed+"  ·  失败 "+failed);
         global.setText(active==0?(store.running?"正在启动…":store.note.isEmpty()?(completed>0&&completed==tasks.size()?"下载完成":"就绪 / 队列已停止"):store.note):"同时下载 "+active+" 本 · 总速度 "+DownloadDisplay.speed(speed));
+        if(!store.cleanupNotice.isEmpty())global.append("\n最近清理："+store.cleanupNotice);
         start.setEnabled(!store.running);pause.setEnabled(store.running);more.setVisibility(tasks.size()>limit?View.VISIBLE:View.GONE);
         showChapterSelection();
     }
@@ -190,13 +192,8 @@ public final class MainActivity extends Activity {
         AlertDialog.Builder builder=new AlertDialog.Builder(this).setTitle("任务详情").setView(scroll).setNegativeButton("关闭",null);
         if(task.status.equals("done"))builder.setPositiveButton("格式互转 / 导出",(d,w)->new ExportScreen(this,store,albumEntry(task)).show());
         else builder.setPositiveButton("取消任务",(d,w)->{send(DownloadService.CANCEL,task.key);});
-        if(!task.status.equals("running")&&!task.status.equals("resetting"))builder.setNeutralButton("清理缓存",(d,w)->confirmClear(task));
+        if(!task.status.equals("running")&&!task.status.equals("resetting"))builder.setNeutralButton("清理临时缓存",(d,w)->CleanupScreen.show(this,store,task));
         builder.show();
-    }
-    private void confirmClear(Store.Task task){
-        new AlertDialog.Builder(this).setTitle("清理此任务的图片缓存？").setMessage("已导出的文件保留。清理后再次重试需要重新下载图片。").setNegativeButton("返回",null).setPositiveButton("清理",(d,w)->{
-            try{if(store.activeKeys.contains(task.key)||task.status.equals("queued")||task.status.equals("running")||task.status.equals("resetting"))throw new IOException("请先暂停此任务并等待请求结束");File cache=store.cache(task);Downloader.deleteOwned(cache,cache.getParentFile());toast("缓存已清理");}catch(Exception error){showError(error.getMessage());}
-        }).show();
     }
     private LibraryStore.Entry albumEntry(Store.Task task){return new LibraryStore.Entry(task.id,task.title,task.resultUri,task.settings.outputUri,task.settings.outputLabel,task.settings.format,false);}
     private void open(Store.Task task,boolean share){

@@ -1,4 +1,4 @@
-JM Batch 0.3.8 — Windows 使用说明
+JM Batch 0.3.9 — Windows 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每个任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.3.8 — Windows 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-16）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.3.8-Windows-x64.zip
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.3.8-Windows-x64.zip
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.3.8-Windows-x64.zip
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/SHA256-release-0.3.8-0.4.8.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.9-0.4.9/JMBatch-0.3.9-Windows-x64.zip
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.9-0.4.9/JMBatch-0.3.9-Windows-x64.zip
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.9-0.4.9/JMBatch-0.3.9-Windows-x64.zip
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.9-0.4.9/SHA256-release-0.3.9-0.4.9.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,27 +28,20 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
+Windows 0.3.9 / Android 0.4.9 — 2026-10-16
 
-Windows 0.3.8 / Android 0.4.8 — 2026-10-16
+手动清理下载缓存与自动清理提示
 
-Android 图片文件夹校验与保存优化
-
-• 图片直接复制到目标目录的临时文件夹，减少一遍完整中间复制；复制时计算源 CRC，写入完成后完整读回目标文件核验大小和 CRC。
-• 保留默认目录逐文件刷盘、同名拒绝覆盖、失败清理和最终重命名；完成标记保存后才清理下载缓存。暂停或写入失败保留原图片缓存，重试可继续复用。
-• 校验显示已检查张数；保存和读回校验显示张数与字节进度；核对目录、清理临时图片也显示进度。任务完成前总百分比仍以已下载图片为基础，上限为 99.9%，实际收尾进度看阶段文字。
-• 核对成品时复用一次章节根目录枚举，避免逐章重复扫描。默认目录和自选系统目录都减少中间复制；系统目录实际速度仍取决于存储提供方。
-• 对同样的图片有效载荷，复制与 CRC 的整图逻辑读写由 4 次读 + 2 次写减少为 2 次读 + 1 次写；不把此比例等同于耗时或闪存物理流量的减少比例。
-
-双端章节读取并行数可配置
-
-• Windows 与 Android 设置中加入“每个任务章节读取并行数”，范围 1–8，默认 4，独立于图片线程数。原配置和已有任务缺少此字段时使用 4。
-• 网络稳定时可试 6 或 8；更高并行数不保证更快，出现超时或限流可调低。同时下载多本时，章节请求数会叠加。
-• 设置用于新任务及手动重试；运行中任务和直接暂停后继续保留原设置。想让已有任务使用新值，先暂停、保存设置，再手动重试。
-• 读取提示显示实际配置上限；保留选中章节、原编号顺序、24 小时章节缓存和图片断点续传。
+• 双端主界面加入“清理下载缓存”，暂停全部下载并等待请求退出后可使用；清理在后台执行，显示进度与结果，清理期间不能启动下载。
+• 手动清理队列中已完成任务的可删除图片缓存、章节缓存，以及各任务内未完成的图片临时文件、导出临时文件和保存暂存目录。暂停、失败、取消、排队及待选章节任务的完整图片与章节信息保留，支持继续下载。
+• 自动清理在成品校验、保存并写入完成标记后执行；支持 PDF、ZIP、图片文件夹和完成标记恢复路径。清理后明确显示删除文件数、释放的文件字节数及未能清理的数量，失败可手动重试，成品仍显示下载完成。
+• Windows 在任务详情及日志显示自动清理结果；Android 在任务列表、详情及主界面显示结果，并保存最近一次清理提示，重开应用可见。
+• 保留已下载成品、收藏、书签、队列和完成标记；沿用任务的“保留图片缓存”设置。手动清理无法确认成品存在时保留完整图片缓存，拒绝跟随符号链接或目录联接。
+• 仅处理仍有队列记录的任务目录内已知缓存，不扫描系统垃圾、不删除无法确认归属的文件、不清理已移除记录的孤立缓存，也不触及外部保存目录中的可疑残留。需要清理时请先清理缓存，再移除任务记录。
 
 版本与验证
 
-• Windows 0.3.8；Android 0.4.8（versionCode 408），沿用原包名、APK 签名证书及更新公钥。
-• 覆盖单章/多章保存、输出字节一致、CRC 不一致、截断/多余字节、写入/刷盘失败、中途暂停、重试、同名保护、清理边界和进度；双端验证 1、4、8 章并行及缓存复用。
-• Windows 执行回归测试、源码及冻结成品自检；Android 执行宿主测试、编译和签名核验，未连接 Android 真机。宿主文件测试不代表手机保存耗时。
-• 同步源码、使用说明、同版日志、安装包、SHA-256 校验文件及签名更新清单。
+• Windows 0.3.9；Android 0.4.9（versionCode 409），保留原包名、APK 签名证书及更新公钥。
+• 验证三种下载格式的自动清理和恢复、文件数/字节数、续传与成品保护、重复清理、缺失路径、清理失败重试及链接目录边界；Windows 包含实际界面按钮与后台互斥检查。
+• Windows 执行回归测试、源码和冻结成品自检；Android 执行宿主测试、编译及签名核验，未连接 Android 真机，不将宿主结果视为手机实测。
+• 同步源码、使用说明、同版更新日志、安装包、SHA-256 校验文件和签名更新清单。

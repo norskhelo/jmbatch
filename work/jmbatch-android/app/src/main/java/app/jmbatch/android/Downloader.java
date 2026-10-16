@@ -32,6 +32,7 @@ public final class Downloader {
     }
 
     public String run() throws Exception {
+        task.cleanupNote="";
         File marker = new File(cache, "completed.json");
         if (marker.isFile()) {
             try {
@@ -54,6 +55,7 @@ public final class Downloader {
                                 if (descriptor != null) task.resultBytes = Math.max(0, descriptor.getStatSize());
                             } catch (IOException ignored) { /* Older providers may not report a size. */ }
                         }
+                        cleanImageCache();
                         return uri.toString();
                     }
                 }
@@ -209,9 +211,7 @@ public final class Downloader {
         String uri = publish(partial);
         task.resultBytes = resultSize;
         writeTextAtomic(marker, new JSONObject().put("uri", uri).put("images", jobs.size()).put("resultBytes", resultSize).put("numericFilename", task.settings.numericFilename).put("flatZip", task.settings.flatZip).put("zipLayoutVersion", Core.ZIP_LAYOUT_VERSION).toString());
-        if (!task.settings.keepImages) {
-            try { deleteOwned(new File(cache, "images"), cache); } catch (IOException ignored) { /* A valid output is still a success. */ }
-        }
+        cleanImageCache();
         return uri;
     }
 
@@ -223,8 +223,13 @@ public final class Downloader {
         control.lastData=SystemClock.elapsedRealtime();
     }
     private void cleanImageCache() {
-        if(!task.settings.keepImages)try{FolderSave.clean(new File(cache,"images"),cache,control::check,this::saveProgress);}
-        catch(Exception error){if(control.stop.isEmpty())store.note="图片已保存，部分临时缓存未清理："+error.getMessage();}
+        task.stage=control.stage="cleanup";
+        CacheCleanup.Result result=CacheCleanup.clean(cache,cache.getParentFile(),true,task.settings.keepImages,r->{
+            task.phase=r.message(true);control.lastData=SystemClock.elapsedRealtime();
+        });
+        if(result.files>0||result.errors>0){
+            task.cleanupNote=result.message(true);store.cleanupNotice="JM"+task.id+" "+task.cleanupNote;
+        }
     }
 
     private void downloadImage(JmApi api, ImageJob job, int retryRound) throws Exception {

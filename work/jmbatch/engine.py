@@ -38,6 +38,7 @@ class Engine:
         self.settings = Settings()
         self.cookie = ""
         self.running = False
+        self.cleaning = False
         self.active: dict[str, WorkerState] = {}
         self.last_saved = 0
         self.context = mp.get_context("spawn")
@@ -87,6 +88,9 @@ class Engine:
         return count
 
     def start(self):
+        if self.cleaning:
+            self.notify("正在清理缓存，请稍后开始。")
+            return
         for task in self.tasks:
             if task.status == "paused":
                 task.status = "selecting" if task.chapter_options and not task.selected_chapters else "queued"
@@ -136,6 +140,8 @@ class Engine:
         self.save()
 
     def retry(self, keys, settings: Settings | None = None):
+        if self.cleaning:
+            raise ValueError("正在清理缓存，请稍后重试。")
         count = 0
         for task in self.tasks:
             if task.key in keys and task.status in ("failed", "cancelled", "paused"):
@@ -250,12 +256,14 @@ class Engine:
             task.phase = event["message"]
             task.speed = 0
             self.notify(f"JM{task.album_id} 下载完成：{task.result}")
+            if event.get("cleanup"):
+                self.notify(f"JM{task.album_id} {event['cleanup']}")
             try:
                 self.library.sync(self.tasks)
             except OSError as exc:
                 self.notify(f"文件已下载，但漫画列表保存失败：{exc}")
             if task.metrics:
-                labels = {"startup": "准备", "metadata": "连接/元数据", "cache": "已有图片校验", "download": "图片下载与处理", "verify": "导出前校验", "export": "导出与清理"}
+                labels = {"startup": "准备", "metadata": "连接/元数据", "cache": "已有图片校验", "download": "图片下载与处理", "verify": "导出前校验", "export": "导出", "cleanup": "缓存清理"}
                 stages = task.metrics.get("stages", {})
                 text = "，".join(f"{labels.get(key, key)} {seconds:.2f}s" for key, seconds in stages.items())
                 self.notify(f"JM{task.album_id} 本轮耗时 {task.metrics['total_seconds']:.2f}s：{text}")
@@ -316,7 +324,7 @@ class Engine:
         now = time.monotonic() if now is None else now
         for state in list(self.active.values()):
             self._tick_worker(state, now)
-        if self.running:
+        if self.running and not self.cleaning:
             for task in self.tasks:
                 if len(self.active) >= self.settings.concurrent_tasks:
                     break

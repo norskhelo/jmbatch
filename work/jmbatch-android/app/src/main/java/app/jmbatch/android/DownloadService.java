@@ -118,7 +118,7 @@ public final class DownloadService extends Service {
                     try{
                         String result=new Downloader(DownloadService.this,store,task,attempt,store.cookie).run();
                         // Keep an already committed output successful if cancellation arrived just after publishing it.
-                        task.resultUri=result;task.status="done";task.phase="下载完成";task.error="";
+                        task.resultUri=result;task.status="done";task.phase="下载完成"+(task.cleanupNote.isEmpty()?"":"；"+task.cleanupNote);task.error="";
                         try{LibraryStore.get(DownloadService.this).sync(store.snapshot());}catch(Exception error){store.note="文件已下载，但漫画列表保存失败："+error.getMessage();}
                         break;
                     }catch(Throwable error){

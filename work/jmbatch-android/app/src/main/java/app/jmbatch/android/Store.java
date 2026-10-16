@@ -18,6 +18,7 @@ public final class Store {
     public volatile boolean running;
     public volatile boolean libraryBusy;
     public volatile String note = "";
+    public volatile String cleanupNotice = "";
     private final AtomicFile file;
 
     public static final class Settings {
@@ -64,6 +65,7 @@ public final class Store {
         public volatile long bytes, speed, elapsed;
         public volatile long imageBytes, resultBytes, downloadStarted;
         public volatile String stage = "metadata";
+        public volatile String cleanupNote = "";
         public volatile List<ChapterRules.Chapter> chapterOptions = Collections.emptyList(), selectedChapters = Collections.emptyList();
         public String progressText() { return DownloadDisplay.progress(done, total, status); }
         public String sizeText() { return DownloadDisplay.sizeText(done, total, imageBytes, resultBytes, status); }
@@ -76,6 +78,7 @@ public final class Store {
             if (!id.matches("[0-9]{1,10}") || !key.matches("[0-9a-f-]{36}")) throw new JSONException("任务数据无效");
             settings = new Settings(json.getJSONObject("settings")); title = json.optString("title"); status = json.optString("status", "paused");
             phase = json.optString("phase"); error = json.optString("error"); resultUri = json.optString("resultUri");
+            cleanupNote = json.optString("cleanupNote");
             done = json.optInt("done"); total = json.optInt("total"); cached = json.optInt("cached"); resets = json.optInt("resets"); elapsed = json.optLong("elapsed");
             imageBytes = json.optLong("imageBytes"); resultBytes = json.optLong("resultBytes");
             chapterOptions = ChapterSelection.read(json.optJSONArray("chapterOptions"));
@@ -86,7 +89,7 @@ public final class Store {
             JSONObject json = new JSONObject();
             try { json.put("chapterOptions", ChapterSelection.json(chapterOptions)).put("selectedChapters", ChapterSelection.json(selectedChapters)).put("id", id).put("key", key).put("settings", settings.json()).put("title", title).put("status", status).put("phase", phase).put("error", error)
                 .put("resultUri", resultUri).put("done", done).put("total", total).put("cached", cached).put("resets", resets).put("elapsed", elapsed)
-                .put("imageBytes", imageBytes).put("resultBytes", resultBytes); }
+                .put("imageBytes", imageBytes).put("resultBytes", resultBytes).put("cleanupNote",cleanupNote); }
             catch (JSONException impossible) { throw new IllegalStateException(impossible); }
             return json;
         }
@@ -98,6 +101,7 @@ public final class Store {
         try (InputStream input = file.openRead()) {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream(); Core.copy(input, buffer);
             JSONObject root = new JSONObject(buffer.toString("UTF-8")); settings = new Settings(root.getJSONObject("settings"));
+            cleanupNotice = root.optString("cleanupNotice");
             JSONArray list = root.getJSONArray("tasks"); for (int i = 0; i < list.length(); i++) tasks.add(new Task(list.getJSONObject(i)));
         } catch (Exception error) {
             tasks.clear(); settings = new Settings();
@@ -110,7 +114,7 @@ public final class Store {
         FileOutputStream stream = null;
         try {
             JSONObject root = new JSONObject(); JSONArray list = new JSONArray();
-            for (Task task : tasks) list.put(task.json()); root.put("settings", settings.json()).put("tasks", list);
+            for (Task task : tasks) list.put(task.json()); root.put("settings", settings.json()).put("tasks", list).put("cleanupNotice",cleanupNotice);
             stream = file.startWrite(); stream.write(root.toString(2).getBytes(StandardCharsets.UTF_8)); file.finishWrite(stream);
         } catch (Exception error) { if (stream != null) file.failWrite(stream); throw new IOException("保存队列失败：" + error.getMessage(), error); }
     }

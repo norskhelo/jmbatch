@@ -59,6 +59,16 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
     cache = task_cache(task)
     cache.mkdir(parents=True, exist_ok=True)
     marker = cache / "completed.json"
+
+    def finish(artifact, total, size):
+        from cache_cleanup import clean_task
+        emit({"type": "phase", "phase": "cleanup", "message": "正在清理下载临时缓存"})
+        cleaned = clean_task(task, completed=True, progress=lambda r: emit({
+            "type": "export_progress", "message": r.message(True)}))
+        notice = cleaned.message(True) if cleaned.files or cleaned.errors else ""
+        emit({"type": "done", "path": str(artifact), "total": total, "result_bytes": size,
+              "message": "下载完成" + ("；" + notice if notice else ""), "cleanup": notice})
+
     if marker.exists():
         completed = json.loads(marker.read_text(encoding="utf-8"))
         artifact = Path(completed["path"])
@@ -69,8 +79,7 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
             except (OSError, ValueError, KeyError):
                 pass
             else:
-                emit({"type": "done", "path": str(artifact), "total": len(saved),
-                      "result_bytes": sum(Path(e["path"]).stat().st_size for e in saved), "message": "下载完成"})
+                finish(artifact, len(saved), sum(Path(e["path"]).stat().st_size for e in saved))
                 return
         if (artifact.is_file() and artifact.parent.resolve() == output.resolve()
                 and settings.format != "images"
@@ -85,7 +94,7 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
                 with zipfile.ZipFile(artifact) as archive:
                     valid = archive.testzip() is None and len(archive.infolist()) == completed["images"]
             if valid:
-                emit({"type": "done", "path": str(artifact), "total": completed["images"], "result_bytes": artifact.stat().st_size, "message": "下载完成"})
+                finish(artifact, completed["images"], artifact.stat().st_size)
                 return
     if shutil.disk_usage(output).free < 256 * 1024 ** 2:
         raise OSError(28, "下载前至少需要 256 MB 可用空间。")
@@ -291,17 +300,7 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
     else:
         final = export_images(task, album.name, entries, emit)
         result_size = final.stat().st_size
-    warning = ""
-    if not settings.keep_images:
-        try:
-            # This path is solely owned by this task; completed.json remains.
-            images = cache / "images"
-            if images.is_symlink() or images.resolve().parent != cache.resolve():
-                raise ValueError("图片缓存路径异常")
-            shutil.rmtree(images)
-        except (OSError, ValueError) as exc:
-            warning = "成品已保存，但图片缓存清理失败：" + str(exc)
-    emit({"type": "done", "path": str(final), "total": len(entries), "result_bytes": result_size, "message": "下载完成" + ("；" + warning if warning else "")})
+    finish(final, len(entries), result_size)
 
 
 def worker_entry(task: dict, cookie: str, channel):

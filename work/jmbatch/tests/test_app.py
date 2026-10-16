@@ -66,7 +66,8 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(progress[-1]["image_bytes"], actual_images)
         self.assertEqual(progress[-1]["bytes"], actual_images)
         result = events[-1]
-        self.assertEqual(result["message"], "下载完成")
+        self.assertTrue(result["message"].startswith("下载完成"))
+        self.assertIn("自动清理", result["cleanup"])
         self.assertEqual(result["result_bytes"], Path(result["path"]).stat().st_size)
         restored = []
         run_download(task, "", restored.append, FixtureClient)
@@ -252,7 +253,7 @@ class IntegrationTests(unittest.TestCase):
         self.assertEqual(len(observed), 5)
         self.assertEqual(len(set(observed)), 1)
         metrics = next(event["metrics"] for event in events if event["type"] == "metrics")
-        self.assertEqual(set(metrics["stages"]), {"startup", "metadata", "cache", "download", "verify", "export"})
+        self.assertEqual(set(metrics["stages"]), {"startup", "metadata", "cache", "download", "verify", "export", "cleanup"})
         self.assertGreater(metrics["total_seconds"], 0)
         self.assertGreater(metrics["downloaded_image_bytes"], 0)
 

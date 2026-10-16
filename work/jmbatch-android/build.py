@@ -65,6 +65,15 @@ run(java,'-cp',testout,'NetworkTest')
 
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/DownloadDisplay.java',ROOT/'tests/DownloadDisplayTest.java')
 run(java,'-cp',testout,'DownloadDisplayTest')
+run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/CacheCleanup.java',ROOT/'tests/CacheCleanupTest.java')
+# Windows junction fixtures exercise the same canonical-path guard used on Android.
+import _winapi
+links=testroot/'cleanup-links';outside=links/'outside';outside.mkdir(parents=True,exist_ok=True)
+(outside/'keep.jpg').write_bytes(b'preserve')
+linked_task=links/'work/task';linked_task.mkdir(parents=True,exist_ok=True)
+for link in (linked_task/'images',linked_task/'album-stage'):
+    if not link.exists():_winapi.CreateJunction(str(outside),str(link))
+run(java,'-cp',testout,'CacheCleanupTest',testroot/'cache-cleanup',links)
 
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/DownloadPool.java',ROOT/'tests/DownloadPoolTest.java')
 run(java,'-cp',testout,'DownloadPoolTest')

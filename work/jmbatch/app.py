@@ -108,6 +108,9 @@ class App:
         header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         ttk.Label(header, text="JM Batch", font=("Segoe UI", 26, "bold"), foreground=INK).pack(side="left")
         ttk.Label(header, text="  /  编号批量下载", font=("Microsoft YaHei UI", 12), foreground=MUTED).pack(side="left", pady=(10, 0))
+        from cleanup_ui import show_cleanup
+        self.cleanup_button = ttk.Button(header, text="清理下载缓存", command=lambda: show_cleanup(self))
+        self.cleanup_button.pack(side="right", padx=(6, 0))
         ttk.Button(header, text="下载设置", command=self.settings_dialog).pack(side="right")
         self.update_button = ttk.Button(header, text="检查更新 / 公告")
         self.update_button.pack(side="right", padx=6)
