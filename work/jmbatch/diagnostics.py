@@ -52,6 +52,76 @@ def stalled_worker(task, cookie, channel):
     time.sleep(120)
 
 
+def cover_fixture_worker(task, cookie, channel):
+    from core import task_cache
+    class SlowPages(FixtureClient):
+        def download_by_image_detail(self, image, path, decode_image=True):
+            if image.from_photo.sort != 1 or image.index != 1:
+                deadline = time.monotonic() + 60
+                while not (task_cache(task) / "continue-cover-test").exists():
+                    if time.monotonic() > deadline:
+                        raise TimeoutError("Offline cover fixture was not released")
+                    time.sleep(.05)
+            super().download_by_image_detail(image, path, decode_image)
+    try:
+        run_download(task, cookie, channel.put, client_factory=SlowPages)
+    except Exception as exc:
+        channel.put({"type": "error", "error": explain_error(exc, cookie)})
+
+
+def check_download_covers_ui(application, directory):
+    """Actual queue and child downloads: show covers before allowing remaining pages."""
+    from core import task_cache
+    from engine import Engine
+    old_engine, root = application.engine, application.root
+    engine = Engine(directory / "live-cover-state", worker_target=cover_fixture_worker)
+    application.engine = engine
+    def wait(predicate):
+        deadline = time.monotonic() + 25
+        while time.monotonic() < deadline:
+            engine.tick()
+            application.render()
+            root.update()
+            if predicate():
+                return
+            time.sleep(.05)
+        raise AssertionError("Live download cover UI timed out: " + str([t.to_dict() for t in engine.tasks]))
+    try:
+        for fmt in ("pdf", "zip", "images"):
+            engine.add(["123456"], Settings(output=str(directory / "live-cover-output"), format=fmt, threads=1, concurrent_tasks=3))
+        tasks = list(engine.tasks)
+        engine.start()
+        # At minimum height, scroll to each row while its download remains blocked.
+        root.geometry("1020x780")
+        for task in tasks:
+            wait(lambda: application.tree.exists(task.key))
+            application.tree.see(task.key)
+            wait(lambda: task.done == 1 and application.download_covers.images.get(task.key, (None, False))[1])
+            assert task.status == "running" and task.done < task.total and not task.result
+            x, y, width, height = application.tree.bbox(task.key, "#0")
+            assert width >= 54 and y + height <= application.tree.winfo_height(), (y, height, application.tree.winfo_height())
+            assert application.tree.item(task.key, "image")
+        engine.pause()
+        for task in tasks:
+            assert task.status == "paused"
+            assert application.download_covers.images[task.key][1]
+            (task_cache(task.to_dict()) / "continue-cover-test").touch()
+        engine.start()
+        wait(lambda: not engine.running and all(t.status == "done" for t in tasks))
+        for task in tasks:
+            assert not (task_cache(task.to_dict()) / "images").exists()
+            application.tree.see(task.key)
+            wait(lambda: application.download_covers.images.get(task.key, (None, False))[1]
+                 and application.download_covers.images[task.key][0][1] == task.settings["format"])
+        engine.tasks = []
+        application.render()
+        assert not application.tree.get_children() and not application.download_covers.images
+    finally:
+        engine.pause()
+        application.engine = old_engine
+        application.render()
+
+
 def check_update_history_ui(root, directory):
     """Exercise real announcement widgets before/after a multi-version upgrade."""
     import core
@@ -187,6 +257,9 @@ def run_self_test(directory: Path):
         root.update()
         assert root.winfo_width() >= 1020
         report["checks"].append("Tk desktop UI constructed and rendered")
+        check_download_covers_ui(application, directory)
+        report["checks"].append("Live queue covers appear before completion in three concurrent real worker downloads at minimum window size")
+        report["checks"].append("Paused/resumed queue covers survive image-cache cleanup and load PDF/ZIP/folder results; removed rows release images")
         from core import Task
         display_task = Task("123456", dict(engine.tasks[0].settings), status="running", done=15, total=20,
                             cached=10, image_bytes=1024 ** 2, speed=2 * 1024 ** 2, phase="正在下载图片")

@@ -10,6 +10,11 @@ import java.util.zip.*;
 
 /** Local first-page previews only; never writes into a user's manga directory. */
 public final class LibraryCover {
+    public static Bitmap loadImage(File file){
+        if(file.length()>CoverRules.MAX_IMAGE_BYTES)return null;
+        try(InputStream stream=new FileInputStream(file)){return decode(stream);}
+        catch(Exception|OutOfMemoryError ignored){return null;}
+    }
     private static Bitmap decode(InputStream stream)throws IOException {
         byte[] data=CoverRules.readImage(stream);BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;
         BitmapFactory.decodeByteArray(data,0,data.length,options);options.inSampleSize=CoverRules.sampleSize(options.outWidth,options.outHeight);options.inJustDecodeBounds=false;

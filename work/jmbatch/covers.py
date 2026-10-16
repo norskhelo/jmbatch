@@ -40,6 +40,11 @@ def load_cover(path, fmt):
         path = Path(path)
         if path.is_symlink():
             return None
+        if fmt == "image":
+            if path.stat().st_size > MAX_IMAGE_BYTES:
+                return None
+            with path.open("rb") as stream:
+                return decode_image(stream)
         if fmt == "images":
             from albums import read_album
             _, entries = read_album(path)
@@ -78,8 +83,9 @@ def load_cover(path, fmt):
 
 class CoverWorker:
     """One daemon, bounded queues; obsolete searches never build up behind a load."""
-    def __init__(self):
+    def __init__(self, loader=load_cover):
         import queue
+        self.loader = loader
         self.jobs = queue.Queue(maxsize=24)
         self.results = queue.Queue(maxsize=24)
         self.closed = threading.Event()
@@ -92,7 +98,7 @@ class CoverWorker:
                 generation, key, path, fmt = self.jobs.get(timeout=0.2)
             except queue.Empty:
                 continue
-            result = (generation, key, load_cover(path, fmt))
+            result = (generation, key, self.loader(path, fmt))
             while not self.closed.is_set():
                 try:
                     self.results.put(result, timeout=0.2)

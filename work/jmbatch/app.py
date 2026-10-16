@@ -60,7 +60,7 @@ class App:
         self.detail_cache = None
         self.root.title(f"JM Batch · 批量下载器 {VERSION}")
         self.root.geometry("1160x850")
-        self.root.minsize(1020, 780)
+        self.root.minsize(1020, 820)
         self.root.configure(bg=BG)
         self._styles()
         self._build()
@@ -169,7 +169,12 @@ class App:
         table = ttk.Frame(outer)
         table.grid(row=5, column=0, sticky="nsew")
         columns = ("id", "title", "status", "progress", "size", "format", "resets")
-        self.tree = ttk.Treeview(table, columns=columns, show="headings", selectmode="extended", height=5)
+        ttk.Style(self.root).configure("Download.Treeview", rowheight=82)
+        self.tree = ttk.Treeview(table, columns=columns, show="tree headings", selectmode="extended", height=2, style="Download.Treeview")
+        self.tree.heading("#0", text="封面")
+        self.tree.column("#0", width=76, minwidth=76, stretch=False)
+        from download_covers import DownloadCovers
+        self.download_covers = DownloadCovers(self.tree)
         for key, label, width in [("id", "编号", 100), ("title", "标题", 220), ("status", "状态", 95), ("progress", "完成进度", 180), ("size", "漫画大小", 125), ("format", "格式", 65), ("resets", "重置", 60)]:
             self.tree.heading(key, text=label)
             self.tree.column(key, width=width, minwidth=60, stretch=key == "title", anchor="w")
@@ -403,8 +408,9 @@ class App:
                 if tuple(map(str, self.tree.item(task.key, "values"))) != tuple(map(str, values)):
                     self.tree.item(task.key, values=values, tags=(task.status,))
             else:
-                self.tree.insert("", "end", iid=task.key, values=values, tags=(task.status,))
+                self.tree.insert("", "end", iid=task.key, image=self.download_covers.placeholder, values=values, tags=(task.status,))
         tasks = self.engine.tasks
+        self.download_covers.poll(tasks)
         done = sum(t.status == "done" for t in tasks)
         failed = sum(t.status == "failed" for t in tasks)
         waiting = sum(t.status in ("queued", "paused") for t in tasks)

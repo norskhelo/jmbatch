@@ -2,19 +2,19 @@
 
 支持 Windows 和 Android 的批量漫画下载工具。下载可选择 PDF、ZIP 或图片文件夹，三种成品可离线互相导出。
 
-当前源码及正式版本：**Windows 0.3.3 / Android 0.4.3（versionCode 403）**。本版修复公告窗口异步刷新，并在升级、重启及再次检查后保留本次跨版本的完整日志。安装包、更新日志与镜像入口见下方。
+当前源码及正式版本：**Windows 0.3.4 / Android 0.4.4（versionCode 404）**。本版支持下载过程中在任务列表显示首章第一页封面，暂停、续传和下载完成后均可查看。安装包、更新日志与镜像入口见下方。
 
 ## 下载安装包（含国内镜像）
 
 GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
 
-当前正式版为 **Windows 0.3.3 / Android 0.4.3**（[发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.3-0.4.3)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+当前正式版为 **Windows 0.3.4 / Android 0.4.4**（[发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.4-0.4.4)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
 
 | 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
 | --- | --- | --- | --- |
-| Windows 0.3.3 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.3-0.4.3/JMBatch-0.3.3-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.3-0.4.3/JMBatch-0.3.3-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.3-0.4.3/JMBatch-0.3.3-Windows-x64.zip) |
-| Android 0.4.3 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.3-0.4.3/JMBatch-0.4.3-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.3-0.4.3/JMBatch-0.4.3-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.3-0.4.3/JMBatch-0.4.3-Android.apk) |
-| 上述版本的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.3-0.4.3/SHA256-release-0.3.3-0.4.3.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.3-0.4.3/SHA256-release-0.3.3-0.4.3.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.3-0.4.3/SHA256-release-0.3.3-0.4.3.txt) |
+| Windows 0.3.4 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/JMBatch-0.3.4-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/JMBatch-0.3.4-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/JMBatch-0.3.4-Windows-x64.zip) |
+| Android 0.4.4 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/JMBatch-0.4.4-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/JMBatch-0.4.4-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/JMBatch-0.4.4-Android.apk) |
+| 上述版本的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/SHA256-release-0.3.4-0.4.4.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/SHA256-release-0.3.4-0.4.4.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/SHA256-release-0.3.4-0.4.4.txt) |
 
 镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像用于手动下载，应用内更新仓库仍填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
 
@@ -35,6 +35,10 @@ GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或�
 5. 导出不删除源文件，可离线重复导出。同名输出会停止并提示，不覆盖已有文件。
 
 图片保存为下载处理后的原分辨率 JPG；文件夹和 ZIP 互转、图片嵌入 PDF 不额外缩放。PDF 转图片会按页面渲染，作为一个章节，可能损失画质；最高 144 DPI，长边最多 8192 像素，每页约 1600 万像素。上游图片的必要解码/还原沿用原实现，不保证与网站原始响应逐字节相同。请保留漫画文件夹名称和图片排序结构，便于重新扫描与导出。恢复与校验信息保存在应用内部，成品目录不附带信息文件；旧版带清单的图片目录仍可读取。
+
+## 下载封面
+
+下载列表会在首章第一页成功下载后自动显示封面，无需等待整本完成；暂停、继续和重启后可从缓存恢复。尚未就绪或无法读取时显示占位，完成后从 PDF、ZIP 或文件夹成品读取。
 
 ## 内置阅读器
 

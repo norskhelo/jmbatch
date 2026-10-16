@@ -21,6 +21,7 @@ public final class MainActivity extends Activity {
     private final int BG=Color.rgb(243,245,248),INK=Color.rgb(23,44,62),MUTED=Color.rgb(97,115,135),ACCENT=Color.rgb(8,127,140);
     private Store store;
     private GithubUpdates updates;
+    private DownloadCovers downloadCovers;
     private LinearLayout layout,queue;
     private EditText ids,rangeFirst,rangeLast;
     private TextView output,summary,global;
@@ -31,7 +32,7 @@ public final class MainActivity extends Activity {
     private final Runnable refresh=new Runnable(){public void run(){render();handler.postDelayed(this,700);}};
 
     public void onCreate(Bundle state){
-        super.onCreate(state);store=Store.get(this);
+        super.onCreate(state);store=Store.get(this);downloadCovers=new DownloadCovers(this);
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
         layout=column();layout.setPadding(dp(18),dp(20),dp(18),dp(28));scroll.addView(layout);setContentView(scroll);
@@ -102,18 +103,25 @@ public final class MainActivity extends Activity {
             row.state.setTextColor(task.status.equals("failed")?Color.rgb(180,35,54):task.status.equals("done")?ACCENT:MUTED);
             row.progress.setIndeterminate(task.status.equals("running")&&task.total==0);row.progress.setProgress((int)(DownloadDisplay.percent(task.done,task.total,task.status)*10));
             row.phase.setText((task.status.equals("done")?"下载完成":task.phase)+"\n"+task.sizeText()+(task.status.equals("running")||task.status.equals("resetting")?"\n"+DownloadDisplay.speed(task.speed)+" · "+task.etaText():""));row.open.setVisibility(task.resultUri.isEmpty()?View.GONE:View.VISIBLE);
+            downloadCovers.bind(task,row.cover);
         }
-        Iterator<Map.Entry<String,Row>> iterator=rows.entrySet().iterator();while(iterator.hasNext()){Map.Entry<String,Row> entry=iterator.next();if(!visible.contains(entry.getKey())){queue.removeView(entry.getValue().card);iterator.remove();}}
+        Iterator<Map.Entry<String,Row>> iterator=rows.entrySet().iterator();while(iterator.hasNext()){Map.Entry<String,Row> entry=iterator.next();if(!visible.contains(entry.getKey())){entry.getValue().cover.remove();queue.removeView(entry.getValue().card);iterator.remove();}}
         summary.setText("共 "+tasks.size()+" 本  ·  完成 "+completed+"  ·  失败 "+failed);
         global.setText(active==0?(store.running?"正在启动…":store.note.isEmpty()?(completed>0&&completed==tasks.size()?"下载完成":"就绪 / 队列已停止"):store.note):"同时下载 "+active+" 本 · 总速度 "+DownloadDisplay.speed(speed));
         start.setEnabled(!store.running);pause.setEnabled(store.running);more.setVisibility(tasks.size()>limit?View.VISIBLE:View.GONE);
     }
 
     private final class Row{
-        LinearLayout card;TextView title,state,phase;ProgressBar progress;Button open;
+        LinearLayout card;TextView title,state,phase;ProgressBar progress;Button open;DownloadCovers.Target cover;
         Row(Store.Task task){
             card=card();LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.bottomMargin=dp(10);card.setLayoutParams(params);
-            title=text("",15,INK);title.setTypeface(null,Typeface.BOLD);title.setMaxLines(2);card.addView(title);state=text("",12,MUTED);state.setPadding(0,dp(7),0,dp(6));card.addView(state);
+            LinearLayout heading=horizontal();card.addView(heading);
+            FrameLayout frame=new FrameLayout(MainActivity.this);frame.setBackgroundColor(Color.rgb(232,237,241));
+            LinearLayout.LayoutParams coverParams=new LinearLayout.LayoutParams(dp(66),dp(88));coverParams.rightMargin=dp(12);heading.addView(frame,coverParams);
+            ImageView image=new ImageView(MainActivity.this);image.setScaleType(ImageView.ScaleType.FIT_CENTER);frame.addView(image,new FrameLayout.LayoutParams(-1,-1));
+            TextView placeholder=text("暂无\n封面",11,MUTED);placeholder.setGravity(Gravity.CENTER);frame.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));cover=new DownloadCovers.Target(image,placeholder);
+            LinearLayout description=column();heading.addView(description,new LinearLayout.LayoutParams(0,-2,1));
+            title=text("",15,INK);title.setTypeface(null,Typeface.BOLD);title.setMaxLines(2);description.addView(title);state=text("",12,MUTED);state.setPadding(0,dp(7),0,dp(6));description.addView(state);
             progress=new ProgressBar(MainActivity.this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(1000);card.addView(progress,new LinearLayout.LayoutParams(-1,dp(8)));
             phase=text("",12,MUTED);phase.setPadding(0,dp(7),0,0);card.addView(phase);
             LinearLayout actions=horizontal();actions.addView(button("详情",v->details(task)),new LinearLayout.LayoutParams(0,-2,1));actions.addView(button("重试",v->retry(task)),new LinearLayout.LayoutParams(0,-2,1));open=button("打开",v->open(task,false));actions.addView(open,new LinearLayout.LayoutParams(0,-2,1));card.addView(actions);
@@ -200,6 +208,7 @@ public final class MainActivity extends Activity {
     }
     protected void onResume(){super.onResume();handler.removeCallbacks(refresh);handler.post(refresh);}
     protected void onPause(){handler.removeCallbacks(refresh);save();super.onPause();}
+    protected void onDestroy(){if(downloadCovers!=null)downloadCovers.close();for(Row row:rows.values())row.cover.remove();super.onDestroy();}
     private void save(){try{store.save();}catch(Exception error){store.note=error.getMessage();toast(store.note);}}
     private void showError(String message){new AlertDialog.Builder(this).setTitle("无法完成操作").setMessage(message).setPositiveButton("知道了",null).show();}
     private void toast(String message){Toast.makeText(this,message,Toast.LENGTH_LONG).show();}
