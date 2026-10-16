@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.4 / Android 0.4.4 — 2026-10-16\n\n下载过程中显示封面\n\n• Windows 下载列表和 Android 下载任务卡片新增封面。首章第一页下载并校验成功后自动显示，无需等待整本下载完成；PDF、ZIP、图片文件夹三种下载格式均支持。\n• 第一页未下载完成或无法读取时显示占位，不会把先完成的后续页或未完成的临时图片当作封面；第一张图片就绪或修复后自动刷新。\n• 暂停、继续、重试和重启应用后，可从已有第一页缓存恢复封面；下载完成并清理图片缓存后，自动改从最终成品读取第一页。\n• 封面在后台异步读取，仅加载可见任务，并限制内存缓存和待加载队列。封面失败不影响下载、进度、重试或打开操作，不增加额外的网站图片请求，也不向成品写入封面或下载信息文件。\n\n版本与验证\n\n• Windows 升至 0.3.4；Android 升至 0.4.4（versionCode 404），保留原包名、APK 签名身份和更新公钥。\n• Windows 回归覆盖下载尚未完成时的实际列表封面、三任务并行、暂停续传、完成后缓存清理、三种成品格式及最小窗口；源码和冻结成品均执行界面自检。\n• Android 执行首页选择、临时文件排除、状态恢复、任务隔离等宿主检查，并编译、核验原证书签名；未进行 Android 真机界面验证。\n• 同步源码、使用说明、更新日志、双端安装包、SHA-256 校验文件和签名更新清单。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.5 / Android 0.4.5 — 2026-10-16\n\n手动检查更新\n\n• Windows 和 Android 主界面新增明确的“检查更新 / 公告”入口，点击后打开更新窗口并立即联网检查。更新窗口和完整公告也提供“检查更新”按钮。\n• 关闭“启动时自动检查更新”后仍可手动检查；检查使用已保存的仓库，不修改自动检查开关。修改仓库后先点击“保存”，再检查；仓库为空时提示先配置。\n• 检查时显示进度状态并防止重复并发请求；完成后显示发现新版、当前已是适用版本或失败重试提示，更新公告同步刷新。失败保留离线公告，可重新点击检查。\n• 检查过程不影响漫画下载；下载更新和安装仍由用户点击确认，沿用原清单签名、SHA-256 及 APK 签名验证机制。\n\n版本与验证\n\n• Windows 升至 0.3.5；Android 升至 0.4.5（versionCode 405），保留原包名、APK 签名身份和更新公钥。\n• Windows 验证关闭自动检查后的实际按钮操作、重复点击、检查状态、失败重试、公告刷新和最小窗口布局；源码与冻结成品均执行界面自检。\n• Android 执行宿主回归、编译及原证书签名核验；未进行 Android 真机界面验证。\n• 同步源码、使用说明、同版日志、双端安装包、SHA-256 校验文件和签名更新清单。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;
@@ -26,10 +26,10 @@ public final class GithubUpdates {
     private TextView notesView,notesStatusView;
     private TextView statusView;
     private TextView announcementView;
-    private Button downloadButton;
+    private Button downloadButton,checkButton,notesCheckButton;
     private String status="尚未配置更新仓库", latestVersion="", latestUrl="";
     private long generation;
-    private boolean downloading;
+    private boolean downloading,checking;
     private final AtomicBoolean cancel=new AtomicBoolean();
     private UpdateInstaller.Ready ready;
 
@@ -47,7 +47,7 @@ public final class GithubUpdates {
             prefs.getString("announcement_installed_version",""),prefs.getString("announcement_upgrade_from",""),
             prefs.getString("announcement_seen",""),Core.VERSION,repo);
         saveHistoryBaseline(repo,from);
-        indicator.setOnClickListener(v->show());
+        indicator.setOnClickListener(v->showAndCheck());
     }
     public void startup() {
         if(!Core.VERSION.equals(prefs.getString("announcement_seen",""))){
@@ -59,25 +59,35 @@ public final class GithubUpdates {
     }
     private void refresh() {
         if(activity.isDestroyed()||activity.isFinishing())return;
-        indicator.setText(latestUrl.isEmpty()?"软件更新 / 公告":"新版 "+latestVersion+" / 公告");
-        if(dialog!=null&&dialog.isShowing()){statusView.setText(status);announcementView.setText(notesText());downloadButton.setEnabled(!latestUrl.isEmpty()||downloading);downloadButton.setText(downloading?"取消下载":ready!=null?"安装新版":"下载新版");}
+        indicator.setText(latestUrl.isEmpty()?"检查更新 / 公告":"新版 "+latestVersion+" / 公告");
+        boolean canCheck=!checking&&!downloading&&ready==null;
+        if(dialog!=null&&dialog.isShowing()){
+            statusView.setText(status);announcementView.setText(notesText());
+            checkButton.setEnabled(canCheck);checkButton.setText(checking?"检查中…":"检查更新");
+            downloadButton.setEnabled(!checking&&(!latestUrl.isEmpty()||downloading||ready!=null));
+            downloadButton.setText(downloading?"取消下载":ready!=null?"安装新版":"下载新版");
+        }
         if(notesDialog!=null&&notesDialog.isShowing()){
             notesStatusView.setText(status);
+            notesCheckButton.setEnabled(canCheck);notesCheckButton.setText(checking?"检查中…":"检查更新");
             String text=notesText();
             if(!text.contentEquals(notesView.getText()))notesView.setText(text);
         }
     }
+    public void showAndCheck(){show();check();}
     private void check() {
         if(downloading||ready!=null)return;
+        if(checking){refresh();return;}
         String repo=prefs.getString("repository","");
-        if(repo.isEmpty()){status="仓库留空，已跳过检查";refresh();return;}
-        if(!busy.compareAndSet(false,true)){status="上次检查仍在结束中，已跳过本次检查";refresh();return;}
+        if(repo.isEmpty()){status="请先填写更新仓库并保存，再点击检查更新";refresh();return;}
+        if(!busy.compareAndSet(false,true)){status="上次检查仍在结束中，请稍后点击检查更新重试";refresh();return;}
+        checking=true;latestUrl="";latestVersion="";
         long ticket=++generation;
         final String from=historyFrom();
         AtomicBoolean delivered=new AtomicBoolean();
         status="正在后台检查，最多等待 8 秒…";refresh();
         Runnable timeout=()->{
-            if(delivered.compareAndSet(false,true)&&ticket==generation){latestUrl="";status="未能取得完整更新日志，已保留离线公告，请稍后重试";refresh();}
+            if(delivered.compareAndSet(false,true)&&ticket==generation){checking=false;latestUrl="";status="未能取得完整更新日志，已保留离线公告，请稍后重试";refresh();}
         };
         main.postDelayed(timeout,8000);
         Thread worker=new Thread(()->{
@@ -89,6 +99,7 @@ public final class GithubUpdates {
                 if(!delivered.compareAndSet(false,true))return;
                 main.removeCallbacks(timeout);
                 if(ticket!=generation||!repo.equals(prefs.getString("repository","")))return;
+                checking=false;
                 boolean newer=result!=null&&UpdateRules.compare(result.latest.version,Core.VERSION)>0;
                 latestUrl=newer?result.latest.url:"";latestVersion=newer?result.latest.version:"";
                 if(ok&&result!=null&&UpdateRules.compare(result.latest.version,Core.VERSION)>=0){
@@ -155,22 +166,22 @@ public final class GithubUpdates {
     public void show() {
         if(dialog!=null&&dialog.isShowing())return;
         LinearLayout form=new LinearLayout(activity);form.setOrientation(LinearLayout.VERTICAL);int pad=(int)(20*activity.getResources().getDisplayMetrics().density);form.setPadding(pad,pad,pad,pad);
-        TextView intro=new TextView(activity);intro.setText("当前安卓版本："+Core.VERSION+"\n\nGitHub 公开仓库（用户名/仓库名；留空不检查）");form.addView(intro);
+        TextView intro=new TextView(activity);intro.setText("当前安卓版本："+Core.VERSION+"\n\nGitHub 公开仓库（用户名/仓库名；修改后先保存，留空不检查）");form.addView(intro);
         EditText repo=new EditText(activity);repo.setSingleLine(true);repo.setHint("用户名/仓库名");repo.setText(prefs.getString("repository",""));form.addView(repo);
         CheckBox auto=new CheckBox(activity);auto.setText("启动时自动检查更新");auto.setChecked(prefs.getBoolean("automatic",true));form.addView(auto);
         statusView=new TextView(activity);statusView.setText(status);form.addView(statusView);
         announcementView=new TextView(activity);announcementView.setText(notesText());announcementView.setMaxLines(8);announcementView.setPadding(0,pad,0,0);form.addView(announcementView);
         Button notes=new Button(activity);notes.setText("查看完整更新公告（离线可用）");form.addView(notes);
         notes.setOnClickListener(v->showNotes());
-        TextView help=new TextView(activity);help.setText("\n检查无响应时静默跳过，不影响下载任务。\n下载后先核验清单签名和 SHA-256；APK 证书先在应用内预检查，系统未提供证书时交由系统安装器核验。已知证书不匹配会阻止安装。\n下载更新时请保持应用在前台；安装前请暂停漫画下载任务。\n只信任本软件发布密钥签署的更新；不发送漫画编号或 Cookie。\n");form.addView(help);
-        Button check=new Button(activity);check.setText("保存并检查");form.addView(check);
+        TextView help=new TextView(activity);help.setText("\n检查更新使用已保存的仓库，关闭自动检查后也可手动检查。\n失败或超时可再次点击重试，不影响下载任务。\n下载后先核验清单签名和 SHA-256；APK 证书先在应用内预检查，系统未提供证书时交由系统安装器核验。已知证书不匹配会阻止安装。\n下载更新时请保持应用在前台；安装前请暂停漫画下载任务。\n只信任本软件发布密钥签署的更新；不发送漫画编号或 Cookie。\n");form.addView(help);
+        checkButton=new Button(activity);checkButton.setText("检查更新");form.addView(checkButton,0);
+        checkButton.setOnClickListener(v->check());
         downloadButton=new Button(activity);downloadButton.setText("下载新版");downloadButton.setEnabled(!latestUrl.isEmpty());form.addView(downloadButton);
         downloadButton.setOnClickListener(v->download());
         ScrollView scroll=new ScrollView(activity);scroll.addView(form);
         dialog=new AlertDialog.Builder(activity).setTitle("软件更新").setView(scroll).setNegativeButton("关闭",null).setPositiveButton("保存",null).create();
         dialog.setOnShowListener(d->{
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{if(save(repo,auto))dialog.dismiss();});
-            check.setOnClickListener(v->{if(save(repo,auto))check();});
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->save(repo,auto));
         });dialog.show();refresh();
     }
     private String notesText(){
@@ -205,13 +216,16 @@ public final class GithubUpdates {
         int pad=(int)(20*activity.getResources().getDisplayMetrics().density);
         LinearLayout form=new LinearLayout(activity);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(pad,pad,pad,pad);
         notesStatusView=new TextView(activity);notesStatusView.setText(status);form.addView(notesStatusView);
+        notesCheckButton=new Button(activity);notesCheckButton.setText("检查更新");form.addView(notesCheckButton);
+        notesCheckButton.setOnClickListener(v->{notesDialog.dismiss();showAndCheck();});
         notesView=new TextView(activity);notesView.setPadding(0,pad,0,0);notesView.setTextIsSelectable(true);notesView.setText(notesText());form.addView(notesView);
         ScrollView content=new ScrollView(activity);content.addView(form);
         notesDialog=new AlertDialog.Builder(activity).setTitle("更新公告").setView(content).setPositiveButton("关闭",null).create();
-        notesDialog.setOnDismissListener(d->{notesDialog=null;notesView=null;notesStatusView=null;});
-        notesDialog.show();
+        notesDialog.setOnDismissListener(d->{notesDialog=null;notesView=null;notesStatusView=null;notesCheckButton=null;});
+        notesDialog.show();refresh();
     }
     private void download(){
+        if(checking)return;
         if(downloading){cancel.set(true);status="正在取消，当前网络请求结束后停止…";refresh();return;}
         if(ready!=null){
             new AlertDialog.Builder(activity).setTitle("安装更新").setMessage("安装会关闭当前应用。请先暂停漫画下载任务，安装后重新打开应用继续。是否继续？")
@@ -237,9 +251,9 @@ public final class GithubUpdates {
         if(downloading||ready!=null){Toast.makeText(activity,"当前更新完成前不能更改仓库",Toast.LENGTH_LONG).show();return false;}
         try{
             String repo=UpdateRules.repository(field.getText().toString());
-            if(!repo.equals(prefs.getString("repository",""))){generation++;latestUrl="";latestVersion="";saveHistoryBaseline(repo,Core.VERSION);}
+            if(!repo.equals(prefs.getString("repository",""))){generation++;checking=false;latestUrl="";latestVersion="";saveHistoryBaseline(repo,Core.VERSION);}
             prefs.edit().putString("repository",repo).putBoolean("automatic",auto.isChecked()).putBoolean("repository_default_v1",true).apply();
-            status=repo.isEmpty()?"仓库留空，不检查更新":"设置已保存";refresh();return true;
+            if(!checking)status=repo.isEmpty()?"仓库留空，不检查更新":"设置已保存";refresh();return true;
         }catch(IllegalArgumentException error){field.setError(error.getMessage());return false;}
     }
 }

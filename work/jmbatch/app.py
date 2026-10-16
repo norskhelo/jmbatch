@@ -66,7 +66,7 @@ class App:
         self._build()
         from updates import UpdateUI
         self.updates = UpdateUI(self)
-        self.update_button.configure(command=self.updates.show)
+        self.update_button.configure(command=self.updates.show_and_check)
         self.root.after(1500, self.updates.startup)
         for notice in self.notices:
             self._append_log(notice)
@@ -108,7 +108,7 @@ class App:
         ttk.Label(header, text="JM Batch", font=("Segoe UI", 26, "bold"), foreground=INK).pack(side="left")
         ttk.Label(header, text="  /  编号批量下载", font=("Microsoft YaHei UI", 12), foreground=MUTED).pack(side="left", pady=(10, 0))
         ttk.Button(header, text="下载设置", command=self.settings_dialog).pack(side="right")
-        self.update_button = ttk.Button(header, text="软件更新 / 公告")
+        self.update_button = ttk.Button(header, text="检查更新 / 公告")
         self.update_button.pack(side="right", padx=6)
         ttk.Label(header, text=f"WINDOWS  ·  {VERSION}", foreground=ACCENT, font=("Segoe UI", 10, "bold")).pack(side="right", padx=18)
 

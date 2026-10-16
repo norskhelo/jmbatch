@@ -1,4 +1,4 @@
-JM Batch 0.3.4 — Windows 使用说明
+JM Batch 0.3.5 — Windows 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每个任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.3.4 — Windows 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-16）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/JMBatch-0.3.4-Windows-x64.zip
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/JMBatch-0.3.4-Windows-x64.zip
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/JMBatch-0.3.4-Windows-x64.zip
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0.4.4/SHA256-release-0.3.4-0.4.4.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.5-0.4.5/JMBatch-0.3.5-Windows-x64.zip
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.5-0.4.5/JMBatch-0.3.5-Windows-x64.zip
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.5-0.4.5/JMBatch-0.3.5-Windows-x64.zip
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.5-0.4.5/SHA256-release-0.3.5-0.4.5.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -22,18 +22,20 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.4-0
 
 9. 下载列表会在首章第一页成功下载后自动显示封面，无需等待整本完成；暂停、继续和重启后可从缓存恢复。尚未就绪或无法读取时显示占位，完成后从 PDF、ZIP 或文件夹成品读取。
 
-Windows 0.3.4 / Android 0.4.4 — 2026-10-16
+10. 点击主界面“检查更新 / 公告”立即联网检查，更新窗口与完整公告也可手动检查。关闭启动自动检查后仍可使用。检查采用已保存仓库；修改后先保存。检查失败保留离线公告，可再次点击重试。下载和安装新版需要手动确认。
 
-下载过程中显示封面
+Windows 0.3.5 / Android 0.4.5 — 2026-10-16
 
-• Windows 下载列表和 Android 下载任务卡片新增封面。首章第一页下载并校验成功后自动显示，无需等待整本下载完成；PDF、ZIP、图片文件夹三种下载格式均支持。
-• 第一页未下载完成或无法读取时显示占位，不会把先完成的后续页或未完成的临时图片当作封面；第一张图片就绪或修复后自动刷新。
-• 暂停、继续、重试和重启应用后，可从已有第一页缓存恢复封面；下载完成并清理图片缓存后，自动改从最终成品读取第一页。
-• 封面在后台异步读取，仅加载可见任务，并限制内存缓存和待加载队列。封面失败不影响下载、进度、重试或打开操作，不增加额外的网站图片请求，也不向成品写入封面或下载信息文件。
+手动检查更新
+
+• Windows 和 Android 主界面新增明确的“检查更新 / 公告”入口，点击后打开更新窗口并立即联网检查。更新窗口和完整公告也提供“检查更新”按钮。
+• 关闭“启动时自动检查更新”后仍可手动检查；检查使用已保存的仓库，不修改自动检查开关。修改仓库后先点击“保存”，再检查；仓库为空时提示先配置。
+• 检查时显示进度状态并防止重复并发请求；完成后显示发现新版、当前已是适用版本或失败重试提示，更新公告同步刷新。失败保留离线公告，可重新点击检查。
+• 检查过程不影响漫画下载；下载更新和安装仍由用户点击确认，沿用原清单签名、SHA-256 及 APK 签名验证机制。
 
 版本与验证
 
-• Windows 升至 0.3.4；Android 升至 0.4.4（versionCode 404），保留原包名、APK 签名身份和更新公钥。
-• Windows 回归覆盖下载尚未完成时的实际列表封面、三任务并行、暂停续传、完成后缓存清理、三种成品格式及最小窗口；源码和冻结成品均执行界面自检。
-• Android 执行首页选择、临时文件排除、状态恢复、任务隔离等宿主检查，并编译、核验原证书签名；未进行 Android 真机界面验证。
-• 同步源码、使用说明、更新日志、双端安装包、SHA-256 校验文件和签名更新清单。
+• Windows 升至 0.3.5；Android 升至 0.4.5（versionCode 405），保留原包名、APK 签名身份和更新公钥。
+• Windows 验证关闭自动检查后的实际按钮操作、重复点击、检查状态、失败重试、公告刷新和最小窗口布局；源码与冻结成品均执行界面自检。
+• Android 执行宿主回归、编译及原证书签名核验；未进行 Android 真机界面验证。
+• 同步源码、使用说明、同版日志、双端安装包、SHA-256 校验文件和签名更新清单。

@@ -38,7 +38,7 @@ public final class MainActivity extends Activity {
         layout=column();layout.setPadding(dp(18),dp(20),dp(18),dp(28));scroll.addView(layout);setContentView(scroll);
         LinearLayout header=horizontal();TextView brand=text("JM Batch",27,INK);brand.setTypeface(null,Typeface.BOLD);header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));header.addView(button("设置",v->settings()));layout.addView(header);
         add(text("安卓独立下载  /  "+Core.VERSION,12,MUTED),0,4);
-        Button updateButton=button("软件更新 / 公告",v->{});add(updateButton,0,10);updates=new GithubUpdates(this,updateButton);handler.postDelayed(()->updates.startup(),1500);
+        Button updateButton=button("检查更新 / 公告",v->{});add(updateButton,0,10);updates=new GithubUpdates(this,updateButton);handler.postDelayed(()->updates.startup(),1500);
         add(button("已下载漫画 / 收藏",v->new LibraryScreen(this,store).show()),0,6);
 
         LinearLayout target=card();target.addView(text("新增任务保存到",13,MUTED));
