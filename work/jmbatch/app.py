@@ -119,9 +119,12 @@ class App:
         self.output_var = tk.StringVar(value=self.engine.settings.output)
         ttk.Entry(dest, textvariable=self.output_var).grid(row=0, column=1, sticky="ew")
         ttk.Button(dest, text="选择目录", command=self.choose_dir).grid(row=0, column=2, padx=(8, 18))
-        self.format_var = tk.StringVar(value="images")
-        ttk.Label(dest, text="下载保存为排序图片").grid(row=0, column=3, padx=7)
-        ttk.Button(dest, text="导出 PDF / ZIP", command=self.export_selected).grid(row=0, column=4)
+        self.format_var = tk.StringVar(value=self.engine.settings.format)
+        formats = ttk.Frame(dest)
+        formats.grid(row=0, column=3, padx=7)
+        for label, value in (("PDF", "pdf"), ("ZIP", "zip"), ("文件夹", "images")):
+            ttk.Radiobutton(formats, text=label, value=value, variable=self.format_var, command=self.save_format).pack(side="left")
+        ttk.Button(dest, text="格式互转 / 导出", command=self.export_selected).grid(row=0, column=4)
 
         entry = ttk.Frame(outer, style="Card.TFrame", padding=12)
         entry.grid(row=2, column=0, sticky="ew", pady=(0, 8))
@@ -141,7 +144,7 @@ class App:
         ttk.Entry(quick, textvariable=self.range_end, width=10).grid(row=1, column=2)
         ttk.Button(quick, text="添加区间", command=self.add_range).grid(row=2, column=0, columnspan=3, sticky="ew", pady=(10, 0))
         ttk.Button(entry, text="加入队列  Ctrl + Enter", style="Accent.TButton", command=self.add_input).grid(row=3, column=0, sticky="w", pady=(10, 0))
-        ttk.Label(entry, text="按章节、页码保存图片；下载后可在“导出”中选择 PDF / ZIP。", foreground=MUTED, style="Card.TLabel").grid(row=4, column=0, columnspan=2, sticky="w", pady=(9, 0))
+        ttk.Label(entry, text="加入队列时确定下载格式；下载后 PDF、ZIP、文件夹可互相导出。", foreground=MUTED, style="Card.TLabel").grid(row=4, column=0, columnspan=2, sticky="w", pady=(9, 0))
 
         bar = ttk.Frame(outer)
         bar.grid(row=3, column=0, sticky="ew", pady=(0, 10))
@@ -237,9 +240,16 @@ class App:
         self.logs.see("end")
         self.logs.configure(state="disabled")
 
+    def save_format(self):
+        self.engine.settings.format = self.format_var.get()
+        try:
+            self.engine.save()
+        except OSError as error:
+            messagebox.showerror("格式设置未保存", str(error), parent=self.root)
+
     def current_settings(self):
         values = dict(self.engine.settings.__dict__)
-        values.update(output=str(Path(self.output_var.get().strip()).expanduser().absolute()), format="images", keep_images=False, numeric_filename=False, flat_zip=False)
+        values.update(output=str(Path(self.output_var.get().strip()).expanduser().absolute()), format=self.format_var.get(), keep_images=False, numeric_filename=False, flat_zip=False)
         if not self.output_var.get().strip():
             raise ValueError("请选择输出目录。")
         return Settings(**values).validate()
@@ -292,7 +302,7 @@ class App:
             count = self.engine.retry(set(self.tree.selection()), self.current_settings())
             if count:
                 self.engine.start()
-                self.log(f"重新排队 {count} 个任务，使用当前网络设置；保留原输出路径，下载保存为排序图片。")
+                self.log(f"重新排队 {count} 个任务，使用当前网络设置；保留原输出路径和下载格式。")
             else:
                 messagebox.showinfo("重试任务", "请选中失败、暂停或取消的任务。", parent=self.root)
         except (ValueError, OSError) as exc:
@@ -438,7 +448,7 @@ class App:
                 self.library_window.tree.selection_set(key)
                 self.library_window.action("export")
         else:
-            self.library_window.status.set("请选择一本已下载的图片漫画，然后点击“导出”。")
+            self.library_window.status.set("请选择一本已下载的 PDF、ZIP 或文件夹，然后点击“导出”。")
 
     def settings_dialog(self):
         dialog = tk.Toplevel(self.root)

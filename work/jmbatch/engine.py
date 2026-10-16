@@ -54,7 +54,6 @@ class Engine:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             settings = Settings(**data.get("settings", {})).validate()
-            settings.format = "images"
             tasks = [Task(**raw) for raw in data.get("tasks", [])]
             for task in tasks:
                 Settings(**task.settings).validate()
@@ -62,8 +61,6 @@ class Engine:
                     task.status = "paused"
                     task.phase = "已恢复；点击开始继续"
                 task.speed = 0
-                if task.status != "done":
-                    task.settings.update(format="images", numeric_filename=False, flat_zip=False, keep_images=False)
             self.settings, self.tasks = settings, tasks
         except Exception as exc:
             # Preserve a corrupt queue for recovery instead of overwriting it.
@@ -131,7 +128,6 @@ class Engine:
                     task.settings.update({k: v for k, v in settings.__dict__.items() if k not in ("output", "format")})
                 task.status = "queued"
                 task.phase = "等待重试"
-                task.settings["format"] = "images"
                 task.error = ""
                 task.resets = 0
                 count += 1

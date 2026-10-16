@@ -160,12 +160,99 @@ class AlbumTests(unittest.TestCase):
         library.remove(key, [], True)
         self.assertFalse(self.folder.exists())
 
-    def test_old_unfinished_queue_migrates_but_completed_export_stays(self):
+    def test_queue_load_and_retry_preserve_selected_formats(self):
         old = Task("123457", Settings(output=str(self.folder.parent), format="pdf").__dict__, status="paused")
         done = Task("123458", Settings(output=str(self.folder.parent), format="zip").__dict__, status="done")
         state = self.root / "legacy"
         atomic_json(state / "queue.json", dict(settings=old.settings, tasks=[old.to_dict(), done.to_dict()]))
         loaded = Engine(state)
-        self.assertEqual(loaded.settings.format, "images")
-        self.assertEqual(loaded.tasks[0].settings["format"], "images")
+        self.assertEqual(loaded.settings.format, "pdf")
+        self.assertEqual(loaded.tasks[0].settings["format"], "pdf")
         self.assertEqual(loaded.tasks[1].settings["format"], "zip")
+        loaded.retry([old.key], Settings(output=str(self.root / "new-output"), format="zip"))
+        self.assertEqual(loaded.tasks[0].settings["format"], "pdf")
+        self.assertEqual(loaded.tasks[0].settings["output"], str(self.folder.parent))
+
+    def test_all_six_conversion_directions_and_clean_roundtrip(self):
+        from PIL import Image
+        original = self.digest()
+        zipped = export_album(self.folder, self.root / "source-zip", "zip")[0]
+        pdf = export_album(self.folder, self.root / "source-pdf", "pdf")[0]
+        zip_bytes, pdf_bytes = zipped.read_bytes(), pdf.read_bytes()
+        for source, formats in ((zipped, ("images", "pdf")), (pdf, ("images", "zip"))):
+            for fmt in formats:
+                with self.subTest(source=source.suffix, destination=fmt):
+                    target = export_album(source, self.root / (source.suffix[1:] + "-" + fmt), fmt)[0]
+                    if fmt == "images":
+                        _, entries = read_album(target, verify=True)
+                        self.assertEqual(len(entries), 5)
+                        self.assertFalse((target / MANIFEST).exists())
+                        if source == zipped:
+                            actual = {str(path.relative_to(target)): hashlib.sha256(path.read_bytes()).hexdigest() for path in target.rglob("*.jpg")}
+                            self.assertEqual(actual, original)
+                        else:
+                            self.assertEqual({entry["chapter"] for entry in entries}, {1})
+                            with Image.open(entries[0]["path"]) as image:
+                                self.assertGreater(image.width, 0)
+                                self.assertLessEqual(image.width * image.height, 16_020_000)
+                        discovered, _ = Library.discover(target.parent)
+                        self.assertEqual(len(discovered), 1)
+                        album_index(target).unlink()
+                        self.assertEqual(len(read_album(target)[1]), 5)
+                    elif fmt == "pdf":
+                        self.assertEqual(len(PdfReader(target).pages), 5)
+                    else:
+                        with zipfile.ZipFile(target) as archive:
+                            self.assertEqual(archive.namelist(), [f"{page:05d}.jpg" for page in range(1, 6)])
+                            self.assertIsNone(archive.testzip())
+        self.assertEqual(self.digest(), original)
+        self.assertEqual(zipped.read_bytes(), zip_bytes)
+        self.assertEqual(pdf.read_bytes(), pdf_bytes)
+
+    def test_zip_natural_order_and_legacy_metadata_are_handled(self):
+        zipped = self.root / "123456.zip"
+        pages = sorted(self.folder.rglob("*.jpg"))
+        with zipfile.ZipFile(zipped, "w") as archive:
+            for name, source in (("chapter10/10.jpg", pages[2]), ("chapter2/10.jpg", pages[1]), ("chapter2/2.jpg", pages[0])):
+                archive.write(source, name)
+            archive.writestr("download-info.json", "{}")
+            archive.writestr("__MACOSX/._1.jpg", "ignored")
+        target = export_album(zipped, self.root / "natural", "images")[0]
+        _, entries = read_album(target)
+        self.assertEqual([(entry["chapter"], entry["page"]) for entry in entries], [(1, 1), (1, 2), (2, 1)])
+        self.assertEqual([Path(entry["path"]).read_bytes() for entry in entries], [page.read_bytes() for page in pages[:3]])
+
+    def test_conversion_cancellation_collision_and_invalid_sources(self):
+        zipped = export_album(self.folder, self.root / "zips", "zip")[0]
+        output = self.root / "converted"
+        original = zipped.read_bytes()
+        with self.assertRaises(InterruptedError):
+            export_album(zipped, output, "images", cancelled=lambda: True)
+        self.assertFalse(output.exists())
+        target = export_album(zipped, output, "images", numeric=True)[0]
+        with self.assertRaises(FileExistsError):
+            export_album(zipped, output, "images", numeric=True)
+        self.assertEqual(len(read_album(target)[1]), 5)
+        cancelled = False
+        def progress(event):
+            nonlocal cancelled
+            cancelled = "保存图片 2/" in event.get("message", "")
+        with self.assertRaises(InterruptedError):
+            export_album(zipped, output, "images", emit=progress, cancelled=lambda: cancelled)
+        self.assertEqual(list(output.iterdir()), [target])
+        self.assertEqual(zipped.read_bytes(), original)
+        with self.assertRaises(ValueError):
+            export_album(self.folder, self.folder / "nested", "zip")
+        for index, name in enumerate(("../escape.jpg", "/absolute.jpg", "C:/absolute.jpg", "dir\\escape.jpg")):
+            bad = self.root / f"bad-{index}.zip"
+            with zipfile.ZipFile(bad, "w") as archive:
+                unsafe = zipfile.ZipInfo("placeholder")
+                unsafe.filename = name
+                archive.writestr(unsafe, b"invalid")
+            with self.assertRaises(ValueError):
+                export_album(bad, self.root / "invalid", "images")
+        empty = self.root / "empty.zip"
+        with zipfile.ZipFile(empty, "w") as archive:
+            archive.writestr("notes.txt", "no pictures")
+        with self.assertRaises(ValueError):
+            export_album(empty, self.root / "invalid", "images")

@@ -73,7 +73,6 @@ public final class Store {
             done = json.optInt("done"); total = json.optInt("total"); cached = json.optInt("cached"); resets = json.optInt("resets"); elapsed = json.optLong("elapsed");
             imageBytes = json.optLong("imageBytes"); resultBytes = json.optLong("resultBytes");
             if (status.equals("running") || status.equals("queued") || status.equals("resetting")) { status = "paused"; phase = "已恢复，点击开始继续"; }
-            if (!status.equals("done")) { settings.format="images"; settings.numericFilename=false; settings.flatZip=false; settings.keepImages=false; }
         }
         public JSONObject json() {
             JSONObject json = new JSONObject();
@@ -92,7 +91,6 @@ public final class Store {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream(); Core.copy(input, buffer);
             JSONObject root = new JSONObject(buffer.toString("UTF-8")); settings = new Settings(root.getJSONObject("settings"));
             JSONArray list = root.getJSONArray("tasks"); for (int i = 0; i < list.length(); i++) tasks.add(new Task(list.getJSONObject(i)));
-            settings.format="images";settings.numericFilename=false;settings.flatZip=false;settings.keepImages=false;
         } catch (Exception error) {
             tasks.clear(); settings = new Settings();
             File backup = new File(context.getFilesDir(), "queue-unreadable-" + System.currentTimeMillis() + ".json");

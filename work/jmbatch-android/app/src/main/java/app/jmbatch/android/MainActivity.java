@@ -44,15 +44,21 @@ public final class MainActivity extends Activity {
         output=text(store.settings.outputLabel,14,INK);output.setPadding(0,dp(8),0,dp(6));target.addView(output);
         LinearLayout targets=horizontal();targets.addView(button("选择目录",v->chooseDirectory()),new LinearLayout.LayoutParams(0,-2,1));targets.addView(button("应用目录",v->{store.settings.outputUri="";store.settings.outputLabel="应用下载目录";save();output.setText(store.settings.outputLabel);}),new LinearLayout.LayoutParams(0,-2,1));target.addView(targets);
         target.addView(button("打开保存目录",v->new SavedDirectory(this,store.settings.outputUri,store.settings.outputLabel).openExternal()));
-        target.addView(text("下载默认保存为按章节、页码排序的图片目录",13,MUTED));
-        target.addView(button("导出 PDF / ZIP",v->new LibraryScreen(this,store).show()));add(target,0,12);
+        RadioGroup formats=new RadioGroup(this);formats.setOrientation(RadioGroup.HORIZONTAL);
+        String[] labels={"PDF","ZIP","文件夹"},values={"pdf","zip","images"};
+        for(int index=0;index<values.length;index++){
+            RadioButton choice=new RadioButton(this);choice.setId(View.generateViewId());choice.setText(labels[index]);choice.setTag(values[index]);formats.addView(choice);
+            if(values[index].equals(store.settings.format))formats.check(choice.getId());
+        }
+        formats.setOnCheckedChangeListener((group,id)->{store.settings.format=(String)group.findViewById(id).getTag();save();});target.addView(formats);
+        target.addView(button("格式互转 / 导出",v->new LibraryScreen(this,store).show()));add(target,0,12);
 
         LinearLayout input=card();TextView title=text("批量编号",17,INK);title.setTypeface(null,Typeface.BOLD);input.addView(title);
         ids=edit("123456, 123460-123465\n可连续输入，支持换行和 JM 前缀",false);ids.setMinLines(2);ids.setMaxLines(5);ids.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);input.addView(ids);
         input.addView(buttonAccent("加入队列",v->{if(addIds(ids.getText().toString()))ids.setText("");}));
         LinearLayout range=horizontal();rangeFirst=edit("起始编号",true);rangeLast=edit("结束编号",true);range.addView(rangeFirst,new LinearLayout.LayoutParams(0,-2,1));TextView to=text(" 至 ",14,MUTED);to.setGravity(Gravity.CENTER);range.addView(to);range.addView(rangeLast,new LinearLayout.LayoutParams(0,-2,1));input.addView(range);
         input.addView(button("添加连续区间",v->{if(addIds(rangeFirst.getText().toString().trim()+"-"+rangeLast.getText().toString().trim())){rangeFirst.setText("");rangeLast.setText("");}}));
-        input.addView(text("自动去重 · 每次最多 2000 个编号\n保存目录在加入队列时确定，格式在导出时选择",11,MUTED));add(input,0,12);
+        input.addView(text("自动去重 · 每次最多 2000 个编号\n保存目录和格式在加入队列时确定，下载后可互相导出",11,MUTED));add(input,0,12);
 
         LinearLayout actions=horizontal();start=buttonAccent("开始 / 继续",v->startQueue());pause=button("暂停全部",v->send(DownloadService.PAUSE,null));actions.addView(start,new LinearLayout.LayoutParams(0,-2,1));actions.addView(pause,new LinearLayout.LayoutParams(0,-2,1));add(actions,0,8);
         summary=text("",13,MUTED);add(summary,0,4);global=text("",12,ACCENT);add(global,0,10);
@@ -118,7 +124,7 @@ public final class MainActivity extends Activity {
         if(store.activeKeys.contains(task.key)){toast("旧请求正在结束，请稍后重试");return;}
         if(!Arrays.asList("failed","paused","cancelled").contains(task.status)){toast("仅失败、暂停或取消的任务可重试");return;}
         String outputUri=task.settings.outputUri,outputLabel=task.settings.outputLabel,format=task.settings.format;
-        task.settings=new Store.Settings(store.settings.json());task.settings.outputUri=outputUri;task.settings.outputLabel=outputLabel;task.settings.format="images";
+        task.settings=new Store.Settings(store.settings.json());task.settings.outputUri=outputUri;task.settings.outputLabel=outputLabel;task.settings.format=format;
         task.status="queued";task.resets=0;task.error="";task.phase="等待重试";save();if(!store.running)startQueue();
     }
     private void details(Store.Task task){
@@ -126,7 +132,7 @@ public final class MainActivity extends Activity {
         if(!task.error.isEmpty())message+="\n\n错误原因：\n"+task.error;
         TextView content=text(message,14,INK);content.setPadding(dp(20),dp(10),dp(20),dp(10));content.setTextIsSelectable(true);ScrollView scroll=new ScrollView(this);LinearLayout details=column();details.addView(content);details.addView(button("打开此任务保存目录",v->new SavedDirectory(this,task.settings.outputUri,task.settings.outputLabel).openExternal()));scroll.addView(details);
         AlertDialog.Builder builder=new AlertDialog.Builder(this).setTitle("任务详情").setView(scroll).setNegativeButton("关闭",null);
-        if(task.status.equals("done"))builder.setPositiveButton(task.settings.format.equals("images")?"导出":"分享文件",(d,w)->{if(task.settings.format.equals("images"))new ExportScreen(this,store,albumEntry(task)).show();else open(task,true);});
+        if(task.status.equals("done"))builder.setPositiveButton("格式互转 / 导出",(d,w)->new ExportScreen(this,store,albumEntry(task)).show());
         else builder.setPositiveButton("取消任务",(d,w)->{send(DownloadService.CANCEL,task.key);});
         if(!task.status.equals("running")&&!task.status.equals("resetting"))builder.setNeutralButton("清理缓存",(d,w)->confirmClear(task));
         builder.show();
@@ -180,7 +186,7 @@ public final class MainActivity extends Activity {
         dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             try{
                 int[] nums=new int[fields.length];for(int i=0;i<fields.length;i++)nums[i]=Integer.parseInt(fields[i].getText().toString().trim());
-                Store.Settings options=new Store.Settings(store.settings.json());options.threads=nums[0];options.timeout=nums[1];options.retries=nums[2];options.slowKB=nums[3];options.window=nums[4];options.stall=nums[5];options.maxResets=nums[6];options.concurrentTasks=nums[7];options.autoReset=auto.isChecked();options.keepImages=false;options.numericFilename=false;options.flatZip=false;options.format="images";options.validate();
+                Store.Settings options=new Store.Settings(store.settings.json());options.threads=nums[0];options.timeout=nums[1];options.retries=nums[2];options.slowKB=nums[3];options.window=nums[4];options.stall=nums[5];options.maxResets=nums[6];options.concurrentTasks=nums[7];options.autoReset=auto.isChecked();options.keepImages=false;options.numericFilename=false;options.flatZip=false;options.validate();
                 String secret=cookie.getText().toString().trim();if(secret.contains("\n")||secret.contains("\r")||(!secret.isEmpty()&&!secret.contains("=")))throw new IllegalArgumentException("Cookie 格式应为 key=value; key2=value2，不能包含换行");
                 store.settings=options;store.cookie=secret;store.save();toast("设置已保存");dialog.dismiss();
             }catch(Exception error){showError(error instanceof NumberFormatException?"参数必须是整数":error.getMessage());}

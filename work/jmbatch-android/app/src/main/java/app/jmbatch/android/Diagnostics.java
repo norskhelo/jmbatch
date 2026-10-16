@@ -49,6 +49,18 @@ public final class Diagnostics {
             File zipResult=AlbumStorage.local(context,android.net.Uri.parse(exported.get(exported.size()-1).uri));
             try(ZipFile archive=new ZipFile(zipResult)){require(archive.size()==2&&archive.getEntry("0002/00001.jpg")!=null,"多章节 ZIP 顺序");}
             require(AlbumStorage.load(context,albumUri).images.size()==2,"导出保留原始图片");
+            List<LibraryStore.Entry> sources=new ArrayList<>();
+            sources.add(exported.get(exported.size()-1));
+            List<LibraryStore.Entry> merged=AlbumExporter.export(context,albumUri,"","自检","pdf",false,false,false,()->{},message->{});exported.addAll(merged);sources.add(merged.get(0));
+            for(LibraryStore.Entry source:sources)for(String format:new String[]{"images",source.format.equals("zip")?"pdf":"zip"}){
+                List<LibraryStore.Entry> converted=AlbumExporter.export(context,android.net.Uri.parse(source.uri),source.format,source.id,source.title,"","自检",format,false,false,false,()->{},message->{});exported.addAll(converted);
+                require(converted.size()==1,"互转成品数 "+source.format+" -> "+format);
+                android.net.Uri convertedUri=android.net.Uri.parse(converted.get(0).uri);
+                if(format.equals("images")){require(AlbumStorage.load(context,convertedUri).images.size()==2,"互转文件夹页数");AlbumStorage.validateForDeletion(context,convertedUri);}
+                else if(format.equals("pdf")){try(ParcelFileDescriptor fd=ParcelFileDescriptor.open(AlbumStorage.local(context,convertedUri),ParcelFileDescriptor.MODE_READ_ONLY);PdfRenderer renderer=new PdfRenderer(fd)){require(renderer.getPageCount()==2,"ZIP 转 PDF 页数");}}
+                else try(ZipFile convertedZip=new ZipFile(AlbumStorage.local(context,convertedUri))){require(convertedZip.size()==2&&convertedZip.getEntry("00001.jpg")!=null,"PDF 转 ZIP 页数和布局");}
+                require(AlbumStorage.local(context,android.net.Uri.parse(source.uri)).isFile(),"互转保留源文件");
+            }
             AlbumStorage.validateForDeletion(context,albumUri);
         }finally{
             for(LibraryStore.Entry entry:exported)AlbumStorage.remove(context,android.net.Uri.parse(entry.uri));
@@ -70,7 +82,7 @@ public final class Diagnostics {
             for(LibraryStore.Entry entry:exported)AlbumStorage.remove(context,android.net.Uri.parse(entry.uri));
             if(singleUri!=null)AlbumStorage.remove(context,singleUri);Downloader.deleteOwned(singleStage,root);
         }
-        String report="离线自检通过\n\n编号与区间解析、API 解密对照、图片分段和重排、JPEG 保存、PDF 系统渲染、排序图片目录保存、分章节 PDF 和多章节 ZIP 导出、导出保留原始图片均通过。\n\n没有请求漫画网站；不代表真实网络和账号访问已经验证。";
+        String report="离线自检通过\n\n编号与区间解析、API 解密对照、图片分段和重排、JPEG 保存、PDF 系统渲染、排序图片目录保存、分章节 PDF、PDF / ZIP / 文件夹六向互转和源文件保留均通过。\n\n没有请求漫画网站；不代表真实网络和账号访问已经验证。";
         Downloader.writeTextAtomic(new File(root,"report.txt"),report);return report;
     }
     private static void require(boolean condition,String name)throws IOException{if(!condition)throw new IOException("自检未通过："+name);}

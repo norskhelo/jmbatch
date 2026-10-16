@@ -106,7 +106,7 @@ class Library:
                     raise InterruptedError("扫描已取消，未导入文件")
                 if entry.is_dir(follow_symlinks=False) and not entry.name.startswith("."):
                     from albums import MANIFEST
-                    if ".partial" in entry.name or not ((Path(entry.path) / MANIFEST).is_file() or re.fullmatch(r"JM[0-9]{1,10}-.*-[0-9a-f]{8}", entry.name)):
+                    if ".partial" in entry.name or not ((Path(entry.path) / MANIFEST).is_file() or re.fullmatch(r"JM[0-9]{1,10}-.*-[0-9a-f]{8}|[0-9]{1,10}", entry.name)):
                         if entry.name.lower().endswith((".pdf", ".zip")):
                             skipped += 1
                         continue

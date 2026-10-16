@@ -72,6 +72,8 @@ run(java,'-Djava.awt.headless=true','-cp',testout,'ResumeCacheTest',testroot/'re
 
 run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/AlbumRules.java',ROOT/'tests/AlbumTest.java')
 run(java,'-Djava.awt.headless=true','-cp',testout,'AlbumTest',testroot/'album-output')
+run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/ArchivePages.java',ROOT/'tests/ArchivePagesTest.java')
+run(java,'-cp',testout,'ArchivePagesTest',testroot/'archive-output')
 
 resources=build/'resources.zip';generated=build/'generated';generated.mkdir(exist_ok=True)
 run(buildtools/'aapt2.exe','compile','--dir',ROOT/'app/src/main/res','-o',resources)

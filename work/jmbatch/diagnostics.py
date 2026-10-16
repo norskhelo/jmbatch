@@ -247,6 +247,12 @@ def run_self_test(directory: Path):
         application.engine.tasks.append(image_task)
         application.render()
         assert application.current_settings().format == "images"
+        for selected_format in ("pdf", "zip", "images"):
+            application.format_var.set(selected_format)
+            application.save_format()
+            assert application.current_settings().format == selected_format
+            assert Engine(application.home).settings.format == selected_format
+        report["checks"].append("Three download formats persist across restart")
         application.show_library()
         image_library = application.library_window
         key = image_library.library.key(image_task.result)
@@ -266,6 +272,14 @@ def run_self_test(directory: Path):
         exports = list(Path(image_task.result).parent.glob("*.pdf"))
         assert len(exports) == 1 and len(PdfReader(exports[0]).pages) == 5
         assert Path(image_task.result).is_dir()
+        from albums import export_album, read_album
+        zipped = export_album(image_task.result, directory / "conversion-zip", "zip")[0]
+        for source in (zipped, exports[0]):
+            converted = export_album(source, directory / ("converted-" + source.suffix[1:]), "images")[0]
+            assert len(read_album(converted, verify=True)[1]) == 5
+            other_format = "pdf" if source.suffix == ".zip" else "zip"
+            assert export_album(source, directory / ("converted-to-" + other_format), other_format)[0].is_file()
+        report["checks"].append("All six folder/ZIP/PDF conversion directions succeed offline and retain sources")
         image_library.window.destroy()
         report["checks"].append("Default ordered-image download, library recognition and explicit PDF export dialog preserve originals")
         report["checks"].append("Library UI: scan orphan export, select all/invert, batch favorite/unfavorite, search and persistence")

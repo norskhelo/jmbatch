@@ -50,7 +50,7 @@ public final class LibraryScreen {
     public void show(){
         LinearLayout body=new LinearLayout(activity);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(12),dp(12),dp(12),dp(8));
         TextView heading=new TextView(activity);heading.setText("已下载漫画 / 收藏");heading.setTextSize(21);body.addView(heading);
-        TextView hint=new TextView(activity);hint.setText("封面默认取第一页。选择图片漫画可导出，长按可打开或分享。");hint.setTextSize(12);body.addView(hint);
+        TextView hint=new TextView(activity);hint.setText("封面默认取第一页。选择 PDF、ZIP 或文件夹可互相导出，长按可打开或分享。");hint.setTextSize(12);body.addView(hint);
         query=new EditText(activity);query.setSingleLine(true);query.setHint("搜索编号 / 标题");body.addView(query);
         LinearLayout tools=new LinearLayout(activity);favorites=new CheckBox(activity);favorites.setText("只看收藏");tools.addView(favorites,new LinearLayout.LayoutParams(0,-2,1));tools.addView(button("扫描目录",this::scan));tools.addView(button("刷新",this::load));body.addView(tools);
         row(body,button("全选结果",()->select(0)),button("反选",()->select(1)),button("清空选择",()->select(2)));
@@ -61,7 +61,7 @@ public final class LibraryScreen {
         list.setOnItemClickListener((p,v,position,id)->{if(busy||position>=entries.size())return;String uri=entries.get(position).uri;if(list.isItemChecked(position))selected.add(uri);else selected.remove(uri);counts();});
         list.setOnItemLongClickListener((p,v,position,id)->{if(!busy&&position<entries.size())details(entries.get(position));return true;});
         row(body,button("批量收藏",()->favorite(true)),button("取消收藏",()->favorite(false)),button("打开 / 详情",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)details(items.get(0));else message("请选择一项查看详情");}));
-        row(body,button("导出",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)new ExportScreen(activity,store,items.get(0)).show();else message("请选择一本图片漫画导出");}),button("删除文件",()->confirmRemove(true)),button("仅移除记录",()->confirmRemove(false)));
+        row(body,button("导出",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)new ExportScreen(activity,store,items.get(0)).show();else message("请选择一本 PDF、ZIP 或文件夹导出");}),button("删除文件",()->confirmRemove(true)),button("仅移除记录",()->confirmRemove(false)));
         stop=new Button(activity);stop.setText("停止操作");stop.setTextSize(12);stop.setEnabled(false);stop.setOnClickListener(v->cancel());
         row(body,stop,button("关闭",()->dialog.dismiss()));
         dialog=new Dialog(activity);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);dialog.setContentView(body);
@@ -143,7 +143,8 @@ public final class LibraryScreen {
     }
     private void details(LibraryStore.Entry entry){
         if(entry.format.equals("images")){AlbumScreen.show(activity,store,entry);return;}
-        new AlertDialog.Builder(activity).setTitle(title(entry)).setItems(new String[]{"打开文件","分享文件",entry.favorite?"取消收藏":"加入收藏","系统文件管理器打开目录","软件内查看目录"},(d,index)->{
+        new AlertDialog.Builder(activity).setTitle(title(entry)).setItems(new String[]{"打开文件","分享文件",entry.favorite?"取消收藏":"加入收藏","系统文件管理器打开目录","软件内查看目录","格式互转 / 导出"},(d,index)->{
+            if(index==5){new ExportScreen(activity,store,entry).show();return;}
             if(index==0||index==1)perform(()->{library.check(entry);return "";},()->open(entry,index==1));
             else if(index==2)perform(()->{library.favorite(entry);return "已更新收藏";},null);
             else if(index==3)new SavedDirectory(activity,entry.tree,entry.label).openExternal();

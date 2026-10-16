@@ -12,13 +12,16 @@ import java.util.zip.*;
 /** Offline export; originals stay in place and only newly published files roll back. */
 public final class AlbumExporter {
     public static List<LibraryStore.Entry> export(Context context,Uri source,String tree,String label,String format,boolean numeric,boolean flat,boolean split,AlbumStorage.Check check,java.util.function.Consumer<String> progress)throws Exception {
-        AlbumStorage.Album album=AlbumStorage.load(context,source);check.run();
+        return export(context,source,"images","","",tree,label,format,numeric,flat,split,check,progress);
+    }
+    public static List<LibraryStore.Entry> export(Context context,Uri source,String sourceFormat,String id,String title,String tree,String label,String format,boolean numeric,boolean flat,boolean split,AlbumStorage.Check check,java.util.function.Consumer<String> progress)throws Exception {
+        File temporary=Files.createTempDirectory(context.getCacheDir().toPath(),"export-").toFile();List<Uri> committed=new ArrayList<>();
+        try {
+        AlbumStorage.Album album=ExportSource.load(context,source,sourceFormat,id,title,temporary,check,progress);check.run();
         Map<Integer,List<AlbumStorage.Image>> groups=new TreeMap<>();
         for(AlbumStorage.Image image:album.images)groups.computeIfAbsent(AlbumRules.group(format,split,image.chapter),k->new ArrayList<>()).add(image);
         String token=UUID.randomUUID().toString().substring(0,8);List<String> names=new ArrayList<>();
         for(int chapter:groups.keySet()){String name=AlbumRules.exportName(album.id,album.title,token,format,numeric,chapter);AlbumStorage.absent(context,tree,name);names.add(name);}
-        File temporary=Files.createTempDirectory(context.getCacheDir().toPath(),"export-").toFile();List<Uri> committed=new ArrayList<>();
-        try {
             List<File> outputs=new ArrayList<>();int index=0,completed=0;
             for(List<AlbumStorage.Image> images:groups.values()){
                 List<Core.Page> pages=new ArrayList<>();List<File> files=new ArrayList<>();Set<Integer> chapters=new HashSet<>();
@@ -32,7 +35,14 @@ public final class AlbumExporter {
                 }
                 File output=new File(temporary,names.get(index++));
                 if(format.equals("pdf"))Core.writePdf(output,pages,(done,total)->{check.run();progress.accept("生成 PDF "+done+"/"+total);});
-                else{
+                else if(format.equals("images")){
+                    if(!output.mkdir())throw new IOException("无法创建导出文件夹");
+                    for(int imageIndex=0;imageIndex<images.size();imageIndex++){
+                        check.run();AlbumStorage.Image image=images.get(imageIndex);File target=new File(output,AlbumRules.imageName(image.chapter,image.page,chapters.size()));
+                        if(!target.getParentFile().isDirectory()&&!target.getParentFile().mkdirs())throw new IOException("无法创建章节目录");
+                        Files.copy(files.get(imageIndex).toPath(),target.toPath());progress.accept("保存图片 "+(imageIndex+1)+"/"+images.size());
+                    }
+                }else{
                     try(ZipOutputStream zip=new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(output)))){
                         zip.setLevel(1);
                         for(int i=0;i<images.size();i++){
@@ -48,7 +58,13 @@ public final class AlbumExporter {
                 outputs.add(output);
             }
             List<LibraryStore.Entry> result=new ArrayList<>();
-            for(File output:outputs){check.run();progress.accept("保存 "+output.getName());Uri uri=AlbumStorage.publish(context,output,tree,output.getName(),check);committed.add(uri);result.add(new LibraryStore.Entry(album.id,output.getName(),uri.toString(),tree,label,format,false));}
+            for(File output:outputs){check.run();progress.accept("保存 "+output.getName());Uri uri=AlbumStorage.publish(context,output,tree,output.getName(),check);committed.add(uri);
+                if(format.equals("images")){
+                    org.json.JSONArray records=new org.json.JSONArray();int chapters=(int)album.images.stream().map(image->image.chapter).distinct().count();
+                    for(AlbumStorage.Image image:album.images)records.put(new org.json.JSONObject().put("chapter",image.chapter).put("page",image.page).put("file",AlbumRules.imageName(image.chapter,image.page,chapters)).put("size",image.size));
+                    AlbumStorage.remember(context,uri,new org.json.JSONObject().put("version",AlbumRules.LAYOUT_VERSION).put("id",album.id).put("title",album.title).put("entries",records));
+                }
+                result.add(new LibraryStore.Entry(album.id,output.getName(),uri.toString(),tree,label,format,false));}
             return result;
         }catch(Exception failure){
             for(Uri uri:committed)try{AlbumStorage.remove(context,uri);}catch(Exception cleanup){failure.addSuppressed(cleanup);}

@@ -246,7 +246,7 @@ class LibraryWindow:
         try:
             if action == "export":
                 if len(selected) != 1:
-                    raise ValueError("请选择一本图片漫画导出")
+                    raise ValueError("请选择一本 PDF、ZIP 或文件夹导出")
                 from export_ui import show_export
                 show_export(self, selected[0])
             elif action in ("favorite", "favorite_on", "favorite_off"):

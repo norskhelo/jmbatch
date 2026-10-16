@@ -1,4 +1,4 @@
-"""Ordered image albums and explicit, offline PDF/ZIP export."""
+"""Ordered image albums and offline folder, PDF and ZIP conversion."""
 import json
 import hashlib
 import os
@@ -27,7 +27,7 @@ def image_name(chapter, page, chapter_count):
 
 def scan_album(folder):
     """Recover portable image-only albums after moving them or clearing app state."""
-    match = re.fullmatch(r"JM([0-9]{1,10})-(.*)-[0-9a-f]{8}", folder.name)
+    match = re.fullmatch(r"JM([0-9]{1,10})-(.*)-[0-9a-f]{8}|([0-9]{1,10})", folder.name)
     if not match:
         raise ValueError("无法识别图片目录名称")
     records = []
@@ -47,7 +47,7 @@ def scan_album(folder):
         groups.setdefault(item["chapter"], []).append(item["page"])
     if sorted(groups) != list(range(1, len(groups) + 1)) or any(sorted(pages) != list(range(1, len(pages) + 1)) for pages in groups.values()):
         raise ValueError("图片章节或页码不连续")
-    return dict(version=LAYOUT_VERSION, id=match[1], title=match[2], entries=records)
+    return dict(version=LAYOUT_VERSION, id=match[1] or match[3], title=match[2] or folder.name, entries=records)
 
 
 def read_album(folder, verify=False):
@@ -119,42 +119,74 @@ def save_album(task, title, entries, emit):
 
 
 def export_album(folder, destination, fmt, numeric=False, flat=False, split_pdf=False, emit=lambda e: None, cancelled=lambda: False):
-    if fmt not in ("pdf", "zip"):
-        raise ValueError("请选择 PDF 或 ZIP")
-    data, entries = read_album(folder, verify=True)
+    from export_sources import prepared_source
+    if fmt not in ("images", "pdf", "zip"):
+        raise ValueError("请选择 PDF、ZIP 或文件夹")
+    def progress(event):
+        if cancelled():
+            raise InterruptedError("导出已取消，源文件保留")
+        emit(event)
+    source = Path(folder).resolve()
+    destination = Path(destination).resolve()
+    if source.is_dir() and destination.is_relative_to(source):
+        raise ValueError("请选择源文件夹以外的导出目录")
+    progress(dict(type="export_progress", message="读取源文件"))
+    with prepared_source(folder, progress) as (data, entries):
+        return export_entries(data, entries, destination, fmt, numeric, flat, split_pdf, progress)
+
+
+def export_entries(data, entries, destination, fmt, numeric, flat, split_pdf, progress):
     destination = Path(destination).resolve()
     destination.mkdir(parents=True, exist_ok=True)
     groups = {}
     for entry in entries:
         groups.setdefault(entry["chapter"] if fmt == "pdf" and split_pdf else 0, []).append(entry)
     stem = str(data["id"]) if numeric else f"JM{data['id']}-{safe_name(data['title'])}-{uuid.uuid4().hex[:8]}"
-    targets = [destination / (stem + (f"-{chapter:04d}" if chapter else "") + "." + fmt) for chapter in groups]
+    targets = [destination / (stem + (f"-{chapter:04d}" if chapter else "") + ("" if fmt == "images" else "." + fmt)) for chapter in groups]
     if any(target.exists() for target in targets):
         raise FileExistsError("同名导出文件已存在，请更换目录或关闭纯编号命名；未覆盖")
     committed = []
-    def progress(event):
-        if cancelled():
-            raise InterruptedError("导出已取消，原始图片保留")
-        emit(event)
+    records = []
     try:
         with tempfile.TemporaryDirectory(prefix=".jmbatch-export-", dir=destination) as temporary:
             staging = Path(temporary)
             ready = []
             for (chapter, pages), target in zip(groups.items(), targets):
                 progress(dict(type="export_progress", message=f"导出第 {chapter} 章" if chapter else "正在导出"))
-                task = dict(album_id=str(data["id"]), key=uuid.uuid4().hex,
-                            settings=Settings(output=str(staging), format=fmt, flat_zip=flat).__dict__)
-                ready.append(export_images(task, data["title"], pages, progress))
+                if fmt == "images":
+                    output = staging / target.name
+                    output.mkdir()
+                    chapter_count = len({entry["chapter"] for entry in pages})
+                    for entry in pages:
+                        progress(dict(type="export_progress", message=f"保存图片 {len(records) + 1}/{len(pages)}"))
+                        relative = image_name(entry["chapter"], entry["page"], chapter_count)
+                        image = output / relative
+                        image.parent.mkdir(exist_ok=True)
+                        shutil.copyfile(entry["path"], image)
+                        records.append(dict(chapter=entry["chapter"], page=entry["page"], file=relative, size=image.stat().st_size))
+                    ready.append(output)
+                else:
+                    task = dict(album_id=str(data["id"]), key=uuid.uuid4().hex,
+                                settings=Settings(output=str(staging), format=fmt, flat_zip=flat).__dict__)
+                    ready.append(export_images(task, data["title"], pages, progress))
             for source, target in zip(ready, targets):
                 progress(dict(type="export_progress", message="保存导出文件"))
-                if os.name == "nt":
+                if os.name == "nt" or source.is_dir():
+                    if target.exists():
+                        raise FileExistsError("同名导出成品已存在，未覆盖")
                     os.rename(source, target)
                 else:
                     os.link(source, target)
                     source.unlink()
                 committed.append(target)
+                if fmt == "images":
+                    atomic_json(album_index(target), dict(version=LAYOUT_VERSION, id=data["id"], title=data["title"], entries=records))
         return committed
     except Exception:
         for target in committed:
-            target.unlink(missing_ok=True)
+            if target.is_dir():
+                shutil.rmtree(target)
+                album_index(target).unlink(missing_ok=True)
+            else:
+                target.unlink(missing_ok=True)
         raise
