@@ -45,7 +45,7 @@ List<UpdateHistory.Entry> entries=new ArrayList<>();
 '''+ '\n'.join(entries)+'''
 UpdateHistory.Selection next=UpdateHistory.select(entries,"0.5.0");
 if(next==null||!next.latest.version.equals("0.5.1")||next.history.size()!=1)throw new AssertionError("upgrade selection");
-Path root=Paths.get(args[0]);String notes=new String(Files.readAllBytes(root.resolve("notes.txt")),"UTF-8");
+Path root=Paths.get(args[0]);String notes=new String(Files.readAllBytes(root.resolve("notes.txt")),"UTF-8").replace("\\r\\n","\\n").trim();
 if(!next.latest.notes.replace("\\r\\n","\\n").trim().equals(notes))throw new AssertionError("release notes");
 UpdateHistory.Selection installed=UpdateHistory.select(entries,"0.5.1");
 if(UpdateRules.compare(installed.latest.version,"0.5.1")!=0)throw new AssertionError("installed update");
