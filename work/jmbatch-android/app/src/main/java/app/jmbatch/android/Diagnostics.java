@@ -15,6 +15,9 @@ public final class Diagnostics {
         require(Core.parseIds("JM123456,123456,123457-123460").size()==5,"编号解析");
         require(Core.decrypt(VECTOR,"1700566805",Core.API_SECRET).equals("{\"id\":123456,\"name\":\"offline-test\"}"),"API 解密对照");
         require(Core.segments(220980,1461466,"00001")==14,"图片分段算法");
+        Store.Settings configured=new Store.Settings();configured.chapterWorkers=8;
+        require(new Store.Settings(configured.json()).chapterWorkers==8,"章节并行设置保存");
+        require(new Store.Settings(new org.json.JSONObject()).chapterWorkers==4,"旧配置默认章节并行数");
         Bitmap pattern=Bitmap.createBitmap(160,203,Bitmap.Config.ARGB_8888);
         for(int y=0;y<203;y++)for(int x=0;x<160;x++)pattern.setPixel(x,y,Color.rgb(y,80,160));
         File raw=new File(root,"test.png"),jpeg=new File(root,"test.jpg");
@@ -37,7 +40,11 @@ public final class Diagnostics {
         }
         android.net.Uri albumUri=null;List<LibraryStore.Entry> exported=new ArrayList<>();
         try{
-            albumUri=AlbumStorage.publish(context,albumStage,"","JM123456-self-test-"+UUID.randomUUID().toString().substring(0,8),()->{});
+            List<FolderSave.Entry> ordered=new ArrayList<>();
+            for(int i=0;i<images.length();i++){org.json.JSONObject image=images.getJSONObject(i);ordered.add(new FolderSave.Entry(new File(albumStage,image.getString("file")),image.getString("file"),image.getLong("size")));}
+            Set<String> savePhases=new HashSet<>();
+            albumUri=AlbumStorage.publishImages(context,ordered,"","JM123456-self-test-"+UUID.randomUUID().toString().substring(0,8),()->{},(phase,done,total,bytes,totalBytes)->savePhases.add(phase));
+            require(savePhases.contains("save")&&savePhases.contains("saved_verify"),"图片保存和读回校验进度");
             require(AlbumStorage.load(context,albumUri).images.size()==2,"无清单目录扫描");
             AlbumStorage.remember(context,albumUri,new org.json.JSONObject().put("version",AlbumRules.LAYOUT_VERSION).put("id","123456").put("title","offline-album-test").put("entries",images));
             require(AlbumStorage.children(context,albumUri).size()==2,"图片目录不含清单");

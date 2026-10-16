@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 
 /** Task-local, versioned metadata records and a bounded, cancellable prefetch. */
 public final class ChapterMetadata {
-    public static final int MAX_WORKERS=4, MAX_BYTES=2*1024*1024;
+    public static final int DEFAULT_WORKERS=4, MAX_WORKERS=8, MAX_BYTES=2*1024*1024;
     public static final long TTL=24*60*60*1000L;
     private static final int MAGIC=0x4a4d4301;
     public interface Check { void run() throws Exception; }
@@ -73,6 +73,11 @@ public final class ChapterMetadata {
     }
     public static List<Detail> load(List<String> ids,Cache cache,Fetch fetch,Check check,
                                     Runnable abort,Progress progress,int timeout)throws Exception{
+        return load(ids,cache,fetch,check,abort,progress,timeout,DEFAULT_WORKERS);
+    }
+    public static List<Detail> load(List<String> ids,Cache cache,Fetch fetch,Check check,
+                                    Runnable abort,Progress progress,int timeout,int workers)throws Exception{
+        if(workers<1||workers>MAX_WORKERS)throw new IllegalArgumentException("章节读取并行数应为 1–8");
         Map<String,Detail> values=new HashMap<>();List<String> missing=new ArrayList<>();int cached=0,pages=0;
         progress.update(0,ids.size(),0);
         for(String id:ids){
@@ -84,13 +89,13 @@ public final class ChapterMetadata {
             }
         }
         if(!missing.isEmpty()){
-            ExecutorService pool=Executors.newFixedThreadPool(Math.min(MAX_WORKERS,missing.size()));
+            ExecutorService pool=Executors.newFixedThreadPool(Math.min(workers,missing.size()));
             CompletionService<Result> completion=new ExecutorCompletionService<>(pool);
             List<Future<Result>> active=new ArrayList<>();int next=0,received=0;boolean success=false;
             try{
                 while(received<missing.size()){
                     check.run();
-                    while(next<missing.size()&&active.size()<MAX_WORKERS){
+                    while(next<missing.size()&&active.size()<workers){
                         String id=missing.get(next++);
                         active.add(completion.submit(()->{check.run();Detail value=fetch.get(id);check.run();return new Result(id,value);}));
                     }

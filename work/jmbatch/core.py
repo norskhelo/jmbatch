@@ -12,7 +12,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-VERSION = "0.3.7"
+VERSION = "0.3.8"
 ZIP_LAYOUT_VERSION = 3
 MAX_TASKS = 2000
 
@@ -45,6 +45,7 @@ class Settings:
     output: str = field(default_factory=lambda: str(Path.home() / "Downloads" / "JMBatch"))
     format: str = "images"
     threads: int = 8
+    chapter_workers: int = 4
     concurrent_tasks: int = 2
     timeout: int = 25
     request_retries: int = 2
@@ -63,6 +64,7 @@ class Settings:
             raise ValueError("输出格式必须是图片、PDF 或 ZIP。")
         for name, low, high, label in [
             ("concurrent_tasks", 1, 4, "同时下载任务数"),
+            ("chapter_workers", 1, 8, "章节读取并行数"),
             ("threads", 1, 16, "图片线程数"), ("timeout", 5, 120, "请求超时"),
             ("request_retries", 0, 5, "请求重试次数"), ("slow_kbps", 0, 10240, "慢速阈值"),
             ("slow_seconds", 15, 600, "慢速观察窗口"), ("stall_seconds", 30, 1800, "无进度超时"),

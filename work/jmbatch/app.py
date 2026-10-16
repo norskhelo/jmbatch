@@ -481,6 +481,7 @@ class App:
         fields = [
             ("concurrent_tasks", "同时下载任务数", "1–4，默认 2；每个任务单独使用下方图片线程"),
             ("threads", "每个任务图片线程数", "1–16，默认 8；遇限流可调低"),
+            ("chapter_workers", "每个任务章节读取并行数", "1–8，默认 4；可试 6 或 8，超时或限流时调低"),
             ("timeout", "单次请求超时 / 秒", "5–120"),
             ("request_retries", "单次请求重试", "0–5"),
             ("slow_kbps", "慢速阈值 / KB/s", "0 表示仅检测无进度"),
@@ -495,12 +496,12 @@ class App:
             ttk.Label(frame, text=hint, foreground=MUTED).grid(row=row, column=2, sticky="w")
         auto = tk.BooleanVar(value=self.engine.settings.auto_reset)
         all_chapters = tk.BooleanVar(value=self.engine.settings.download_all_chapters)
-        ttk.Checkbutton(frame, text="默认下载全章节（跳过章节选择，仅用于尚未选择章节的任务）", variable=all_chapters).grid(row=10, column=0, columnspan=3, sticky="w")
-        ttk.Checkbutton(frame, text="启用慢速 / 无进度自动重置", variable=auto).grid(row=9, column=0, columnspan=3, sticky="w", pady=(14, 5))
-        ttk.Label(frame, text="Cookie（可选，仅本次会话有效，不写入配置或日志）").grid(row=12, column=0, columnspan=3, sticky="w", pady=(15, 6))
+        ttk.Checkbutton(frame, text="默认下载全章节（跳过章节选择，仅用于尚未选择章节的任务）", variable=all_chapters).grid(row=11, column=0, columnspan=3, sticky="w")
+        ttk.Checkbutton(frame, text="启用慢速 / 无进度自动重置", variable=auto).grid(row=10, column=0, columnspan=3, sticky="w", pady=(14, 5))
+        ttk.Label(frame, text="Cookie（可选，仅本次会话有效，不写入配置或日志）").grid(row=13, column=0, columnspan=3, sticky="w", pady=(15, 6))
         cookie = tk.StringVar(value=self.engine.cookie)
-        ttk.Entry(frame, textvariable=cookie, show="●", width=65).grid(row=13, column=0, columnspan=3, sticky="ew")
-        ttk.Label(frame, text="速度按已完成图片的文件大小估算，大图下载期间可能暂时显示 0。\n重置会终止旧进程并重建连接；导出阶段不重置。\n任务数保存后生效；调低时等待当前任务结束，不中断下载。\n其他设置用于新任务及手动重试；运行中任务保留原设置。", foreground=MUTED, justify="left").grid(row=14, column=0, columnspan=3, sticky="w", pady=15)
+        ttk.Entry(frame, textvariable=cookie, show="●", width=65).grid(row=14, column=0, columnspan=3, sticky="ew")
+        ttk.Label(frame, text="章节并行数独立于图片线程；越高不一定越快，多任务会叠加请求。\n速度按已完成图片的文件大小估算，大图下载期间可能暂时显示 0。\n重置会终止旧进程并重建连接；导出阶段不重置。\n任务数保存后生效；调低时等待当前任务结束，不中断下载。\n其他设置用于新任务及手动重试；运行中任务保留原设置。", foreground=MUTED, justify="left").grid(row=15, column=0, columnspan=3, sticky="w", pady=15)
 
         def save():
             try:
@@ -520,7 +521,7 @@ class App:
                 dialog.destroy()
             except (ValueError, OSError) as exc:
                 messagebox.showerror("设置无效", str(exc), parent=dialog)
-        ttk.Button(frame, text="保存设置", style="Accent.TButton", command=save).grid(row=15, column=0, columnspan=3, sticky="e")
+        ttk.Button(frame, text="保存设置", style="Accent.TButton", command=save).grid(row=16, column=0, columnspan=3, sticky="e")
 
     def close(self):
         if self.engine.active and not messagebox.askyesno("退出 JM Batch", "退出会暂停全部下载任务并保留已验证图片。下次打开可继续。", parent=self.root):

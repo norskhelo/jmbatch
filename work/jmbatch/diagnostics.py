@@ -321,6 +321,8 @@ def run_self_test(directory: Path):
         from chapter_metadata_checks import check_metadata_resume
         check_metadata_resume(directory / 'chapter-metadata')
         report["checks"].append("Bounded chapter metadata: four workers, persisted records, restart reuses all 12 chapters without detail requests")
+        check_metadata_resume(directory / 'chapter-metadata-eight', workers=8)
+        report["checks"].append("Configurable chapter metadata: eight workers, bounded requests and restart cache reuse")
         from network_routes import run_routes, RoutesExhausted
         route_calls = []
         def simulated_connection(host):

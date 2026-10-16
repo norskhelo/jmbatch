@@ -23,11 +23,13 @@ public final class Store {
     public static final class Settings {
         public String outputUri = "", outputLabel = "应用下载目录", format = "images";
         public int concurrentTasks = 2, threads = 8, timeout = 25, retries = 2, slowKB = 30, window = 90, stall = 180, maxResets = 3;
+        public int chapterWorkers = ChapterMetadata.DEFAULT_WORKERS;
         public boolean autoReset = true, keepImages = false, numericFilename = false, flatZip = false;
         public boolean downloadAllChapters = false;
         public Settings() {}
         public Settings(JSONObject json) {
             concurrentTasks = json.optInt("concurrentTasks", 2);
+            chapterWorkers = json.optInt("chapterWorkers", ChapterMetadata.DEFAULT_WORKERS);
             downloadAllChapters = json.optBoolean("downloadAllChapters", false);
             outputUri = json.optString("outputUri", ""); outputLabel = json.optString("outputLabel", "应用下载目录");
             format = json.optString("format", "images"); threads = json.optInt("threads", 8); timeout = json.optInt("timeout", 25);
@@ -39,6 +41,7 @@ public final class Store {
         }
         public void validate() {
             check(concurrentTasks, 1, 4, "同时下载任务数");
+            check(chapterWorkers, 1, ChapterMetadata.MAX_WORKERS, "章节读取并行数");
             if (!format.equals("images") && !format.equals("pdf") && !format.equals("zip")) throw new IllegalArgumentException("输出格式无效");
             check(threads, 1, 16, "图片线程"); check(timeout, 5, 120, "请求超时"); check(retries, 0, 5, "请求重试");
             check(slowKB, 0, 10240, "慢速阈值"); check(window, 15, 600, "观察窗口"); check(stall, 30, 1800, "无进度超时"); check(maxResets, 0, 10, "重置次数");
@@ -46,7 +49,7 @@ public final class Store {
         private static void check(int n, int min, int max, String label) { if (n < min || n > max) throw new IllegalArgumentException(label + "应为 " + min + "–" + max); }
         public JSONObject json() {
             JSONObject json = new JSONObject();
-            try { json.put("downloadAllChapters", downloadAllChapters).put("outputUri", outputUri).put("outputLabel", outputLabel).put("format", format).put("threads", threads).put("timeout", timeout).put("retries", retries)
+            try { json.put("chapterWorkers", chapterWorkers).put("downloadAllChapters", downloadAllChapters).put("outputUri", outputUri).put("outputLabel", outputLabel).put("format", format).put("threads", threads).put("timeout", timeout).put("retries", retries)
                 .put("concurrentTasks", concurrentTasks).put("slowKB", slowKB).put("window", window).put("stall", stall).put("maxResets", maxResets).put("autoReset", autoReset).put("keepImages", keepImages).put("numericFilename", numericFilename).put("flatZip", flatZip); }
             catch (JSONException impossible) { throw new IllegalStateException(impossible); }
             return json;

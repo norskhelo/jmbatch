@@ -78,6 +78,24 @@ public class ChapterMetadataTest {
             try{ChapterMetadata.load(Arrays.asList("1","2"),limit,ChapterMetadataTest::detail,()->{},()->{},(d,t,c)->{},5);throw new AssertionError();}
             catch(IOException expected){check(expected.getMessage().contains("20000"));}
         }
+        for(int workers:new int[]{1,8}){
+            ChapterMetadata.Cache configured=new ChapterMetadata.Cache(new File(root,"workers-"+workers),scope);
+            AtomicInteger configuredActive=new AtomicInteger(),configuredPeak=new AtomicInteger(),configuredCalls=new AtomicInteger();
+            CountDownLatch gate=new CountDownLatch(workers);List<Integer> configuredProgress=new ArrayList<>();
+            List<ChapterMetadata.Detail> ordered=ChapterMetadata.load(ids,configured,id->{
+                configuredCalls.incrementAndGet();int n=configuredActive.incrementAndGet();configuredPeak.accumulateAndGet(n,Math::max);
+                try{gate.countDown();if(!gate.await(5,TimeUnit.SECONDS))throw new IOException("not concurrent");Thread.sleep(5);return detail(id);}
+                finally{configuredActive.decrementAndGet();}
+            },()->{},()->{},(d,t,c)->configuredProgress.add(d),5,workers);
+            check(configuredPeak.get()==workers);check(configuredActive.get()==0);check(configuredCalls.get()==24);
+            for(int i=0;i<ids.size();i++)check(ordered.get(i).images.get(0).equals(ids.get(i)+".jpg"));
+            check(configuredProgress.get(configuredProgress.size()-1)==24);
+            ChapterMetadata.load(ids,configured,forbidden,()->{},()->{},(d,t,c)->{},5,workers);
+            check(configuredCalls.get()==24);
+        }
+        for(int workers:new int[]{0,9})try{
+            ChapterMetadata.load(ids,cache,forbidden,()->{},()->{},(d,t,c)->{},5,workers);throw new AssertionError();
+        }catch(IllegalArgumentException expected){check(true);}
         System.out.println("ChapterMetadataTest: "+checks+" checks passed");
     }
 }

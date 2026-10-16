@@ -230,21 +230,21 @@ public final class MainActivity extends Activity {
 
     private void settings(){
         LinearLayout form=column();form.setPadding(dp(20),dp(12),dp(20),dp(18));ScrollView scroll=new ScrollView(this);scroll.addView(form);
-        String[] names={"每个任务图片线程数（1–16）","请求超时 / 秒（5–120）","请求重试（0–5）","慢速阈值 / KB/s（0=仅检测停滞）","慢速观察窗口 / 秒（15–600）","无进度超时 / 秒（30–1800）","每本最大重置次数（0–10）","同时下载任务数（1–4，默认 2）"};
-        int[] values={store.settings.threads,store.settings.timeout,store.settings.retries,store.settings.slowKB,store.settings.window,store.settings.stall,store.settings.maxResets,store.settings.concurrentTasks};
+        String[] names={"每个任务图片线程数（1–16）","请求超时 / 秒（5–120）","请求重试（0–5）","慢速阈值 / KB/s（0=仅检测停滞）","慢速观察窗口 / 秒（15–600）","无进度超时 / 秒（30–1800）","每本最大重置次数（0–10）","同时下载任务数（1–4，默认 2）","每个任务章节读取并行数（1–8，默认 4）"};
+        int[] values={store.settings.threads,store.settings.timeout,store.settings.retries,store.settings.slowKB,store.settings.window,store.settings.stall,store.settings.maxResets,store.settings.concurrentTasks,store.settings.chapterWorkers};
         EditText[] fields=new EditText[names.length];
         for(int i=0;i<names.length;i++){form.addView(text(names[i],13,MUTED));fields[i]=edit("",true);fields[i].setText(Integer.toString(values[i]));form.addView(fields[i]);}
         CheckBox auto=new CheckBox(this);auto.setText("慢速 / 无进度时自动重连");auto.setChecked(store.settings.autoReset);form.addView(auto);
         CheckBox allChapters=new CheckBox(this);allChapters.setText("默认下载全章节（跳过章节选择）");allChapters.setChecked(store.settings.downloadAllChapters);form.addView(allChapters);
         form.addView(text("Cookie（可选，仅本次应用进程内保存）",13,MUTED));EditText cookie=edit("key=value; key2=value2",false);cookie.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);cookie.setText(store.cookie);form.addView(cookie);
-        form.addView(text("默认同时下载 2 本，每本 8 个图片线程；并行越多，流量和内存占用越高。速度统计为图片响应的接收字节，重试流量也计入。\n任务数保存后用于后续调度；调低不会中断已运行任务。\n其他设置影响新任务和手动重试；已有任务保留原目录和格式。",12,MUTED));
+        form.addView(text("章节读取默认并行 4 章，可试 6 或 8；超时或限流时调低，越高不一定越快，多任务会叠加请求。\n默认同时下载 2 本，每本 8 个图片线程；并行越多，流量和内存占用越高。速度统计为图片响应的接收字节，重试流量也计入。\n任务数保存后用于后续调度；调低不会中断已运行任务。\n其他设置影响新任务和手动重试；已有任务保留原目录和格式。",12,MUTED));
         form.addView(button("运行离线自检（不访问网站）",v->selfTest()));
         form.addView(button("查看本地使用说明",v->new AlertDialog.Builder(this).setTitle("使用说明").setMessage("1. 选择保存目录，添加编号或区间。\n2. 点击开始，图片按章节和页码保存，通知栏可暂停。\n3. 下载后在任务详情或漫画库选择“导出”，再选择 PDF、ZIP、命名方式与保存目录。\n4. 多章节 PDF 可统一导出或分章节导出，导出始终保留原始图片。\n5. 失败任务会保留已验证缓存，可修正后重试。\n6. 应用目录在卸载后会被删除，重要图片请选公共目录或导出备份。\n7. 导出和文件管理前请暂停下载，系统目录授权失效时需重新选择目录。").setPositiveButton("知道了",null).show()));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("下载设置").setView(scroll).setNegativeButton("返回",null).setPositiveButton("保存",null).create();
         dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             try{
                 int[] nums=new int[fields.length];for(int i=0;i<fields.length;i++)nums[i]=Integer.parseInt(fields[i].getText().toString().trim());
-                Store.Settings options=new Store.Settings(store.settings.json());options.threads=nums[0];options.timeout=nums[1];options.retries=nums[2];options.slowKB=nums[3];options.window=nums[4];options.stall=nums[5];options.maxResets=nums[6];options.concurrentTasks=nums[7];options.autoReset=auto.isChecked();options.keepImages=false;options.numericFilename=false;options.flatZip=false;options.validate();
+                Store.Settings options=new Store.Settings(store.settings.json());options.threads=nums[0];options.timeout=nums[1];options.retries=nums[2];options.slowKB=nums[3];options.window=nums[4];options.stall=nums[5];options.maxResets=nums[6];options.concurrentTasks=nums[7];options.chapterWorkers=nums[8];options.autoReset=auto.isChecked();options.keepImages=false;options.numericFilename=false;options.flatZip=false;options.validate();
                 options.downloadAllChapters=allChapters.isChecked();
                 String secret=cookie.getText().toString().trim();if(secret.contains("\n")||secret.contains("\r")||(!secret.isEmpty()&&!secret.contains("=")))throw new IllegalArgumentException("Cookie 格式应为 key=value; key2=value2，不能包含换行");
                 store.settings=options;store.cookie=secret;store.save();toast("设置已保存");dialog.dismiss();

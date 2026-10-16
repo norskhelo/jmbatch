@@ -98,7 +98,12 @@ public final class AlbumStorage {
         records.put(new JSONObject().put("chapter",chapter).put("page",page).put("file",relative).put("size",size));
     }
     public static Album load(Context context,Uri folder)throws Exception {
-        Node marker=null;for(Node node:children(context,folder))if(node.name.equals(AlbumRules.MANIFEST)){if(marker!=null)throw new IOException("重复图片清单");marker=node;}
+        return load(context,folder,()->{},(phase,done,total,bytes,totalBytes)->{});
+    }
+    public static Album load(Context context,Uri folder,FolderSave.Check check,FolderSave.Progress progress)throws Exception {
+        check.run();Map<String,Node> rootNodes=new HashMap<>();
+        for(Node node:children(context,folder))if(rootNodes.put(node.name,node)!=null)throw new IOException("目录含同名文件");
+        Node marker=rootNodes.get(AlbumRules.MANIFEST);
         File stored=index(context,folder);JSONObject json;
         if(marker!=null){
             if(marker.directory||marker.size>8*1024*1024)throw new IOException("图片清单无效");
@@ -113,17 +118,21 @@ public final class AlbumStorage {
         if(entries.length()==0||entries.length()>20000)throw new IOException("图片数量无效");
         Set<Integer> chapterIds=new HashSet<>();for(int i=0;i<entries.length();i++)chapterIds.add(entries.getJSONObject(i).getInt("chapter"));
         boolean flat=version==AlbumRules.LAYOUT_VERSION&&chapterIds.size()==1;
+        progress.update("index",0,entries.length(),0,0);
         for(int i=0;i<entries.length();i++){
+            check.run();
             JSONObject item=entries.getJSONObject(i);int c=item.getInt("chapter"),p=item.getInt("page");String name=version==1?AlbumRules.imageName(c,p):AlbumRules.imageName(c,p,chapterIds.size());
             if(!name.equals(item.getString("file"))||!seen.add(name))throw new IOException("图片顺序或路径无效");
             if(!chapters.containsKey(c)){
                 Uri directory=folder;
-                if(!flat){Node chapter=child(context,folder,name.split("/")[0]);if(!chapter.directory)throw new IOException("章节不是目录");directory=chapter.uri;}
-                Map<String,Node> nodes=new HashMap<>();for(Node n:children(context,directory))if(nodes.put(n.name,n)!=null)throw new IOException("章节有同名文件");chapters.put(c,nodes);
+                if(!flat){Node chapter=rootNodes.get(name.split("/")[0]);if(chapter==null||!chapter.directory)throw new IOException("章节目录缺失");directory=chapter.uri;}
+                Map<String,Node> nodes=flat?rootNodes:new HashMap<>();
+                if(!flat)for(Node n:children(context,directory))if(nodes.put(n.name,n)!=null)throw new IOException("章节有同名文件");chapters.put(c,nodes);
             }
             Node image=chapters.get(c).get(flat?name:name.split("/")[1]);long size=item.getLong("size");
             if(image==null||image.directory||size<=0||image.size>=0&&image.size!=size)throw new IOException("图片缺失或大小变化："+name);
             images.add(new Image(c,p,image.uri,size,name));
+            progress.update("index",i+1,entries.length(),0,0);
         }
         images.sort(Comparator.comparingInt((Image i)->i.chapter).thenComparingInt(i->i.page));return new Album(id,json.getString("title"),images);
     }
@@ -157,6 +166,42 @@ public final class AlbumStorage {
             try(InputStream in=new FileInputStream(source);OutputStream out=context.getContentResolver().openOutputStream(target,"w")){if(out==null)throw new IOException("保存目录不可写");copy(in,out,check);}
             try(InputStream a=new FileInputStream(source);InputStream b=open(context,target)){if(crc(a,check)!=crc(b,check))throw new IOException("图片保存校验失败");}
         }
+    }
+    public static Uri publishImages(Context context,List<FolderSave.Entry> entries,String tree,String name,
+                                    FolderSave.Check check,FolderSave.Progress progress)throws Exception {
+        if(tree.isEmpty())return ExportProvider.uri(context,FolderSave.publish(root(context),entries,name,check,progress));
+        long totalBytes=FolderSave.validate(entries);check.run();absent(context,tree,name);
+        Uri treeUri=Uri.parse(tree),parent=DocumentsContract.buildDocumentUriUsingTree(treeUri,DocumentsContract.getTreeDocumentId(treeUri));
+        Uri temporary=DocumentsContract.createDocument(context.getContentResolver(),parent,DocumentsContract.Document.MIME_TYPE_DIR,name+"."+UUID.randomUUID()+".partial");
+        if(temporary==null)throw new IOException("无法创建临时输出");boolean committed=false;
+        try{
+            Map<String,Uri> directories=new HashMap<>();int done=0;long bytes=0;
+            for(FolderSave.Entry entry:entries){
+                check.run();String[] parts=entry.path.split("/");Uri directory=temporary;
+                if(parts.length==2){
+                    directory=directories.get(parts[0]);
+                    if(directory==null){
+                        directory=DocumentsContract.createDocument(context.getContentResolver(),temporary,DocumentsContract.Document.MIME_TYPE_DIR,parts[0]);
+                        if(directory==null)throw new IOException("无法创建章节目录");directories.put(parts[0],directory);
+                    }
+                }
+                final Uri target=DocumentsContract.createDocument(context.getContentResolver(),directory,"image/jpeg",parts[parts.length-1]);
+                if(target==null)throw new IOException("无法创建图片文件");
+                FolderSave.transfer(entry,new FolderSave.Target(){
+                    public OutputStream write()throws Exception{return context.getContentResolver().openOutputStream(target,"w");}
+                    public void sync(OutputStream out){} // SAF providers own stream durability; readback still verifies every byte.
+                    public InputStream read()throws Exception{return open(context,target);}
+                },check,progress,done,entries.size(),bytes,totalBytes);
+                done++;bytes+=entry.size;
+            }
+            check.run();absent(context,tree,name);
+            Uri renamed=DocumentsContract.renameDocument(context.getContentResolver(),temporary,name);
+            if(renamed==null)throw new IOException("所选目录不支持安全重命名");temporary=renamed;
+            try(Cursor c=context.getContentResolver().query(renamed,new String[]{"_display_name"},null,null,null)){
+                if(c==null||!c.moveToFirst()||!name.equals(c.getString(0)))throw new IOException("存储服务更改了输出名称");
+            }
+            committed=true;return renamed;
+        }finally{if(!committed)try{progress.update("cleanup",0,0,0,0);DocumentsContract.deleteDocument(context.getContentResolver(),temporary);}catch(Exception ignored){}}
     }
     public static Uri publish(Context context,File source,String tree,String name,Check check)throws Exception {
         absent(context,tree,name);String tempName=name+"."+UUID.randomUUID()+".partial";

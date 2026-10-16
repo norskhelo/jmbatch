@@ -82,6 +82,8 @@ run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/a
 run(java,'-cp',testout,'ChapterTest')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/ChapterMetadata.java',ROOT/'tests/ChapterMetadataTest.java')
 run(java,'-cp',testout,'ChapterMetadataTest',testroot/'chapter-metadata')
+run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/FolderSave.java',ROOT/'tests/FolderSaveTest.java')
+run(java,'-cp',testout,'FolderSaveTest',testroot/'folder-save')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/ReaderRules.java',ROOT/'tests/ReaderTest.java')
 run(java,'-cp',testout,'ReaderTest')
 run(buildtools/'aapt2.exe','compile','--dir',ROOT/'app/src/main/res','-o',resources)

@@ -38,8 +38,9 @@ public final class Downloader {
                 JSONObject finished = new JSONObject(readText(marker)); Uri uri = Uri.parse(finished.getString("uri"));
                 if(task.settings.format.equals("images")) {
                     if(!finished.optString("format").equals("images")||finished.optInt("albumLayoutVersion")!=AlbumRules.LAYOUT_VERSION)throw new IOException("旧版成品需重新保存图片");
-                    AlbumStorage.Album album=AlbumStorage.load(context,uri);task.total=task.done=album.images.size();task.resultBytes=0;
+                    AlbumStorage.Album album=AlbumStorage.load(context,uri,control::check,this::saveProgress);task.total=task.done=album.images.size();task.resultBytes=0;
                     for(AlbumStorage.Image image:album.images)task.resultBytes+=image.size;
+                    cleanImageCache();
                     return uri.toString();
                 }
                 if (finished.optBoolean("numericFilename", false) != task.settings.numericFilename ||
@@ -94,7 +95,7 @@ public final class Downloader {
         List<ChapterMetadata.Detail> details;
         try{details=ChapterMetadata.load(selectedIds,metadata,fetch,control::check,
             ()->{if(control.stop.isEmpty())control.cancel("ABORT");},
-            (done,total,cached)->{control.lastData=SystemClock.elapsedRealtime();task.phase="读取所选章节 "+done+"/"+total+"（复用 "+cached+" 章，最多 4 章并行）";},task.settings.timeout);}
+            (done,total,cached)->{control.lastData=SystemClock.elapsedRealtime();task.phase="读取所选章节 "+done+"/"+total+"（复用 "+cached+" 章，最多 "+task.settings.chapterWorkers+" 章并行）";},task.settings.timeout,task.settings.chapterWorkers);}
         catch(ChapterMetadata.UnstoppedWorkers error){control.cancel("FATAL");throw error;}
         List<ImageJob> jobs = new ArrayList<>(); Set<String> chapterIds = new HashSet<>(); int detailIndex=0;
         for (ChapterRules.Chapter chapter : chosen) {
@@ -151,34 +152,31 @@ public final class Downloader {
             error->!(error instanceof NetworkRoutes.HttpFailure && ((NetworkRoutes.HttpFailure)error).code<500)
                 && !String.valueOf(error.getMessage()).contains("存储空间不足") && !String.valueOf(error.getMessage()).contains("解码内存"));
         if (task.done != task.total) throw new IOException("图片不完整：" + task.done + "/" + task.total + "，未生成成品");
-        task.stage = control.stage = "verify"; task.phase = "核对图片和章节完整性";
+        task.stage = control.stage = "verify"; task.phase = "校验图片 0/"+jobs.size();
         List<Core.Page> pages = new ArrayList<>(); long totalSize = 0;
         for (ImageJob job : jobs) {
             control.check(); BitmapFactory.Options bounds = dimensions(job.target);
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IOException("图片损坏：第 " + job.chapter + " 章第 " + job.page + " 张");
             pages.add(new Core.Page(job.target, bounds.outWidth, bounds.outHeight)); totalSize += job.target.length();
+            task.phase="校验图片 "+pages.size()+"/"+jobs.size();
         }
         checkSpace(totalSize + 64L*1024*1024);
         if(task.settings.format.equals("images")) {
-            task.stage=control.stage="export";task.phase="保存排序图片";
-            File staging=new File(cache,"album-stage-"+UUID.randomUUID());if(!staging.mkdir())throw new IOException("无法创建图片暂存目录");
-            try {
-                JSONArray entries=new JSONArray();
-                for(ImageJob job:jobs){
-                    control.check();String relative=AlbumRules.imageName(job.chapter,job.page,chapterIds.size());File target=new File(staging,relative);
-                    if(!target.getParentFile().exists()&&!target.getParentFile().mkdirs())throw new IOException("无法创建章节目录");
-                    Files.copy(job.target.toPath(),target.toPath());
-                    entries.put(new JSONObject().put("chapter",job.chapter).put("page",job.page).put("file",relative).put("size",target.length()));
-                }
-                String filename=Core.outputName(task.id,task.title,"images",false);String folderName=filename.substring(0,filename.length()-7);
-                String uri=AlbumStorage.publish(context,staging,task.settings.outputUri,folderName,control::check).toString();
-                AlbumStorage.remember(context,Uri.parse(uri),new JSONObject().put("version",AlbumRules.LAYOUT_VERSION).put("id",task.id).put("title",task.title).put("entries",entries));
-                AlbumStorage.load(context,Uri.parse(uri));
-                task.resultBytes=totalSize;
-                writeTextAtomic(marker,new JSONObject().put("uri",uri).put("images",jobs.size()).put("format","images").put("resultBytes",totalSize).put("albumLayoutVersion",AlbumRules.LAYOUT_VERSION).toString());
-                if(!task.settings.keepImages)try{deleteOwned(new File(cache,"images"),cache);}catch(IOException ignored){}
-                return uri;
-            } finally { if(staging.exists())deleteOwned(staging,cache); }
+            JSONArray entries=new JSONArray();List<FolderSave.Entry> sources=new ArrayList<>();
+            for(ImageJob job:jobs){
+                control.check();String relative=AlbumRules.imageName(job.chapter,job.page,chapterIds.size());long size=job.target.length();
+                sources.add(new FolderSave.Entry(job.target,relative,size));
+                entries.put(new JSONObject().put("chapter",job.chapter).put("page",job.page).put("file",relative).put("size",size));
+            }
+            String filename=Core.outputName(task.id,task.title,"images",false);String folderName=filename.substring(0,filename.length()-7);
+            String uri=AlbumStorage.publishImages(context,sources,task.settings.outputUri,folderName,control::check,this::saveProgress).toString();
+            AlbumStorage.remember(context,Uri.parse(uri),new JSONObject().put("version",AlbumRules.LAYOUT_VERSION).put("id",task.id).put("title",task.title).put("entries",entries));
+            // Once published, finish the marker even if pause arrived during the last rename.
+            AlbumStorage.load(context,Uri.parse(uri),()->{},this::saveProgress);
+            task.resultBytes=totalSize;
+            writeTextAtomic(marker,new JSONObject().put("uri",uri).put("images",jobs.size()).put("format","images").put("resultBytes",totalSize).put("albumLayoutVersion",AlbumRules.LAYOUT_VERSION).toString());
+            cleanImageCache();
+            return uri;
         }
         task.stage = control.stage = "export";
         File partial = new File(cache, "export.partial." + task.settings.format);
@@ -215,6 +213,18 @@ public final class Downloader {
             try { deleteOwned(new File(cache, "images"), cache); } catch (IOException ignored) { /* A valid output is still a success. */ }
         }
         return uri;
+    }
+
+    private void saveProgress(String phase,int done,int total,long bytes,long totalBytes) {
+        task.stage=control.stage=phase.equals("cleanup")?"cleanup":"export";
+        String label=phase.equals("save")?"保存图片":phase.equals("saved_verify")?"核验已保存图片":phase.equals("index")?"核对保存目录":"清理临时图片";
+        task.phase=label+" "+done+"/"+(total>0?Integer.toString(total):"…")
+            +(totalBytes>0?" · "+DownloadDisplay.size(bytes)+" / "+DownloadDisplay.size(totalBytes):"");
+        control.lastData=SystemClock.elapsedRealtime();
+    }
+    private void cleanImageCache() {
+        if(!task.settings.keepImages)try{FolderSave.clean(new File(cache,"images"),cache,control::check,this::saveProgress);}
+        catch(Exception error){if(control.stop.isEmpty())store.note="图片已保存，部分临时缓存未清理："+error.getMessage();}
     }
 
     private void downloadImage(JmApi api, ImageJob job, int retryRound) throws Exception {

@@ -50,6 +50,25 @@ class MetadataTests(unittest.TestCase):
     def test_worker_parallel_and_restart_zero_requests(self):
         self.assertEqual(check_metadata_resume(self.root)['requests_after_resume'], 0)
 
+    def test_configured_concurrency_reaches_one_and_eight_in_real_worker(self):
+        for workers in (1, 8):
+            self.assertEqual(check_metadata_resume(self.root / str(workers), workers)['peak'], workers)
+
+    def test_settings_old_state_bounds_and_retry_persistence(self):
+        self.assertEqual(Settings(**{}).chapter_workers, 4)
+        for workers in (0, 9, '8'):
+            with self.assertRaises(ValueError): Settings(chapter_workers=workers).validate()
+            with self.assertRaises(ValueError): hydrate([], self.cache, None, None, workers)
+        engine = Engine(self.root / 'state')
+        options = Settings(output=str(self.root / 'output'), chapter_workers=8)
+        engine.add(['123456'], options)
+        task = engine.tasks[0]; task.status = 'paused'; engine.save()
+        restored = Engine(self.root / 'state')
+        self.assertEqual(restored.tasks[0].settings['chapter_workers'], 8)
+        restored.retry([task.key], Settings(output=str(self.root / 'ignored'), chapter_workers=1))
+        self.assertEqual(restored.tasks[0].settings['chapter_workers'], 1)
+        self.assertEqual(restored.tasks[0].settings['output'], options.output)
+
     def test_out_of_order_keeps_order_and_progress(self):
         photos = list(self.album)
         progress = []

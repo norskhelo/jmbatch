@@ -2,19 +2,19 @@
 
 支持 Windows 和 Android 的批量漫画下载工具。下载可选择 PDF、ZIP 或图片文件夹，三种成品可离线互相导出。
 
-当前源码及正式版本：**Windows 0.3.7 / Android 0.4.7（versionCode 407）**。本版优化多章节读取：最多 4 章并行，并缓存章节信息以加快暂停后的继续下载。安装包、更新日志与镜像入口见下方。
+当前源码及正式版本：**Windows 0.3.8 / Android 0.4.8（versionCode 408）**。本版优化 Android 图片文件夹的校验与保存，并为双端加入 1–8 章读取并行数配置（默认 4）。安装包、更新日志与镜像入口见下方。
 
 ## 下载安装包（含国内镜像）
 
 GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
 
-当前正式版为 **Windows 0.3.7 / Android 0.4.7**（[发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.7-0.4.7)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+当前正式版为 **Windows 0.3.8 / Android 0.4.8**（[发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.8-0.4.8)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
 
 | 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
 | --- | --- | --- | --- |
-| Windows 0.3.7 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.3.7-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.3.7-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.3.7-Windows-x64.zip) |
-| Android 0.4.7 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.4.7-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.4.7-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.4.7-Android.apk) |
-| 上述版本的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/SHA256-release-0.3.7-0.4.7.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/SHA256-release-0.3.7-0.4.7.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/SHA256-release-0.3.7-0.4.7.txt) |
+| Windows 0.3.8 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.3.8-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.3.8-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.3.8-Windows-x64.zip) |
+| Android 0.4.8 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.4.8-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.4.8-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.4.8-Android.apk) |
+| 上述版本的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/SHA256-release-0.3.8-0.4.8.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/SHA256-release-0.3.8-0.4.8.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/SHA256-release-0.3.8-0.4.8.txt) |
 
 镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像用于手动下载，应用内更新仓库仍填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
 
@@ -86,4 +86,6 @@ GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或�
 
 多章节下载：获取章节后选择要下载的章节，支持多选、全选和清空。设置中的“默认下载全章节”默认关闭，开启后新任务自动下载全部章节。关闭选择框会暂停该任务，点击开始可重新选择；已确认的选择在暂停、重启和重试后保留。仅选一章时 ZIP / 文件夹图片平铺，多章按原章节编号分目录。
 
-章节读取提速：每任务最多 4 章并行读取，图片线程数不影响此上限。成功读取的章节在任务内部缓存 24 小时，暂停/重启/重试可复用；过期、损坏、Cookie 或目录信息变化会重新获取。进度显示复用章数；每次开始仍会联网确认漫画目录。旧任务首次使用新版需读取一次，缓存不会出现在导出的漫画中。
+章节读取提速：每任务可配置 1–8 章并行读取，默认 4，独立于图片线程。新值用于新任务和手动重试，直接继续保留原设置。可试 6 或 8，超时或限流时调低。成功读取的章节在任务内部缓存 24 小时，暂停/重启/重试可复用；过期、损坏、Cookie 或目录信息变化会重新获取。进度显示复用章数；每次开始仍会联网确认漫画目录。旧任务首次使用新版需读取一次，缓存不会出现在导出的漫画中。
+
+Android 图片保存：一次复制到目标临时目录，复制时计算源 CRC，写后完整读回目标核验；默认目录保留刷盘。校验、保存/读回、核对目录、清理显示进度，减少重复复制和章节目录扫描。总百分比完成前上限 99.9%，请查看阶段张数和字节进度。

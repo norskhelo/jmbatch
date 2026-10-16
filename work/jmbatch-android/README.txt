@@ -1,4 +1,4 @@
-JM Batch 0.4.7 — Android 使用说明
+JM Batch 0.4.8 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每个任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.4.7 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-16）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.4.7-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.4.7-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/JMBatch-0.4.7-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0.4.7/SHA256-release-0.3.7-0.4.7.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.4.8-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.4.8-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/JMBatch-0.4.8-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.8-0.4.8/SHA256-release-0.3.8-0.4.8.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -24,21 +24,31 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.7-0
 
 10. 点击主界面“检查更新 / 公告”立即联网检查，更新窗口与完整公告也可手动检查。关闭启动自动检查后仍可使用。检查采用已保存仓库；修改后先保存。检查失败保留离线公告，可再次点击重试。下载和安装新版需要手动确认。
 
-Windows 0.3.7 / Android 0.4.7 — 2026-10-16
+章节选择说明
 
-下载章节选择
+多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-• 多章节漫画获取章节列表后，弹出下载章节选择，可多选、全选、清空；至少选择一章才会开始下载。
-• 下载设置新增“默认下载全章节”，默认关闭。开启后，新任务和未选择章节的手动重试任务跳过弹窗；单章节直接下载。
-• 关闭弹窗或选择“稍后选择”会暂停该任务，点击“开始 / 继续”可再次选择。待选任务不占下载名额，多个任务依次弹窗；Android 在应用返回前台后显示待选章节。
-• 只读取和下载选中章节的图片；PDF、ZIP、文件夹均适用。选择随任务保存，暂停、重启、重试和自动重连沿用原选择；已选章节不会因全章节设置改变而增加。
-• 保留原章节顺序与编号以正确复用缓存；单个所选章节的 ZIP / 文件夹图片平铺，多个所选章节按原章节编号分目录，封面取首个所选章节第一页。
+
+Windows 0.3.8 / Android 0.4.8 — 2026-10-16
+
+Android 图片文件夹校验与保存优化
+
+• 图片直接复制到目标目录的临时文件夹，减少一遍完整中间复制；复制时计算源 CRC，写入完成后完整读回目标文件核验大小和 CRC。
+• 保留默认目录逐文件刷盘、同名拒绝覆盖、失败清理和最终重命名；完成标记保存后才清理下载缓存。暂停或写入失败保留原图片缓存，重试可继续复用。
+• 校验显示已检查张数；保存和读回校验显示张数与字节进度；核对目录、清理临时图片也显示进度。任务完成前总百分比仍以已下载图片为基础，上限为 99.9%，实际收尾进度看阶段文字。
+• 核对成品时复用一次章节根目录枚举，避免逐章重复扫描。默认目录和自选系统目录都减少中间复制；系统目录实际速度仍取决于存储提供方。
+• 对同样的图片有效载荷，复制与 CRC 的整图逻辑读写由 4 次读 + 2 次写减少为 2 次读 + 1 次写；不把此比例等同于耗时或闪存物理流量的减少比例。
+
+双端章节读取并行数可配置
+
+• Windows 与 Android 设置中加入“每个任务章节读取并行数”，范围 1–8，默认 4，独立于图片线程数。原配置和已有任务缺少此字段时使用 4。
+• 网络稳定时可试 6 或 8；更高并行数不保证更快，出现超时或限流可调低。同时下载多本时，章节请求数会叠加。
+• 设置用于新任务及手动重试；运行中任务和直接暂停后继续保留原设置。想让已有任务使用新值，先暂停、保存设置，再手动重试。
+• 读取提示显示实际配置上限；保留选中章节、原编号顺序、24 小时章节缓存和图片断点续传。
 
 版本与验证
 
-• Windows 升至 0.3.7；Android 升至 0.4.7（versionCode 407），沿用原包名、APK 签名身份和更新公钥。
-• 使用离线章节素材验证选择、默认全选、缓存续传、队列调度和三种成品；Windows 源码与冻结成品执行实际界面自检。
-• Android 执行宿主测试、编译和签名核验；未进行 Android 真机界面或真实网站下载验证。
-• 同步源码、使用说明、同版日志、双端安装包、SHA-256 校验文件和签名更新清单。
-
-章节读取提速：每任务最多 4 章并行读取，图片线程数不影响此上限。成功读取的章节在任务内部缓存 24 小时，暂停/重启/重试可复用；过期、损坏、Cookie 或目录信息变化会重新获取。进度显示复用章数；每次开始仍会联网确认漫画目录。旧任务首次使用新版需读取一次，缓存不会出现在导出的漫画中。
+• Windows 0.3.8；Android 0.4.8（versionCode 408），沿用原包名、APK 签名证书及更新公钥。
+• 覆盖单章/多章保存、输出字节一致、CRC 不一致、截断/多余字节、写入/刷盘失败、中途暂停、重试、同名保护、清理边界和进度；双端验证 1、4、8 章并行及缓存复用。
+• Windows 执行回归测试、源码及冻结成品自检；Android 执行宿主测试、编译和签名核验，未连接 Android 真机。宿主文件测试不代表手机保存耗时。
+• 同步源码、使用说明、同版日志、安装包、SHA-256 校验文件及签名更新清单。

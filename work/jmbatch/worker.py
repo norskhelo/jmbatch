@@ -137,7 +137,8 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
             details = MetadataCache(cache / 'chapters', cache_scope(album, cookie))
             hydrate(photos, details, self.client.check_photo,
                     lambda done, total, cached: emit({'type': 'metadata',
-                        'message': f'读取所选章节 {done}/{total}（复用 {cached} 章，最多 4 章并行）'}))
+                        'message': f'读取所选章节 {done}/{total}（复用 {cached} 章，最多 {settings.chapter_workers} 章并行）'}),
+                    workers=settings.chapter_workers)
             for item, photo in zip(chosen, photos):
                 index = item["number"]
                 if len(photo) == 0:

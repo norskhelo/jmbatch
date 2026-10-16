@@ -21,9 +21,10 @@ class MetadataFixture(FixtureClient):
             photo.data_original_domain = 'offline.invalid'
 
 
-def check_metadata_resume(directory):
+def check_metadata_resume(directory, workers=4):
     lock = threading.Lock()
     calls, active, peak = [], 0, 0
+    barrier = threading.Barrier(workers)
 
     class Client(MetadataFixture):
         def check_photo(self, photo):
@@ -32,6 +33,9 @@ def check_metadata_resume(directory):
                 return
             with lock:
                 calls.append(str(photo.id)); active += 1; peak = max(peak, active)
+                ordinal = len(calls)
+            if 2 <= ordinal <= workers + 1:
+                barrier.wait(timeout=10)
             time.sleep(.025 if int(photo.id) % 2 else .01)
             super().check_photo(photo)
             with lock:
@@ -47,7 +51,8 @@ def check_metadata_resume(directory):
         if event.get('type') == 'phase' and event.get('phase') == 'download':
             raise BeforeImages()
 
-    task = Task('123456', Settings(output=str(directory / 'output'), download_all_chapters=True).__dict__).to_dict()
+    task = Task('123456', Settings(output=str(directory / 'output'), download_all_chapters=True,
+                                 chapter_workers=workers).__dict__).to_dict()
     for attempt in range(2):
         try:
             run_download(task, '', emit, Client)
@@ -55,6 +60,6 @@ def check_metadata_resume(directory):
         except BeforeImages:
             pass
         assert len(calls) == 12
-    assert 1 < peak <= 4 and active == 0
+    assert peak == workers and active == 0
     assert len(list((task_cache(task) / 'chapters').glob('*.json'))) == 12
     return dict(chapters=12, requests_after_resume=len(calls)-12, peak=peak)

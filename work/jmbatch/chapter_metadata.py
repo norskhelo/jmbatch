@@ -7,7 +7,8 @@ import time
 
 from core import atomic_json
 
-MAX_WORKERS = 4
+DEFAULT_WORKERS = 4
+MAX_WORKERS = 8
 TTL_SECONDS = 24 * 60 * 60
 MAX_RECORD_BYTES = 2 * 1024 * 1024
 
@@ -73,13 +74,15 @@ class MetadataCache:
             self.path(photo.id).unlink(missing_ok=True)
 
 
-def hydrate(photos, cache, fetch, progress):
+def hydrate(photos, cache, fetch, progress, workers=DEFAULT_WORKERS):
     """Workers touch separate photos; only the coordinator persists/reports results.
 
-    At most four requests are scheduled. The first miss warms the shared API's
+    At most the configured requests are scheduled. The first miss warms the shared API's
     album scramble cache before concurrent calls, avoiding duplicate requests.
     Windows pause terminates the isolated process; atomic records survive it.
     """
+    if type(workers) is not int or not 1 <= workers <= MAX_WORKERS:
+        raise ValueError('章节读取并行数必须在 1–8 之间。')
     missing, done, cached = [], 0, 0
     progress(0, len(photos), 0)
     for photo in photos:
@@ -101,7 +104,7 @@ def hydrate(photos, cache, fetch, progress):
     fetch(missing[0])
     commit(missing[0])
     remaining = iter(missing[1:])
-    with ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix='chapter') as pool:
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix='chapter') as pool:
         pending = {}
 
         def submit():
@@ -109,7 +112,7 @@ def hydrate(photos, cache, fetch, progress):
             if photo is not None:
                 pending[pool.submit(fetch, photo)] = photo
 
-        for _ in range(MAX_WORKERS):
+        for _ in range(workers):
             submit()
         try:
             while pending:
