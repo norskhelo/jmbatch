@@ -57,6 +57,7 @@ def source_files(platform):
         paths.append(source / '.gitignore')
     paths += [p for p in (source / 'app/src').rglob('*') if p.suffix in ('.java', '.xml', '.txt')]
     paths += list((source / 'tests').glob('*.java'))
+    paths += list((source / 'tests').glob('test_*.py'))
     paths += [source / 'tests/fixtures' / n for n in ('manifest.bin', 'manifest.sig')]
     return {'JMBatch-Android/' + p.relative_to(source).as_posix(): p for p in paths}
 

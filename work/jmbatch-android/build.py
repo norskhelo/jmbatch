@@ -1,5 +1,5 @@
 """Build with an official JDK and Android SDK build-tools; no third-party runtime."""
-import argparse, os, pathlib, subprocess, zipfile, shutil, re
+import argparse, os, pathlib, subprocess, zipfile, shutil, re, sys
 import xml.etree.ElementTree as ET
 
 ROOT=pathlib.Path(__file__).resolve().parent
@@ -59,6 +59,7 @@ run(java,'-cp',testout,'BatchTest',testroot/'test-output')
 
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/DirectoryTargets.java',ROOT/'tests/DirectoryTest.java')
 run(java,'-cp',testout,'DirectoryTest')
+run(sys.executable,ROOT/'tests/test_system_directory.py',jdk,testroot/'system-directory')
 
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/NetworkRoutes.java',ROOT/'tests/NetworkTest.java')
 run(java,'-cp',testout,'NetworkTest')

@@ -31,6 +31,30 @@ public class DirectoryTest {
         attempts.clear();
         check(!DirectoryTargets.open(Arrays.asList(documents,documents),name->{attempts.add(name);throw new SecurityException();}));
         check(attempts.size()==1);
+        attempts.clear();
+        check(DirectoryTargets.openManagers(Arrays.asList(documents,thirdParty,vendor),attempts::add));
+        check(attempts.equals(Arrays.asList(vendor.component)));
+        attempts.clear();
+        check(!DirectoryTargets.openManagers(Arrays.asList(documents,thirdParty),attempts::add));
+        check(attempts.isEmpty());
+        Target alternative=new Target("b.vendor/Folder",true,true,true,true,false);
+        check(DirectoryTargets.openManagers(Arrays.asList(documents,vendor,alternative,vendor),name->{
+            attempts.add(name);if(name.equals(vendor.component))throw new SecurityException();}));
+        check(attempts.equals(Arrays.asList(vendor.component,alternative.component)));
+        attempts.clear();
+        check(!DirectoryTargets.openManagers(Arrays.asList(vendor,documents),name->{attempts.add(name);throw new IllegalStateException();}));
+        check(attempts.equals(Arrays.asList(vendor.component)));
+        attempts.clear();
+        check(!DirectoryTargets.openManagers(Arrays.asList(
+            new Target("disabled",true,false,true,true,false),
+            new Target("private",true,true,false,true,false),
+            new Target("wildcard",true,true,true,false,false)),attempts::add));
+        check(attempts.isEmpty());
+        check(DirectoryTargets.documentsUi("com.android.documentsui","FilesActivity"));
+        check(DirectoryTargets.documentsUi("com.google.android.documentsui","FilesActivity"));
+        check(DirectoryTargets.documentsUi("vendor.files","com.android.documentsui.FilesActivity"));
+        check(!DirectoryTargets.documentsUi("com.huawei.hidisk","FileManager"));
+        check(DirectoryTargets.LEGACY_MANAGERS.contains("com.huawei.hidisk"));
         System.out.println("System directory selection and fallback: "+checks+" checks passed");
     }
 }

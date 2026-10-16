@@ -1,4 +1,4 @@
-JM Batch 0.5.0 — Android 使用说明
+JM Batch 0.5.1 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每个任务图片线程数”控制单本图片并发。
@@ -6,11 +6,11 @@ JM Batch 0.5.0 — Android 使用说明
 4. 文件夹和 ZIP 只含图片：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。导出和文件删除前请暂停下载并等待请求退出。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
-安装包下载（2026-10-16）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.0/JMBatch-0.5.0-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.0/JMBatch-0.5.0-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.0/JMBatch-0.5.0-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.0/SHA256-release-android-0.5.0.txt
+安装包下载（2026-10-17）
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.1/JMBatch-0.5.1-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.1/JMBatch-0.5.1-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.1/JMBatch-0.5.1-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.1/SHA256-release-android-0.5.1.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,20 +28,19 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Android 0.5.0 — 2026-10-16
+Android 0.5.1 — 2026-10-17
 
-安卓下载速度优化
+默认使用系统文件管理器
 
-• 图片网络接收与还原、JPEG 压缩分开调度，预取图片数量有上限，避免所有下载线程都等同一张图片处理。
-• 图片处理根据处理器数量最多并行 4 张，由所有下载任务共享位图内存预算；大图自动等待可用预算，保留原分辨率及条带还原，不通过缩图提速。
-• 图片 CDN 记住近期成功线路，按实际请求的响应吞吐选择；连接失败、超时等故障暂时退避。每 8 次请求最多安排一次备用线路比较，两次比较至少间隔 15 秒，同时最多一次，直接使用该页正常请求，不重复下载测速。
-• 去掉可丢弃的原始临时图片逐页强制刷盘；保留处理后图片刷盘、尺寸核验、原子提交以及最终成品完整性校验。
-• 图片响应声明长度与实际接收不一致时拒绝使用并按原恢复规则处理；暂停、取消与失败会等待工作线程退出，再清理未完成临时文件，完整缓存保留，继续只下载缺失或损坏页。
-• 保留原 HTTP 拒绝访问/限流处理、HTTPS 校验、请求上限和单页恢复规则。提高线程数不保证达到宽带测速上限，速度仍受图片服务器、线路、图片像素和手机性能影响。
+• “打开保存目录”改用安卓原生 Intent，默认优先启动手机自带的文件管理应用；不再自动优先打开左侧菜单显示“JM Batch”的文档管理界面。
+• 支持目录查看的系统文件管理器会收到保存目录地址；仅提供应用入口时，直接打开文件管理器主界面，并提示手动定位。返回 JM Batch 后可查看、复制保存位置或选择备用打开方式。
+• 使用 Android 原生文件应用类别发现组件，并兼容旧款华为／荣耀文件管理器入口；仅自动启动可用的系统组件。组件受限或启动失败时继续尝试其他入口。
+• 文档管理改为手动备用选项，保留选择其他应用和软件内查看。首页、任务详情、漫画库和软件内子目录的系统打开入口使用同一逻辑。
+• 不移动已有文件，不更改保存目录或目录授权。部分文件管理器不能浏览应用目录，或会忽略指定位置；此时可用备用入口，或在首页为以后下载选择可见的公共文件夹。
 
 版本与验证
 
-• 仅更新 Android：0.4.9 → 0.5.0，versionCode 500；Windows 保持 0.3.9。保留原包名、APK 签名证书和更新公钥，可覆盖安装。
-• 验证有界预取、并行处理、全局内存预算、失败页保留与续传、暂停清理、CDN 记忆/退避/慢线路比较、响应截断以及拒绝访问不绕过；执行全部 Android 宿主回归、编译和签名核验。
-• 生产流水线的合成负载用于验证调度改善，不能解释为手机实测加速倍数。未连接 Android 真机，原生 Bitmap 并行图片还原自检已加入应用，尚待设备执行。
-• 同步源码、使用说明、同版日志、APK、SHA-256 和签名更新清单，正式发布 Android 0.5.0。
+• Android 0.5.0 → 0.5.1，versionCode 501；Windows 保持 0.3.9。保留原包名、APK 签名证书与更新公钥，支持覆盖安装。
+• 回归默认文件管理器选择、文档管理仅手动回退、原生 Intent 参数、启动失败备用入口、禁用/非导出组件及第三方组件过滤；执行 Android 宿主回归、编译与签名核验。
+• 用户设备为荣耀 Play5 / Android 10。未连接该手机；宿主模拟检查不能证明厂商界面实际跳转，未承诺所有系统都能直达保存目录。
+• 同步源码、应用内说明、同版更新日志、APK、SHA-256 校验文件及原密钥签名更新清单，正式发布 Android 0.5.1。
