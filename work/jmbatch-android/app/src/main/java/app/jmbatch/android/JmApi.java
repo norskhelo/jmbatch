@@ -24,6 +24,7 @@ public final class JmApi {
     private final String userCookie;
     private List<String> domains = new ArrayList<>(Arrays.asList(DEFAULT_API));
     private volatile int preferred;
+    private final ImageRoutes imageRoutes = new ImageRoutes(Arrays.asList(IMAGE_HOSTS), SystemClock::elapsedRealtime);
     public final Control control;
 
     public static final class Control {
@@ -107,17 +108,20 @@ public final class JmApi {
 
     public void image(String chapterId, String filename, File output, int retryRound) throws Exception {
         if (!filename.matches("[A-Za-z0-9._-]+") || filename.contains("..")) throw new IOException("图片文件名无效");
-        List<String> routes=new ArrayList<>(Arrays.asList(IMAGE_HOSTS));Collections.rotate(routes,-retryRound);
-        NetworkRoutes.run(routes,settings.retries,"图片下载",host->{
+        try (ImageRoutes.Plan plan = imageRoutes.plan(retryRound)) {
+        NetworkRoutes.run(plan.hosts,settings.retries,"图片下载",host->{
             Map<String,String> headers=new HashMap<>();
             headers.put("Referer","https://"+domains.get(preferred));headers.put("X-Requested-With","com.JMComic3.app");
             headers.put("Accept","image/webp,image/*,*/*;q=0.8");
             if(retryRound>0)headers.put("Connection","close");
+            long begin = SystemClock.elapsedRealtime();
             try(FileOutputStream stream=new FileOutputStream(output)){
                 transfer("https://"+host+"/media/photos/"+chapterId+"/"+filename,headers,false,settings.timeout,stream,64L*1024*1024,true);
-                stream.getFD().sync();return true;
-            }
+                // Disposable raw input: only the validated, decoded cache is durably committed.
+                imageRoutes.success(host, output.length(), SystemClock.elapsedRealtime() - begin); return true;
+            } catch (Exception error) { control.check(); imageRoutes.failure(host, error); throw error; }
         },control::check,message->{});
+        }
     }
 
     private String text(String url, Map<String,String> headers, boolean api, int timeout) throws Exception {
@@ -130,7 +134,7 @@ public final class JmApi {
         URL url = new URL(address); control.check();
         HttpURLConnection connection = (HttpURLConnection)url.openConnection();
         connection.setConnectTimeout(Math.min(8,timeout)*1000); connection.setReadTimeout(timeout*1000); connection.setInstanceFollowRedirects(false);
-        connection.setRequestProperty("User-Agent", UA); connection.setRequestProperty("Accept-Encoding", "gzip");
+        connection.setRequestProperty("User-Agent", UA); connection.setRequestProperty("Accept-Encoding", image ? "identity" : "gzip");
         for (Map.Entry<String,String> header : headers.entrySet()) connection.setRequestProperty(header.getKey(), header.getValue());
         for (Map.Entry<String,List<String>> header : cookies.get(url.toURI(), Collections.emptyMap()).entrySet())
             if (header.getKey() != null && !header.getValue().isEmpty()) connection.setRequestProperty(header.getKey(), String.join("; ", header.getValue()));
@@ -148,6 +152,9 @@ public final class JmApi {
                     output.write(buffer, 0, n); if (image) control.received(n);
                 }
                 if (total == 0) throw new NetworkRoutes.BadResponse();
+                long expected = connection.getContentLengthLong();
+                if (!"gzip".equalsIgnoreCase(connection.getContentEncoding()) && expected >= 0 && total != expected)
+                    throw new EOFException("响应长度不完整");
             }
             success = true;
         } finally {

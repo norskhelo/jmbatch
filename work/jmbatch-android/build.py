@@ -63,6 +63,18 @@ run(java,'-cp',testout,'DirectoryTest')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/NetworkRoutes.java',ROOT/'tests/NetworkTest.java')
 run(java,'-cp',testout,'NetworkTest')
 
+for component in ('ImageMemory', 'ImagePipeline', 'ImageRoutes'):
+    run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android'/(component+'.java'),ROOT/'tests'/(component+'Test.java'))
+    run(java,'-cp',testout,component+'Test',testroot/component)
+
+# Exercise production HTTP/CDN code without Android runtime, sockets or user data.
+transport=testroot/'transport-host';transport.mkdir(exist_ok=True)
+stubs=transport/'stubs';stubs.mkdir(exist_ok=True)
+(stubs/'Store.java').write_text('package app.jmbatch.android; public final class Store { public static class Settings { public int retries=2,timeout=25; } }',encoding='utf-8')
+(stubs/'SystemClock.java').write_text('package android.os; public final class SystemClock { public static long elapsedRealtime(){return System.nanoTime()/1000000;} }',encoding='utf-8')
+run(javac,'-encoding','UTF-8','-cp',str(testout)+os.pathsep+str(platform),'-d',transport,stubs/'Store.java',stubs/'SystemClock.java',ROOT/'app/src/main/java/app/jmbatch/android/JmApi.java',ROOT/'tests/JmApiTransportTest.java')
+run(java,'-cp',str(transport)+os.pathsep+str(testout)+os.pathsep+str(platform),'app.jmbatch.android.JmApiTransportTest',transport/'data')
+
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/DownloadDisplay.java',ROOT/'tests/DownloadDisplayTest.java')
 run(java,'-cp',testout,'DownloadDisplayTest')
 run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/CacheCleanup.java',ROOT/'tests/CacheCleanupTest.java')

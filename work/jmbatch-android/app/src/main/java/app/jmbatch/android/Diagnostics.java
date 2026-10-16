@@ -24,6 +24,17 @@ public final class Diagnostics {
         try(FileOutputStream out=new FileOutputStream(raw)){pattern.compress(Bitmap.CompressFormat.PNG,100,out);}pattern.recycle();
         Downloader.decode(raw,jpeg,8);Bitmap decoded=BitmapFactory.decodeFile(jpeg.getAbsolutePath());require(decoded!=null,"原生图片解码");
         for(int i=0;i<8;i++){int[] strip=Core.strip(203,8,i);int source=strip[0]+strip[2]/2;int target=strip[1]+strip[2]/2;require(Math.abs(Color.red(decoded.getPixel(80,target))-source)<12,"图片条带重排 "+i);}decoded.recycle();
+        List<Integer> parallelPages=Arrays.asList(1,2,3,4,5,6,7,8);
+        require(ImagePipeline.run(parallelPages,4,ImageMemory.SHARED.workers(),
+            n->java.nio.file.Files.copy(raw.toPath(),new File(root,"parallel-"+n+".raw").toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING),
+            n->Downloader.decode(new File(root,"parallel-"+n+".raw"),new File(root,"parallel-"+n+".jpg"),8),
+            n->new File(root,"parallel-"+n+".raw").delete(),()->{},()->{},5).isEmpty(),"原生图片流水线");
+        for(int n:parallelPages){
+            File pageFile=new File(root,"parallel-"+n+".jpg");Bitmap page=BitmapFactory.decodeFile(pageFile.getAbsolutePath());
+            require(page!=null&&page.getWidth()==160&&page.getHeight()==203,"并行图片完整尺寸");
+            for(int i=0;i<8;i++){int[] strip=Core.strip(203,8,i);require(Math.abs(Color.red(page.getPixel(80,strip[1]+strip[2]/2))-(strip[0]+strip[2]/2))<12,"并行图片条带重排");}
+            page.recycle();pageFile.delete();
+        }
         File pdf=new File(root,"test.pdf");Core.writePdf(pdf,Arrays.asList(new Core.Page(jpeg,160,203),new Core.Page(jpeg,160,203)),(a,b)->{});Downloader.verifyPdf(pdf);
         try(ParcelFileDescriptor descriptor=ParcelFileDescriptor.open(pdf,ParcelFileDescriptor.MODE_READ_ONLY);PdfRenderer renderer=new PdfRenderer(descriptor)){
             require(renderer.getPageCount()==2,"PDF 页数");

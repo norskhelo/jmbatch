@@ -20,7 +20,6 @@ public final class Downloader {
     private final Store.Task task;
     private final JmApi.Control control;
     private final String cookie;
-    private final Semaphore decodeGate = new Semaphore(1);
     private final File cache;
 
     private static final class ImageJob {
@@ -127,26 +126,15 @@ public final class Downloader {
         }
         task.stage = control.stage = "download"; task.downloadStarted = control.lastData = SystemClock.elapsedRealtime();
         task.phase = "已恢复 " + task.done + "/" + task.total + " 张图片，继续下载剩余 " + restored.pending.size() + " 张";
-        ExecutorService pool = Executors.newFixedThreadPool(task.settings.threads);
-        CompletionService<SinglePageRecovery.Failure<ImageJob>> completion = new ExecutorCompletionService<>(pool);
         List<SinglePageRecovery.Failure<ImageJob>> failed = new ArrayList<>();
-        boolean collected = false;
         try {
-            for (ImageJob job : restored.pending) completion.submit(() -> {
-                try { downloadImage(api, job, 0); return null; }
-                catch (Exception error) { control.check(); return new SinglePageRecovery.Failure<>(job,error,"第 "+job.chapter+" 章第 "+job.page+" 页"); }
-            });
-            for (int i = 0; i < restored.pending.size(); i++) { control.check(); SinglePageRecovery.Failure<ImageJob> failure=completion.take().get(); if(failure!=null)failed.add(failure); }
-            collected = true;
-        } finally {
-            pool.shutdownNow();
-            if (!collected && control.stop.isEmpty()) control.cancel("ABORT");
-            // A reset must not start until old workers have stopped using their files.
-            if (!pool.awaitTermination(task.settings.timeout + 10L, TimeUnit.SECONDS)) {
-                control.cancel("FATAL");
-                throw new IOException("旧下载线程未能及时退出；已停止该任务以避免重复写入。请重启应用后重试。");
-            }
-        }
+            for (ImagePipeline.Failure<ImageJob> failure : ImagePipeline.run(restored.pending,
+                    task.settings.threads, ImageMemory.SHARED.workers(),
+                    job -> fetchImage(api, job, 0), this::finishImage, this::clearTemporaryImage,
+                    control::check, () -> { if (control.stop.isEmpty()) control.cancel("ABORT"); }, task.settings.timeout))
+                failed.add(new SinglePageRecovery.Failure<>(failure.page, failure.error,
+                    "第 " + failure.page.chapter + " 章第 " + failure.page.page + " 页"));
+        } catch (ImagePipeline.UnstoppedWorkers error) { control.cancel("FATAL"); throw error; }
         control.check();
         for(SinglePageRecovery.Failure<ImageJob> failure:failed)metadata.invalidate(failure.page.chapterId);
         SinglePageRecovery.recover(failed,(job,round)->downloadImage(api,job,round),control::check,
@@ -233,30 +221,24 @@ public final class Downloader {
     }
 
     private void downloadImage(JmApi api, ImageJob job, int retryRound) throws Exception {
-        control.check(); boolean cached = false;
-        if (job.target.isFile()) {
-            decodeGate.acquire();
-            try { cached = validImage(job.target); } finally { decodeGate.release(); }
-        }
-        if (!cached) {
-            checkSpace(32L*1024*1024);
-            File raw = new File(job.target.getParentFile(), job.target.getName() + ".download");
-            File decoded = new File(job.target.getParentFile(), job.target.getName() + ".partial");
-            try {
-            api.image(job.chapterId, job.filename, raw, retryRound); control.check();
-            decodeGate.acquire();
-            try {
-                control.check();
-                String name = job.filename.contains(".") ? job.filename.substring(0, job.filename.lastIndexOf('.')) : job.filename;
-                decode(raw, decoded, Core.segments(job.scramble, Long.parseLong(job.chapterId), name));
-                control.check(); Files.move(decoded.toPath(), job.target.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            } finally { decodeGate.release(); }
-            } finally { raw.delete(); decoded.delete(); }
-        }
+        try { fetchImage(api, job, retryRound); finishImage(job); }
+        finally { clearTemporaryImage(job); }
+    }
+    private File temporaryImage(ImageJob job, String suffix) { return new File(job.target.getParentFile(), job.target.getName() + suffix); }
+    private void fetchImage(JmApi api, ImageJob job, int retryRound) throws Exception {
+        control.check(); checkSpace(64L*1024*1024);
+        api.image(job.chapterId, job.filename, temporaryImage(job, ".download"), retryRound);
+    }
+    private void finishImage(ImageJob job) throws Exception {
+        control.check(); File decoded = temporaryImage(job, ".partial");
+        String name = job.filename.contains(".") ? job.filename.substring(0, job.filename.lastIndexOf('.')) : job.filename;
+        decode(temporaryImage(job, ".download"), decoded, Core.segments(job.scramble, Long.parseLong(job.chapterId), name), control::check);
+        control.check(); Files.move(decoded.toPath(), job.target.toPath(), StandardCopyOption.REPLACE_EXISTING);
         control.check();
-        synchronized (task) { task.imageBytes += job.target.length(); task.done++; if (cached) task.cached++; task.phase = "第 " + job.chapter + " 章 · 图片 " + job.page + "（已完成 " + task.done + "/" + task.total + "）"; }
+        synchronized (task) { task.imageBytes += job.target.length(); task.done++; task.phase = "第 " + job.chapter + " 章 · 图片 " + job.page + "（已完成 " + task.done + "/" + task.total + "）"; }
         control.lastData = SystemClock.elapsedRealtime();
     }
+    private void clearTemporaryImage(ImageJob job) { temporaryImage(job, ".download").delete(); temporaryImage(job, ".partial").delete(); }
 
     static BitmapFactory.Options dimensions(File file) {
         BitmapFactory.Options options = new BitmapFactory.Options(); options.inJustDecodeBounds = true; BitmapFactory.decodeFile(file.getAbsolutePath(), options); return options;
@@ -264,8 +246,9 @@ public final class Downloader {
     private boolean validImage(File file) {
         try {
             BitmapFactory.Options bounds = dimensions(file); if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return false;
-            checkBitmapMemory(bounds.outWidth, bounds.outHeight);
-            Bitmap image = BitmapFactory.decodeFile(file.getAbsolutePath()); if (image == null) return false; image.recycle(); return true;
+            try (ImageMemory.Lease memory = ImageMemory.SHARED.acquire(ImageMemory.estimate(bounds.outWidth, bounds.outHeight, 1), control::check)) {
+                Bitmap image = BitmapFactory.decodeFile(file.getAbsolutePath(), bitmapOptions()); if (image == null) return false; image.recycle(); return true;
+            }
         } catch (Exception ignored) { return false; }
     }
     static void checkBitmapMemory(int width, int height) throws IOException {
@@ -273,23 +256,40 @@ public final class Downloader {
             throw new IOException("单张图片尺寸过大，超出当前手机安全解码内存；未缩小图片或生成不完整文件");
     }
     static void decode(File raw, File output, int count) throws Exception {
+        decode(raw, output, count, () -> { if (Thread.currentThread().isInterrupted()) throw new IOException("图片处理已中断"); });
+    }
+    private static BitmapFactory.Options bitmapOptions() {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        options.inPreferredColorSpace = ColorSpace.get(ColorSpace.Named.SRGB);
+        return options;
+    }
+    static void decode(File raw, File output, int count, ImageMemory.Check check) throws Exception {
         BitmapFactory.Options bounds = dimensions(raw); checkBitmapMemory(bounds.outWidth, bounds.outHeight);
-        Bitmap source = BitmapFactory.decodeFile(raw.getAbsolutePath()); if (source == null) throw new IOException("图片解码失败，响应可能不是图片");
-        Bitmap result = null;
+        try (ImageMemory.Lease memory = ImageMemory.SHARED.acquire(ImageMemory.estimate(bounds.outWidth, bounds.outHeight, 2), check)) {
+        Bitmap source = null, result = null;
         try {
+            check.run(); source = BitmapFactory.decodeFile(raw.getAbsolutePath(), bitmapOptions());
+            if (source == null) throw new IOException("图片解码失败，响应可能不是图片");
+            check.run();
             // Produce RGB JPEGs so PDF /DeviceRGB is always correct.
             result = Bitmap.createBitmap(source.getWidth(), source.getHeight(), Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(result); canvas.drawColor(Color.WHITE); Paint paint = new Paint();
             if (count == 0) canvas.drawBitmap(source, 0, 0, paint);
             else for (int i = 0; i < count; i++) {
+                check.run();
                 int[] strip = Core.strip(source.getHeight(), count, i);
                 canvas.drawBitmap(source, new Rect(0,strip[0],source.getWidth(),strip[0]+strip[2]), new Rect(0,strip[1],source.getWidth(),strip[1]+strip[2]), paint);
             }
             try (FileOutputStream stream = new FileOutputStream(output)) {
+                check.run();
                 if (!result.compress(Bitmap.CompressFormat.JPEG, 92, stream)) throw new IOException("无法保存解码图片");
                 stream.getFD().sync();
             }
-        } finally { source.recycle(); if (result != null) result.recycle(); }
+            BitmapFactory.Options saved = dimensions(output);
+            if (saved.outWidth != bounds.outWidth || saved.outHeight != bounds.outHeight) throw new IOException("处理后图片尺寸校验失败");
+        } finally { if (source != null) source.recycle(); if (result != null) result.recycle(); }
+        }
     }
 
     private void checkSpace(long bytes) throws IOException { if (new StatFs(cache.getAbsolutePath()).getAvailableBytes() < bytes) throw new IOException("手机存储空间不足，需要至少约 " + bytes/1024/1024 + " MB 可用空间"); }
