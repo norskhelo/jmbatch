@@ -67,12 +67,20 @@ public final class Downloader {
         if (series != null) for (int i = 0; i < series.length(); i++) chapters.add(series.getJSONObject(i));
         if (chapters.isEmpty()) chapters.add(new JSONObject().put("id", task.id).put("sort", 1));
         chapters.sort(Comparator.comparingInt(item -> item.optInt("sort", 1)));
+        List<ChapterRules.Chapter> catalog = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for(JSONObject chapter:chapters){
+            String id=chapter.getString("id");
+            if(seen.add(id))catalog.add(new ChapterRules.Chapter(id,catalog.size()+1,chapter.optString("name","第 "+(catalog.size()+1)+" 章")));
+        }
+        List<ChapterRules.Chapter> chosen=ChapterRules.resolve(catalog,task.selectedChapters,task.settings.downloadAllChapters);
+        task.selectedChapters=Collections.unmodifiableList(new ArrayList<>(chosen));store.save();control.check();
         List<ImageJob> jobs = new ArrayList<>(); Set<String> chapterIds = new HashSet<>(); long scramble = -1;
-        for (JSONObject chapter : chapters) {
-            control.check(); String id = chapter.getString("id");
+        for (ChapterRules.Chapter chapter : chosen) {
+            control.check(); String id = chapter.id;
             if (!id.matches("[0-9]{1,10}")) throw new IOException("服务端章节编号无效");
             if (!chapterIds.add(id)) continue;
-            int index = chapterIds.size(); task.phase = "读取章节 " + index + "/" + chapters.size();
+            int index = chapter.number; task.phase = "读取所选章节 " + chapterIds.size() + "/" + chosen.size();
             JSONObject detail = api.detail("chapter", id); JSONArray files = detail.optJSONArray("images");
             if (files == null || files.length() == 0) throw new IOException("第 " + index + " 章没有图片，可能需要登录");
             if (scramble < 0) scramble = api.scramble(id);

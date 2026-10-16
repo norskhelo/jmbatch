@@ -24,9 +24,11 @@ public final class Store {
         public String outputUri = "", outputLabel = "应用下载目录", format = "images";
         public int concurrentTasks = 2, threads = 8, timeout = 25, retries = 2, slowKB = 30, window = 90, stall = 180, maxResets = 3;
         public boolean autoReset = true, keepImages = false, numericFilename = false, flatZip = false;
+        public boolean downloadAllChapters = false;
         public Settings() {}
         public Settings(JSONObject json) {
             concurrentTasks = json.optInt("concurrentTasks", 2);
+            downloadAllChapters = json.optBoolean("downloadAllChapters", false);
             outputUri = json.optString("outputUri", ""); outputLabel = json.optString("outputLabel", "应用下载目录");
             format = json.optString("format", "images"); threads = json.optInt("threads", 8); timeout = json.optInt("timeout", 25);
             retries = json.optInt("retries", 2); slowKB = json.optInt("slowKB", 30); window = json.optInt("window", 90);
@@ -44,7 +46,7 @@ public final class Store {
         private static void check(int n, int min, int max, String label) { if (n < min || n > max) throw new IllegalArgumentException(label + "应为 " + min + "–" + max); }
         public JSONObject json() {
             JSONObject json = new JSONObject();
-            try { json.put("outputUri", outputUri).put("outputLabel", outputLabel).put("format", format).put("threads", threads).put("timeout", timeout).put("retries", retries)
+            try { json.put("downloadAllChapters", downloadAllChapters).put("outputUri", outputUri).put("outputLabel", outputLabel).put("format", format).put("threads", threads).put("timeout", timeout).put("retries", retries)
                 .put("concurrentTasks", concurrentTasks).put("slowKB", slowKB).put("window", window).put("stall", stall).put("maxResets", maxResets).put("autoReset", autoReset).put("keepImages", keepImages).put("numericFilename", numericFilename).put("flatZip", flatZip); }
             catch (JSONException impossible) { throw new IllegalStateException(impossible); }
             return json;
@@ -59,6 +61,7 @@ public final class Store {
         public volatile long bytes, speed, elapsed;
         public volatile long imageBytes, resultBytes, downloadStarted;
         public volatile String stage = "metadata";
+        public volatile List<ChapterRules.Chapter> chapterOptions = Collections.emptyList(), selectedChapters = Collections.emptyList();
         public String progressText() { return DownloadDisplay.progress(done, total, status); }
         public String sizeText() { return DownloadDisplay.sizeText(done, total, imageBytes, resultBytes, status); }
         public String etaText() { String text=DownloadDisplay.eta(status, stage, done, total, cached,
@@ -72,11 +75,13 @@ public final class Store {
             phase = json.optString("phase"); error = json.optString("error"); resultUri = json.optString("resultUri");
             done = json.optInt("done"); total = json.optInt("total"); cached = json.optInt("cached"); resets = json.optInt("resets"); elapsed = json.optLong("elapsed");
             imageBytes = json.optLong("imageBytes"); resultBytes = json.optLong("resultBytes");
+            chapterOptions = ChapterSelection.read(json.optJSONArray("chapterOptions"));
+            selectedChapters = ChapterSelection.read(json.optJSONArray("selectedChapters"));
             if (status.equals("running") || status.equals("queued") || status.equals("resetting")) { status = "paused"; phase = "已恢复，点击开始继续"; }
         }
         public JSONObject json() {
             JSONObject json = new JSONObject();
-            try { json.put("id", id).put("key", key).put("settings", settings.json()).put("title", title).put("status", status).put("phase", phase).put("error", error)
+            try { json.put("chapterOptions", ChapterSelection.json(chapterOptions)).put("selectedChapters", ChapterSelection.json(selectedChapters)).put("id", id).put("key", key).put("settings", settings.json()).put("title", title).put("status", status).put("phase", phase).put("error", error)
                 .put("resultUri", resultUri).put("done", done).put("total", total).put("cached", cached).put("resets", resets).put("elapsed", elapsed)
                 .put("imageBytes", imageBytes).put("resultBytes", resultBytes); }
             catch (JSONException impossible) { throw new IllegalStateException(impossible); }
@@ -115,8 +120,9 @@ public final class Store {
         settings = new Settings(options.json()); save(); return count;
     }
     public synchronized Task next() { for (Task t : tasks) if (t.status.equals("queued") && !activeKeys.contains(t.key)) return t; return null; }
-    public synchronized void resume() throws IOException { for (Task t : tasks) if (t.status.equals("paused")) { t.status = "queued"; t.phase = "排队中"; } save(); }
-    public synchronized void pauseQueued() throws IOException { for (Task t : tasks) if (t.status.equals("queued")) { t.status = "paused"; t.phase = "已暂停"; } save(); }
+    public synchronized void resume() throws IOException { for (Task t : tasks) if (t.status.equals("paused")) { t.status = !t.chapterOptions.isEmpty() && t.selectedChapters.isEmpty() ? "selecting" : "queued"; t.phase = t.status.equals("selecting") ? "请选择下载章节" : "排队中"; } save(); }
+    public synchronized void pauseQueued() throws IOException { for (Task t : tasks) if (t.status.equals("queued") || t.status.equals("selecting")) { t.status = "paused"; t.phase = "已暂停"; } save(); }
+    public synchronized void pauseQueuedOnly() throws IOException { for(Task t:tasks)if(t.status.equals("queued")){t.status="paused";t.phase="已暂停";}save(); }
     public File cache(Task task) throws IOException {
         File parent = new File(context.getFilesDir(), "work"); File target = new File(parent, task.key);
         if (!target.getCanonicalFile().getParentFile().equals(parent.getCanonicalFile())) throw new IOException("缓存路径异常");
@@ -124,6 +130,6 @@ public final class Store {
         return target;
     }
     public static String status(String status) {
-        switch (status) { case "running": return "下载中"; case "done": return "下载完成"; case "failed": return "失败"; case "paused": return "已暂停"; case "cancelled": return "已取消"; case "resetting": return "正在恢复"; default: return "排队中"; }
+        switch (status) { case "selecting": return "待选章节"; case "running": return "下载中"; case "done": return "下载完成"; case "failed": return "失败"; case "paused": return "已暂停"; case "cancelled": return "已取消"; case "resetting": return "正在恢复"; default: return "排队中"; }
     }
 }

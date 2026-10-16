@@ -12,7 +12,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-VERSION = "0.3.5"
+VERSION = "0.3.6"
 ZIP_LAYOUT_VERSION = 3
 MAX_TASKS = 2000
 
@@ -56,6 +56,7 @@ class Settings:
     keep_images: bool = False
     numeric_filename: bool = False
     flat_zip: bool = False
+    download_all_chapters: bool = False
 
     def validate(self):
         if self.format not in ("images", "pdf", "zip"):
@@ -93,6 +94,8 @@ class Task:
     error: str = ""
     result: str = ""
     metrics: dict = field(default_factory=dict)
+    chapter_options: list = field(default_factory=list)
+    selected_chapters: list = field(default_factory=list)
     created: str = field(default_factory=lambda: time.strftime("%Y-%m-%d %H:%M:%S"))
 
     def to_dict(self):

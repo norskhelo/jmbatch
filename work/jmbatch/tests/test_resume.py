@@ -69,7 +69,7 @@ class ResumeTests(unittest.TestCase):
                 requested.append((image.from_photo.sort, image.index))
                 Path(path).write_bytes(jpeg)
 
-        task = Task('123456', Settings(output=str(self.root / 'out'), keep_images=True).__dict__).to_dict()
+        task = Task('123456', Settings(download_all_chapters=True, output=str(self.root / 'out'), keep_images=True).__dict__).to_dict()
         cache = task_cache(task)
         positions = [(chapter, page) for chapter, count in enumerate(counts, 1) for page in range(1, count + 1)]
         saved = set(positions[:4321]) | {(3, 100)}  # also keep out-of-order completed work
@@ -100,7 +100,7 @@ class ResumeTests(unittest.TestCase):
 
     def test_launch_keeps_last_progress_until_cache_reconciled(self):
         engine = Engine(self.root / 'state')
-        task = Task('123456', Settings(output=str(self.root / 'out')).__dict__,
+        task = Task('123456', Settings(download_all_chapters=True, output=str(self.root / 'out')).__dict__,
                     status='paused', done=4321, total=7227, cached=100, image_bytes=123456)
         engine.tasks = [task]
         try:
@@ -116,7 +116,7 @@ class ResumeTests(unittest.TestCase):
             with self.subTest(cold_start=cold_start):
                 root = self.root / str(cold_start)
                 engine = Engine(root / 'state', worker_target=pausable_worker)
-                engine.add(['123456'], Settings(output=str(root / 'out'), threads=1, auto_reset=False))
+                engine.add(['123456'], Settings(download_all_chapters=True, output=str(root / 'out'), threads=1, auto_reset=False))
                 task = engine.tasks[0]
                 cache = task_cache(task.to_dict())
                 try:
@@ -156,7 +156,7 @@ class ResumeTests(unittest.TestCase):
 
     def test_cache_scan_never_triggers_network_watchdog(self):
         engine = Engine(self.root / 'state')
-        task = Task('123456', Settings(output=str(self.root / 'out')).__dict__, status='running')
+        task = Task('123456', Settings(download_all_chapters=True, output=str(self.root / 'out')).__dict__, status='running')
         state = WorkerState(task, watch=SpeedWatch(Settings(**task.settings), 0))
         from unittest.mock import Mock
         state.process = Mock()

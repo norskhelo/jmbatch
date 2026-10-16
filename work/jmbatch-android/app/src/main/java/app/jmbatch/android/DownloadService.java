@@ -7,7 +7,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public final class DownloadService extends Service {
-    public static final String START="start", PAUSE="pause", CANCEL="cancel";
+    public static final String START="start", SELECTED="selected", PAUSE="pause", CANCEL="cancel";
     private static final String CHANNEL="downloads";
     private Store store;
     private final DownloadPool<String,DownloadJob> pool=new DownloadPool<>();
@@ -56,7 +56,7 @@ public final class DownloadService extends Service {
             if(store.libraryBusy||!store.activeKeys.isEmpty()){store.note="正在管理文件或关闭旧请求，请稍后再开始下载";stopForeground(true);foreground=false;stopSelf();return START_NOT_STICKY;}
             store.running=true;
         }
-        try{store.resume();}catch(Exception error){store.note=error.getMessage();finishQueue();return START_NOT_STICKY;}
+        try{if(!SELECTED.equals(action))store.resume();}catch(Exception error){store.note=error.getMessage();finishQueue();return START_NOT_STICKY;}
         store.note="";accepting=true;
         wake.acquire(6*60*60*1000L);
         main.removeCallbacks(dispatch);main.post(dispatch);return START_NOT_STICKY;
@@ -82,7 +82,7 @@ public final class DownloadService extends Service {
 
     private void finishQueue(){
         accepting=false;if(store.activeKeys.isEmpty())store.running=false;
-        try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}
+        try{store.pauseQueuedOnly();}catch(Exception error){store.note=error.getMessage();}
         if(wake.isHeld())wake.release();saveQuietly();
         if(foreground){stopForeground(true);foreground=false;}stopSelf();
     }
@@ -123,6 +123,11 @@ public final class DownloadService extends Service {
                         break;
                     }catch(Throwable error){
                         if(!stop.isEmpty()){stopped();break;}
+                        if(error instanceof ChapterRules.ChoiceRequired){
+                            task.chapterOptions=((ChapterRules.ChoiceRequired)error).chapters;
+                            task.stage=attempt.stage="selection";task.phase="请选择下载章节";task.status="selecting";
+                            break;
+                        }
                         String reason=attempt.stop;
                         if(reason.startsWith("RESET:")){
                             if(task.resets>=task.settings.maxResets){task.status="failed";task.error=reason.substring(6)+"；已达到自动重置上限 "+task.settings.maxResets+" 次";task.phase="速度恢复失败";break;}

@@ -1,4 +1,4 @@
-JM Batch 0.4.5 — Android 使用说明
+JM Batch 0.4.6 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每个任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.4.5 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-16）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.5-0.4.5/JMBatch-0.4.5-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.5-0.4.5/JMBatch-0.4.5-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.5-0.4.5/JMBatch-0.4.5-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.5-0.4.5/SHA256-release-0.3.5-0.4.5.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.6-0.4.6/JMBatch-0.4.6-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.6-0.4.6/JMBatch-0.4.6-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.6-0.4.6/JMBatch-0.4.6-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.6-0.4.6/SHA256-release-0.3.6-0.4.6.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -24,18 +24,19 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.5-0
 
 10. 点击主界面“检查更新 / 公告”立即联网检查，更新窗口与完整公告也可手动检查。关闭启动自动检查后仍可使用。检查采用已保存仓库；修改后先保存。检查失败保留离线公告，可再次点击重试。下载和安装新版需要手动确认。
 
-Windows 0.3.5 / Android 0.4.5 — 2026-10-16
+Windows 0.3.6 / Android 0.4.6 — 2026-10-16
 
-手动检查更新
+下载章节选择
 
-• Windows 和 Android 主界面新增明确的“检查更新 / 公告”入口，点击后打开更新窗口并立即联网检查。更新窗口和完整公告也提供“检查更新”按钮。
-• 关闭“启动时自动检查更新”后仍可手动检查；检查使用已保存的仓库，不修改自动检查开关。修改仓库后先点击“保存”，再检查；仓库为空时提示先配置。
-• 检查时显示进度状态并防止重复并发请求；完成后显示发现新版、当前已是适用版本或失败重试提示，更新公告同步刷新。失败保留离线公告，可重新点击检查。
-• 检查过程不影响漫画下载；下载更新和安装仍由用户点击确认，沿用原清单签名、SHA-256 及 APK 签名验证机制。
+• 多章节漫画获取章节列表后，弹出下载章节选择，可多选、全选、清空；至少选择一章才会开始下载。
+• 下载设置新增“默认下载全章节”，默认关闭。开启后，新任务和未选择章节的手动重试任务跳过弹窗；单章节直接下载。
+• 关闭弹窗或选择“稍后选择”会暂停该任务，点击“开始 / 继续”可再次选择。待选任务不占下载名额，多个任务依次弹窗；Android 在应用返回前台后显示待选章节。
+• 只读取和下载选中章节的图片；PDF、ZIP、文件夹均适用。选择随任务保存，暂停、重启、重试和自动重连沿用原选择；已选章节不会因全章节设置改变而增加。
+• 保留原章节顺序与编号以正确复用缓存；单个所选章节的 ZIP / 文件夹图片平铺，多个所选章节按原章节编号分目录，封面取首个所选章节第一页。
 
 版本与验证
 
-• Windows 升至 0.3.5；Android 升至 0.4.5（versionCode 405），保留原包名、APK 签名身份和更新公钥。
-• Windows 验证关闭自动检查后的实际按钮操作、重复点击、检查状态、失败重试、公告刷新和最小窗口布局；源码与冻结成品均执行界面自检。
-• Android 执行宿主回归、编译及原证书签名核验；未进行 Android 真机界面验证。
+• Windows 升至 0.3.6；Android 升至 0.4.6（versionCode 406），沿用原包名、APK 签名身份和更新公钥。
+• 使用离线章节素材验证选择、默认全选、缓存续传、队列调度和三种成品；Windows 源码与冻结成品执行实际界面自检。
+• Android 执行宿主测试、编译和签名核验；未进行 Android 真机界面或真实网站下载验证。
 • 同步源码、使用说明、同版日志、双端安装包、SHA-256 校验文件和签名更新清单。

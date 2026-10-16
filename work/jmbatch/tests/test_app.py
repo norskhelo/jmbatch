@@ -55,7 +55,7 @@ class IntegrationTests(unittest.TestCase):
         self.temp.cleanup()
 
     def task(self, fmt="pdf"):
-        return Task("123456", Settings(output=str(self.root / "out"), format=fmt, keep_images=True).__dict__).to_dict()
+        return Task("123456", Settings(download_all_chapters=True, output=str(self.root / "out"), format=fmt, keep_images=True).__dict__).to_dict()
 
     def test_sizes_survive_cached_download_and_queue_restore(self):
         task = self.task("zip")
@@ -275,7 +275,7 @@ class IntegrationTests(unittest.TestCase):
 
     def test_queue_snapshot_and_cookie_not_saved(self):
         engine = Engine(self.root / "state")
-        settings = Settings(output=str(self.root / "out"))
+        settings = Settings(download_all_chapters=True, output=str(self.root / "out"))
         engine.cookie = "secret-cookie"
         self.assertEqual(engine.add(["123456", "123456"], settings), 1)
         engine.tasks[0].status = "running"
@@ -286,7 +286,7 @@ class IntegrationTests(unittest.TestCase):
 
     def test_subprocess_pause_resume(self):
         engine = Engine(self.root / "state", worker_target=stalled_worker)
-        engine.add(["123456"], Settings(output=str(self.root / "out")))
+        engine.add(["123456"], Settings(download_all_chapters=True, output=str(self.root / "out")))
         engine.start()
         engine.tick()
         self.assertTrue(engine.active[engine.tasks[0].key].process.is_alive())
@@ -306,7 +306,7 @@ class IntegrationTests(unittest.TestCase):
 
     def test_bounded_reset_terminates_real_worker(self):
         engine = Engine(self.root / "state", worker_target=stalled_worker)
-        settings = Settings(output=str(self.root / "out"), slow_kbps=0, stall_seconds=30, max_resets=1)
+        settings = Settings(download_all_chapters=True, output=str(self.root / "out"), slow_kbps=0, stall_seconds=30, max_resets=1)
         engine.add(["123456"], settings)
         engine.start()
         engine.tick()

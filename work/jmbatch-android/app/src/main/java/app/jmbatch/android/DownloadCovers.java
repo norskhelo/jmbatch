@@ -39,11 +39,12 @@ public final class DownloadCovers {
         long now=SystemClock.elapsedRealtime();
         if(target.pending||now<target.next)return;
         final String key=task.key,status=task.status,result=task.resultUri,format=task.settings.format;
+        final int firstChapter=task.selectedChapters.isEmpty()?1:task.selectedChapters.get(0).number;
         target.pending=true;target.next=now+1000;
         try{worker.execute(()->{
             Bitmap bitmap=null;
             try{
-                DownloadCoverRules.Source source=DownloadCoverRules.resolve(new File(context.getFilesDir(),"work"),key,status,result,format);
+                DownloadCoverRules.Source source=DownloadCoverRules.resolve(new File(context.getFilesDir(),"work"),key,status,result,format,firstChapter);
                 if(source!=null){
                     Cover found=cache.get(source.stamp);
                     if(found==null||(found.bitmap==null&&SystemClock.elapsedRealtime()-found.checked>=3000)){

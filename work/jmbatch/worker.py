@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 from core import Settings, ZIP_LAYOUT_VERSION, atomic_json, explain_error, export_images, task_cache, verify_image
+from chapters import ChapterChoiceRequired, resolve_chapters
 
 
 def parse_cookies(text: str):
@@ -125,15 +126,23 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
             photos = list(album)
             if not photos:
                 raise ValueError("该编号没有可下载的章节。")
+            catalog = [{"id": str(photo.id), "number": index, "title": str(photo.name or f"第 {index} 章")}
+                       for index, photo in enumerate(photos, 1)]
+            chosen = resolve_chapters(catalog, task.get("selected_chapters"), settings.download_all_chapters)
+            task["selected_chapters"] = chosen
+            emit({"type": "chapter_plan", "chapters": chosen})
+            available = {str(photo.id): photo for photo in photos}
+            photos = [available[item["id"]] for item in chosen]
             # Hydrate all chapter metadata before displaying an exact total.
-            for index, photo in enumerate(photos, 1):
+            for item, photo in zip(chosen, photos):
+                index = item["number"]
                 self.client.check_photo(photo)
                 if len(photo) == 0:
                     raise ValueError(f"第 {index} 章没有图片，可能是访问权限或服务端数据异常。")
                 self.chapter_numbers[str(photo.id)] = index
                 self.expected_chapters[index] = len(photo)
                 self.expected += len(photo)
-                emit({"type": "metadata", "message": f"读取章节 {index}/{len(photos)}"})
+                emit({"type": "metadata", "message": f"读取所选章节 {len(self.expected_chapters)}/{len(photos)}"})
             self.restore_cache(photos)
             emit({"type": "phase", "phase": "download", "message": f"继续下载剩余 {self.expected - self.completed} 张图片", "total": self.expected})
             for photo in photos:
@@ -296,5 +305,7 @@ def worker_entry(task: dict, cookie: str, channel):
         sys.stderr = sink
         try:
             run_download(task, cookie, channel.put)
+        except ChapterChoiceRequired as choice:
+            channel.put({"type": "chapters", "chapters": choice.chapters})
         except Exception as exc:
             channel.put({"type": "error", "error": explain_error(exc, cookie)})

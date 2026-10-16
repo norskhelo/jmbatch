@@ -17,7 +17,7 @@ class DownloadCoverTests(unittest.TestCase):
         folder.mkdir(exist_ok=True)
         self.temp = tempfile.TemporaryDirectory(dir=folder)
         self.root = Path(self.temp.name).resolve()
-        self.task = Task("123456", Settings(output=str(self.root), threads=1).__dict__, status="running").to_dict()
+        self.task = Task("123456", Settings(download_all_chapters=True, output=str(self.root), threads=1).__dict__, status="running").to_dict()
         self.first = task_cache(self.task) / "images/0001/00001.jpg"
         self.first.parent.mkdir(parents=True)
 
@@ -66,7 +66,7 @@ class DownloadCoverTests(unittest.TestCase):
 
     def test_running_cover_precedes_completion_for_every_format(self):
         for fmt in ("images", "zip", "pdf"):
-            task = Task("123456", Settings(output=str(self.root / fmt), format=fmt, threads=1).__dict__, status="running").to_dict()
+            task = Task("123456", Settings(download_all_chapters=True, output=str(self.root / fmt), format=fmt, threads=1).__dict__, status="running").to_dict()
             loader = DownloadCoverLoader()
             seen = []
             def observe(event):

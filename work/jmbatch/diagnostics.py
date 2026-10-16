@@ -7,6 +7,7 @@ import traceback
 from pathlib import Path
 
 from core import Settings, Task, atomic_json, explain_error
+from chapters import ChapterChoiceRequired
 from worker import run_download
 
 
@@ -43,6 +44,8 @@ class FailingFixtureClient(FixtureClient):
 def fixture_worker(task, cookie, channel):
     try:
         run_download(task, cookie, channel.put, client_factory=FixtureClient)
+    except ChapterChoiceRequired as choice:
+        channel.put({"type": "chapters", "chapters": choice.chapters})
     except Exception as exc:
         channel.put({"type": "error", "error": explain_error(exc, cookie)})
 
@@ -88,7 +91,7 @@ def check_download_covers_ui(application, directory):
         raise AssertionError("Live download cover UI timed out: " + str([t.to_dict() for t in engine.tasks]))
     try:
         for fmt in ("pdf", "zip", "images"):
-            engine.add(["123456"], Settings(output=str(directory / "live-cover-output"), format=fmt, threads=1, concurrent_tasks=3))
+            engine.add(["123456"], Settings(download_all_chapters=True, output=str(directory / "live-cover-output"), format=fmt, threads=1, concurrent_tasks=3))
         tasks = list(engine.tasks)
         engine.start()
         # At minimum height, scroll to each row while its download remains blocked.
@@ -333,7 +336,7 @@ def run_self_test(directory: Path):
         report["jmcomic"] = jmcomic.__version__
         engine = Engine(directory / "state", worker_target=fixture_worker)
         for fmt in ("pdf", "zip"):
-            engine.add(["123456"], Settings(output=str(directory / "artifacts"), format=fmt))
+            engine.add(["123456"], Settings(download_all_chapters=True, output=str(directory / "artifacts"), format=fmt))
         engine.start()
         engine.tick()
         assert len(engine.active) == 2, "Two independent workers must overlap"
@@ -370,6 +373,9 @@ def run_self_test(directory: Path):
         root.update()
         assert root.winfo_width() >= 1020
         report["checks"].append("Tk desktop UI constructed and rendered")
+        from chapter_checks import check_chapter_ui
+        check_chapter_ui(application, directory)
+        report["checks"].append("Chapter picker: three real metadata workers release slots; ordered dialogs, empty selection, postpone/resume, second-chapter-only PDF/ZIP/folder, minimum layout and persisted setting")
         check_download_covers_ui(application, directory)
         report["checks"].append("Live queue covers appear before completion in three concurrent real worker downloads at minimum window size")
         report["checks"].append("Paused/resumed queue covers survive image-cache cleanup and load PDF/ZIP/folder results; removed rows release images")
@@ -489,7 +495,7 @@ def run_self_test(directory: Path):
         library_ui.window.destroy()
         # Exercise the new default download and the actual export dialog/worker.
         from worker import run_download
-        image_task = Task("123459", Settings(output=str(directory / "image-artifacts")).__dict__)
+        image_task = Task("123459", Settings(download_all_chapters=True, output=str(directory / "image-artifacts")).__dict__)
         events = []
         run_download(image_task.to_dict(), "", events.append, FixtureClient)
         image_task.status = "done"

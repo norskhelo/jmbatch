@@ -78,6 +78,8 @@ run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java
 run(java,'-cp',testout,'ArchivePagesTest',testroot/'archive-output')
 
 resources=build/'resources.zip';generated=build/'generated';generated.mkdir(exist_ok=True)
+run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/ChapterRules.java',ROOT/'tests/ChapterTest.java')
+run(java,'-cp',testout,'ChapterTest')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/ReaderRules.java',ROOT/'tests/ReaderTest.java')
 run(java,'-cp',testout,'ReaderTest')
 run(buildtools/'aapt2.exe','compile','--dir',ROOT/'app/src/main/res','-o',resources)

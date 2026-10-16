@@ -29,6 +29,8 @@ public final class MainActivity extends Activity {
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final Map<String,Row> rows=new LinkedHashMap<>();
     private int limit=50;
+    private AlertDialog chapterDialog;
+    private Store.Task chapterTask;
     private final Runnable refresh=new Runnable(){public void run(){render();handler.postDelayed(this,700);}};
 
     public void onCreate(Bundle state){
@@ -109,6 +111,52 @@ public final class MainActivity extends Activity {
         summary.setText("共 "+tasks.size()+" 本  ·  完成 "+completed+"  ·  失败 "+failed);
         global.setText(active==0?(store.running?"正在启动…":store.note.isEmpty()?(completed>0&&completed==tasks.size()?"下载完成":"就绪 / 队列已停止"):store.note):"同时下载 "+active+" 本 · 总速度 "+DownloadDisplay.speed(speed));
         start.setEnabled(!store.running);pause.setEnabled(store.running);more.setVisibility(tasks.size()>limit?View.VISIBLE:View.GONE);
+        showChapterSelection();
+    }
+
+    private void showChapterSelection(){
+        if(isFinishing()||isDestroyed())return;
+        if(chapterDialog!=null){
+            if(!chapterTask.status.equals("selecting")){chapterDialog.dismiss();chapterDialog=null;}
+            else return;
+        }
+        // A worker must leave its cache before this task can be rescheduled.
+        if(store.running&&store.activeKeys.isEmpty())return;
+        Store.Task next=null;
+        for(Store.Task task:store.snapshot())if(task.status.equals("selecting")&&!store.activeKeys.contains(task.key)){next=task;break;}
+        if(next==null)return;
+        final Store.Task task=next;chapterTask=task;
+        final List<ChapterRules.Chapter> options=task.chapterOptions;
+        String[] labels=new String[options.size()];boolean[] checked=new boolean[options.size()];Arrays.fill(checked,true);
+        for(int i=0;i<labels.length;i++)labels[i]="第 "+options.get(i).number+" 章 · "+options.get(i).title;
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("JM"+task.id+" · 选择下载章节")
+            .setMultiChoiceItems(labels,checked,(d,index,value)->checked[index]=value)
+            .setPositiveButton("下载所选",null).setNeutralButton("清空",null)
+            .setNegativeButton("稍后选择",(d,w)->postponeChapter(task)).create();
+        chapterDialog=dialog;
+        dialog.setOnCancelListener(d->postponeChapter(task));
+        dialog.setOnDismissListener(d->{if(chapterDialog==dialog){chapterDialog=null;chapterTask=null;}});
+        dialog.setOnShowListener(d->{
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v->{
+                boolean all=true;for(boolean value:checked)all&=value;
+                Arrays.fill(checked,!all);for(int i=0;i<checked.length;i++)dialog.getListView().setItemChecked(i,!all);
+                dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setText(all?"全选":"清空");
+            });
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                try{
+                    synchronized(store){
+                        if(!task.status.equals("selecting")||store.activeKeys.contains(task.key))throw new IOException("任务状态已变化，请稍后再试");
+                        Set<String> ids=new HashSet<>();for(int i=0;i<checked.length;i++)if(checked[i])ids.add(options.get(i).id);
+                        List<ChapterRules.Chapter> chosen=ChapterRules.select(options,ids);
+                        task.selectedChapters=chosen;task.status="queued";task.phase="等待下载所选章节";store.save();
+                    }
+                    dialog.dismiss();if(!store.running)startForegroundService(new Intent(this,DownloadService.class).setAction(DownloadService.SELECTED));
+                }catch(Exception error){toast(error.getMessage());}
+            });
+        });dialog.show();
+    }
+    private void postponeChapter(Store.Task task){
+        if(task.status.equals("selecting")){task.status="paused";task.phase="已暂停；点击开始继续选择章节";save();}
     }
 
     private final class Row{
@@ -187,6 +235,7 @@ public final class MainActivity extends Activity {
         EditText[] fields=new EditText[names.length];
         for(int i=0;i<names.length;i++){form.addView(text(names[i],13,MUTED));fields[i]=edit("",true);fields[i].setText(Integer.toString(values[i]));form.addView(fields[i]);}
         CheckBox auto=new CheckBox(this);auto.setText("慢速 / 无进度时自动重连");auto.setChecked(store.settings.autoReset);form.addView(auto);
+        CheckBox allChapters=new CheckBox(this);allChapters.setText("默认下载全章节（跳过章节选择）");allChapters.setChecked(store.settings.downloadAllChapters);form.addView(allChapters);
         form.addView(text("Cookie（可选，仅本次应用进程内保存）",13,MUTED));EditText cookie=edit("key=value; key2=value2",false);cookie.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);cookie.setText(store.cookie);form.addView(cookie);
         form.addView(text("默认同时下载 2 本，每本 8 个图片线程；并行越多，流量和内存占用越高。速度统计为图片响应的接收字节，重试流量也计入。\n任务数保存后用于后续调度；调低不会中断已运行任务。\n其他设置影响新任务和手动重试；已有任务保留原目录和格式。",12,MUTED));
         form.addView(button("运行离线自检（不访问网站）",v->selfTest()));
@@ -196,6 +245,7 @@ public final class MainActivity extends Activity {
             try{
                 int[] nums=new int[fields.length];for(int i=0;i<fields.length;i++)nums[i]=Integer.parseInt(fields[i].getText().toString().trim());
                 Store.Settings options=new Store.Settings(store.settings.json());options.threads=nums[0];options.timeout=nums[1];options.retries=nums[2];options.slowKB=nums[3];options.window=nums[4];options.stall=nums[5];options.maxResets=nums[6];options.concurrentTasks=nums[7];options.autoReset=auto.isChecked();options.keepImages=false;options.numericFilename=false;options.flatZip=false;options.validate();
+                options.downloadAllChapters=allChapters.isChecked();
                 String secret=cookie.getText().toString().trim();if(secret.contains("\n")||secret.contains("\r")||(!secret.isEmpty()&&!secret.contains("=")))throw new IllegalArgumentException("Cookie 格式应为 key=value; key2=value2，不能包含换行");
                 store.settings=options;store.cookie=secret;store.save();toast("设置已保存");dialog.dismiss();
             }catch(Exception error){showError(error instanceof NumberFormatException?"参数必须是整数":error.getMessage());}
@@ -207,7 +257,7 @@ public final class MainActivity extends Activity {
         toast("正在生成本地测试图片和 PDF…");new Thread(()->{String result;try{result=Diagnostics.run(this);}catch(Throwable error){result="自检失败："+Core.error(error,"");}String message=result;runOnUiThread(()->new AlertDialog.Builder(this).setTitle("离线自检结果").setMessage(message).setPositiveButton("知道了",null).show());},"offline-check").start();
     }
     protected void onResume(){super.onResume();handler.removeCallbacks(refresh);handler.post(refresh);}
-    protected void onPause(){handler.removeCallbacks(refresh);save();super.onPause();}
+    protected void onPause(){handler.removeCallbacks(refresh);if(chapterDialog!=null){chapterDialog.dismiss();chapterDialog=null;}save();super.onPause();}
     protected void onDestroy(){if(downloadCovers!=null)downloadCovers.close();for(Row row:rows.values())row.cover.remove();super.onDestroy();}
     private void save(){try{store.save();}catch(Exception error){store.note=error.getMessage();toast(store.note);}}
     private void showError(String message){new AlertDialog.Builder(this).setTitle("无法完成操作").setMessage(message).setPositiveButton("知道了",null).show();}

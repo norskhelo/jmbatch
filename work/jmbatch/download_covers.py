@@ -9,7 +9,8 @@ from covers import CoverWorker, load_cover
 
 
 def cover_source(task):
-    first = task_cache(task) / "images" / "0001" / "00001.jpg"
+    chosen = task.get("selected_chapters") or [{"number": 1}]
+    first = task_cache(task) / "images" / f"{chosen[0]['number']:04d}" / "00001.jpg"
     if first.is_file():
         path, fmt = first, "image"
     elif task.get("status") == "done" and task.get("result"):

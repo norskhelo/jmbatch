@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from core import Settings, SpeedWatch, Task, atomic_json
 from worker import worker_entry
 from library import Library
+from chapters import select_chapters
 
 ACTIVE = {"running", "resetting"}
 
@@ -88,8 +89,8 @@ class Engine:
     def start(self):
         for task in self.tasks:
             if task.status == "paused":
-                task.status = "queued"
-                task.phase = "排队中"
+                task.status = "selecting" if task.chapter_options and not task.selected_chapters else "queued"
+                task.phase = "请选择下载章节" if task.status == "selecting" else "排队中"
         self.running = True
         self.save()
 
@@ -102,10 +103,25 @@ class Engine:
             state.task.speed = 0
         self.active.clear()
         for task in self.tasks:
-            if task.status == "queued":
+            if task.status in ("queued", "selecting"):
                 task.status = "paused"
                 task.phase = "已暂停"
         self.save()
+
+    def choose_chapters(self, key, ids):
+        task = next(t for t in self.tasks if t.key == key)
+        if task.status != "selecting":
+            raise ValueError("任务状态已变化，请重新开始。")
+        task.selected_chapters = select_chapters(task.chapter_options, ids)
+        task.status, task.phase = "queued", "等待下载所选章节"
+        self.save()
+        self.running = True
+
+    def postpone_chapters(self, key):
+        task = next((t for t in self.tasks if t.key == key), None)
+        if task and task.status == "selecting":
+            task.status, task.phase = "paused", "已暂停；点击开始继续选择章节"
+            self.save()
 
     def cancel(self, keys):
         for task in self.tasks:
@@ -192,6 +208,15 @@ class Engine:
         kind = event.get("type")
         if kind == "title":
             task.title = event["title"]
+        elif kind == "chapter_plan":
+            task.selected_chapters = event["chapters"]
+            self.save()
+        elif kind == "chapters":
+            task.chapter_options = event["chapters"]
+            task.status, task.phase, task.speed = "selecting", "请选择下载章节", 0
+            self._stop_process(state)
+            self.active.pop(task.key, None)
+            self.save()
         elif kind == "route":
             task.phase = event["message"]
         elif kind == "metadata":
@@ -299,7 +324,7 @@ class Engine:
                     self._launch(task, now)
             if not self.active and not any(t.status == "queued" for t in self.tasks):
                 self.running = False
-                self.notify("下载完成" if self.tasks and all(t.status == "done" for t in self.tasks)
+                self.notify("请选择下载章节" if any(t.status == "selecting" for t in self.tasks) else "下载完成" if self.tasks and all(t.status == "done" for t in self.tasks)
                             else "本轮队列已结束；失败任务可选中后重试。")
                 self.save()
         if self.active and now - self.last_saved > 5:

@@ -37,7 +37,7 @@ class ConcurrentQueueTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(dir=directory)
         self.root = Path(self.temp.name)
         self.engine = Engine(self.root / 'state', worker_target=gated_worker)
-        self.settings = Settings(output=str(self.root / 'out'), concurrent_tasks=2, auto_reset=False)
+        self.settings = Settings(output=str(self.root / 'out'), concurrent_tasks=2, auto_reset=False, download_all_chapters=True)
 
     def tearDown(self):
         self.engine.close()

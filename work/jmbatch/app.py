@@ -14,12 +14,13 @@ from tkinter import filedialog, messagebox, ttk
 from core import VERSION, MAX_TASKS, Settings, parse_ids
 from engine import Engine
 from download_display import format_size, format_speed, percent, progress_text, size_text, eta_text
+from chapter_ui import poll_chapters
 
 BG = "#f3f5f8"
 INK = "#172c3e"
 MUTED = "#617387"
 ACCENT = "#087f8c"
-STATUS = {"queued": "等待", "running": "进行中", "paused": "已暂停", "resetting": "重建连接", "failed": "失败", "done": "下载完成", "cancelled": "已取消"}
+STATUS = {"selecting": "待选章节", "queued": "等待", "running": "进行中", "paused": "已暂停", "resetting": "重建连接", "failed": "失败", "done": "下载完成", "cancelled": "已取消"}
 
 
 def app_home():
@@ -291,7 +292,7 @@ class App:
             self.range_end.set("")
 
     def start(self):
-        if not any(t.status in ("queued", "paused") for t in self.engine.tasks):
+        if not any(t.status in ("queued", "paused", "selecting") for t in self.engine.tasks):
             messagebox.showinfo("没有待下载任务", "请添加编号，或选中失败任务后点击“重试选中”。", parent=self.root)
             return
         self.engine.start()
@@ -413,7 +414,8 @@ class App:
         self.download_covers.poll(tasks)
         done = sum(t.status == "done" for t in tasks)
         failed = sum(t.status == "failed" for t in tasks)
-        waiting = sum(t.status in ("queued", "paused") for t in tasks)
+        waiting = sum(t.status in ("queued", "paused", "selecting") for t in tasks)
+        selecting = sum(t.status == "selecting" for t in tasks)
         self.summary.set(f"共 {len(tasks)} 本    ·    已完成 {done}    ·    失败 {failed}    ·    待处理 {waiting}")
         active = list(self.engine.active.values())
         selected = self.selected_task()
@@ -421,7 +423,7 @@ class App:
         state = state or (active[0] if active else None)
         current = state.task if state else None
         self.start_button.configure(state="disabled" if self.engine.running else "normal")
-        self.pause_button.configure(state="normal" if self.engine.running else "disabled")
+        self.pause_button.configure(state="normal" if self.engine.running or selecting else "disabled")
         if current:
             self.speed_text.set(f"同时下载 {len(active)} 本 · 总落盘速度  " + format_speed(sum(s.task.speed for s in active)))
             estimate = eta_text(current.status, state.phase, current.done, current.total, current.cached,
@@ -434,7 +436,7 @@ class App:
         else:
             self.speed_text.set("落盘速度  —")
             latest = next((t for t in reversed(tasks) if t.status == "done"), None)
-            self.progress_text.set("队列已暂停，点击开始继续" if waiting and not self.engine.running else
+            self.progress_text.set(f"{selecting} 本等待选择下载章节" if selecting else "队列已暂停，点击开始继续" if waiting and not self.engine.running else
                                    (f"JM{latest.album_id} · 下载完成 · 100.0%\n" + size_text(latest.done, latest.total, latest.image_bytes, latest.result_bytes, latest.status) if latest else "当前没有正在运行的任务"))
             self.progressbar["value"] = 100 if latest and not waiting else 0
         self.update_details()
@@ -443,6 +445,7 @@ class App:
         try:
             self.engine.tick()
             self.render()
+            poll_chapters(self)
         except Exception as exc:
             self.log(f"队列异常：{type(exc).__name__}: {exc}")
             try:
@@ -491,6 +494,8 @@ class App:
             ttk.Entry(frame, textvariable=variables[key], width=9).grid(row=row, column=1, padx=8)
             ttk.Label(frame, text=hint, foreground=MUTED).grid(row=row, column=2, sticky="w")
         auto = tk.BooleanVar(value=self.engine.settings.auto_reset)
+        all_chapters = tk.BooleanVar(value=self.engine.settings.download_all_chapters)
+        ttk.Checkbutton(frame, text="默认下载全章节（跳过章节选择，仅用于尚未选择章节的任务）", variable=all_chapters).grid(row=10, column=0, columnspan=3, sticky="w")
         ttk.Checkbutton(frame, text="启用慢速 / 无进度自动重置", variable=auto).grid(row=9, column=0, columnspan=3, sticky="w", pady=(14, 5))
         ttk.Label(frame, text="Cookie（可选，仅本次会话有效，不写入配置或日志）").grid(row=12, column=0, columnspan=3, sticky="w", pady=(15, 6))
         cookie = tk.StringVar(value=self.engine.cookie)
@@ -505,7 +510,7 @@ class App:
                         values[key] = int(variable.get())
                     except ValueError:
                         raise ValueError("数值设置必须填写整数。")
-                values.update(auto_reset=auto.get())
+                values.update(auto_reset=auto.get(), download_all_chapters=all_chapters.get())
                 from worker import parse_cookies
                 parse_cookies(cookie.get().strip())
                 self.engine.settings = Settings(**values).validate()

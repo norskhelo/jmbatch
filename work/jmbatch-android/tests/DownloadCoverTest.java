@@ -14,6 +14,7 @@ public class DownloadCoverTest {
         Files.write(first.resolveSibling("00001.partial.jpg"),new byte[]{3});
         Path later=work.resolve(key).resolve("images/0002/00001.jpg");Files.createDirectories(later.getParent());Files.write(later,new byte[]{4});
         check(DownloadCoverRules.resolve(work.toFile(),key,"running","","images")==null);
+        check(DownloadCoverRules.resolve(work.toFile(),key,"running","","images",2).path.equals(later.toString()));
         Files.write(first,new byte[]{1});
         DownloadCoverRules.Source before=DownloadCoverRules.resolve(work.toFile(),key,"running","","pdf");
         check(before.path.equals(first.toString())&&before.format.equals("image"));

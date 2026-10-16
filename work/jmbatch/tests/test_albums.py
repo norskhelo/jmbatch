@@ -24,7 +24,7 @@ class AlbumTests(unittest.TestCase):
         self.root = Path(self.temp.name).resolve()
         self.environment = patch.dict(os.environ, JM_BATCH_HOME=str(self.root / "app-state"))
         self.environment.start()
-        self.task = Task("123456", Settings(output=str(self.root / "downloads")).__dict__)
+        self.task = Task("123456", Settings(download_all_chapters=True, output=str(self.root / "downloads")).__dict__)
         events = []
         run_download(self.task.to_dict(), "", events.append, FixtureClient)
         self.event = events[-1]
@@ -95,7 +95,7 @@ class AlbumTests(unittest.TestCase):
             def get_album_detail(self, album_id):
                 return jmcomic.JmAlbumDetail(album_id, "220980", "Single chapter", [("800001", "1", "Chapter one")],
                                             3, "2026-01-01", "2026-01-01", "0", "0", 0, [], [], [], [])
-        task = Task("123457", Settings(output=str(self.folder.parent)).__dict__)
+        task = Task("123457", Settings(download_all_chapters=True, output=str(self.folder.parent)).__dict__)
         events = []
         run_download(task.to_dict(), "", events.append, Single)
         folder = Path(events[-1]["path"])
@@ -161,15 +161,15 @@ class AlbumTests(unittest.TestCase):
         self.assertFalse(self.folder.exists())
 
     def test_queue_load_and_retry_preserve_selected_formats(self):
-        old = Task("123457", Settings(output=str(self.folder.parent), format="pdf").__dict__, status="paused")
-        done = Task("123458", Settings(output=str(self.folder.parent), format="zip").__dict__, status="done")
+        old = Task("123457", Settings(download_all_chapters=True, output=str(self.folder.parent), format="pdf").__dict__, status="paused")
+        done = Task("123458", Settings(download_all_chapters=True, output=str(self.folder.parent), format="zip").__dict__, status="done")
         state = self.root / "legacy"
         atomic_json(state / "queue.json", dict(settings=old.settings, tasks=[old.to_dict(), done.to_dict()]))
         loaded = Engine(state)
         self.assertEqual(loaded.settings.format, "pdf")
         self.assertEqual(loaded.tasks[0].settings["format"], "pdf")
         self.assertEqual(loaded.tasks[1].settings["format"], "zip")
-        loaded.retry([old.key], Settings(output=str(self.root / "new-output"), format="zip"))
+        loaded.retry([old.key], Settings(download_all_chapters=True, output=str(self.root / "new-output"), format="zip"))
         self.assertEqual(loaded.tasks[0].settings["format"], "pdf")
         self.assertEqual(loaded.tasks[0].settings["output"], str(self.folder.parent))
 
