@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.2 / Android 0.4.2 — 2026-10-16\n\n#软件内阅读\n\n• 从下载任务或漫画库打开 PDF、ZIP、图片文件夹，直接进入内置阅读器。\n• 支持章节列表、上一章/下一章、本章页码与总页码、输入总页码跳转。文件夹和 ZIP 按图片目录识别章节；PDF 作为一个章节，不恢复原章节。\n• 阅读时可快捷收藏/取消收藏，与已有漫画库共用收藏记录。\n• 支持添加、移除、查看和跳转书签。每本漫画分别保存书签、上次页码和阅读模式，重新打开恢复。\n• 可在连续滚动与左右翻页之间切换。Windows 支持滚轮、方向键、PageUp/PageDown 和点击两侧；Android 支持上下滚动、左右滑动、点击两侧及按钮翻页。\n• 页面按需后台加载，限制解码尺寸和缓存；关闭阅读器释放文件。阅读记录保存在应用内部，不向漫画文件夹或 ZIP 写入信息。\n• Android 外部 ZIP 先复制到应用临时缓存再按页读取，关闭后清理；最多支持 8 GB 文件、20000 页。首次打开大文件需要等待，返回可取消。无效、加密或无权限文件显示错误，单页损坏可继续翻页。\n\n#版本与验证\n\n• Windows 0.3.1 → 0.3.2；Android 0.4.1 → 0.4.2（versionCode 402）。保留原包名、APK 签名和更新公钥。\n• 同步源码、使用说明、更新日志、安装包、SHA-256 和签名更新清单。\n• 验证使用隔离素材、Windows 自动化界面与冻结成品自检、Android 宿主测试和编译；Android 真机手势及厂商 SAF 行为未因编译通过而视为验证通过。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.3 / Android 0.4.3 — 2026-10-16\n\n跨版本更新公告修复\n\n• 已打开的“完整更新公告”和升级后自动公告会随后台检查结果刷新，同时显示检查状态；网络失败时保留已有日志，关闭公告后检查完成也不会访问已关闭窗口。\n• 单独保存升级前的版本，升级后的自动公告与完整公告均显示本次跨版本升级的全部已发布日志。重启应用或再次检查更新不会将其收缩成最后一版。\n• 本次升级日志按版本升序显示；发现更高版本时，另列“可用更新”，区分已经安装和仍可升级的内容。下一次实际升级后，以刚刚使用的版本作为新起点。\n• 兼容旧版本已查看标记和完整日志缓存。缓存不足时显示“完整日志尚未获取”，联网检查后补齐；首次安装、降级或切换仓库时不会混入不适用的升级记录。清除应用数据后无法恢复原升级起点。\n\n版本与验证\n\n• Windows 升至 0.3.3；Android 升至 0.4.3（versionCode 403），保留原包名、APK 签名身份及更新公钥。\n• 补充窗口打开期间检查完成、跨多版升级、重启、再次检查、失败回退、下一次升级和仓库隔离回归验证；Windows 同时在源码与冻结成品中执行真实 Tk 控件检查。\n• Android 执行宿主规则测试、编译和原证书签名验证；未将宿主测试或编译通过视为 Android 真机界面验收。\n• 同步源码、使用说明、同版日志、双端安装包、SHA-256 文件及签名更新清单。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;
@@ -22,6 +22,8 @@ public final class GithubUpdates {
     private final SharedPreferences prefs;
     private final Handler main=new Handler(Looper.getMainLooper());
     private AlertDialog dialog;
+    private AlertDialog notesDialog;
+    private TextView notesView,notesStatusView;
     private TextView statusView;
     private TextView announcementView;
     private Button downloadButton;
@@ -40,11 +42,16 @@ public final class GithubUpdates {
         }
         if(!prefs.getString("repository","").isEmpty())status="等待检查";
         else status="仓库留空，不检查更新";
+        String repo=prefs.getString("repository","");
+        String from=UpdateHistory.baseline(prefs.getString("announcement_upgrade_repo",""),
+            prefs.getString("announcement_installed_version",""),prefs.getString("announcement_upgrade_from",""),
+            prefs.getString("announcement_seen",""),Core.VERSION,repo);
+        saveHistoryBaseline(repo,from);
         indicator.setOnClickListener(v->show());
     }
     public void startup() {
         if(!Core.VERSION.equals(prefs.getString("announcement_seen",""))){
-            showNotes(true);prefs.edit().putString("announcement_seen",Core.VERSION).apply();
+            showNotes();prefs.edit().putString("announcement_seen",Core.VERSION).apply();
         }
         if(startupChecked)return;
         startupChecked=true;
@@ -54,6 +61,11 @@ public final class GithubUpdates {
         if(activity.isDestroyed()||activity.isFinishing())return;
         indicator.setText(latestUrl.isEmpty()?"软件更新 / 公告":"新版 "+latestVersion+" / 公告");
         if(dialog!=null&&dialog.isShowing()){statusView.setText(status);announcementView.setText(notesText());downloadButton.setEnabled(!latestUrl.isEmpty()||downloading);downloadButton.setText(downloading?"取消下载":ready!=null?"安装新版":"下载新版");}
+        if(notesDialog!=null&&notesDialog.isShowing()){
+            notesStatusView.setText(status);
+            String text=notesText();
+            if(!text.contentEquals(notesView.getText()))notesView.setText(text);
+        }
     }
     private void check() {
         if(downloading||ready!=null)return;
@@ -61,6 +73,7 @@ public final class GithubUpdates {
         if(repo.isEmpty()){status="仓库留空，已跳过检查";refresh();return;}
         if(!busy.compareAndSet(false,true)){status="上次检查仍在结束中，已跳过本次检查";refresh();return;}
         long ticket=++generation;
+        final String from=historyFrom();
         AtomicBoolean delivered=new AtomicBoolean();
         status="正在后台检查，最多等待 8 秒…";refresh();
         Runnable timeout=()->{
@@ -69,7 +82,7 @@ public final class GithubUpdates {
         main.postDelayed(timeout,8000);
         Thread worker=new Thread(()->{
             UpdateHistory.Selection answer=null;boolean success=false;
-            try{answer=fetch(repo);success=true;}catch(Exception ignored){/* Silent failure, no task changes. */}
+            try{answer=fetch(repo,from);success=true;}catch(Exception ignored){/* Silent failure, no task changes. */}
             finally{busy.set(false);}
             final UpdateHistory.Selection result=answer;final boolean ok=success;
             main.post(()->{
@@ -78,7 +91,7 @@ public final class GithubUpdates {
                 if(ticket!=generation||!repo.equals(prefs.getString("repository","")))return;
                 boolean newer=result!=null&&UpdateRules.compare(result.latest.version,Core.VERSION)>0;
                 latestUrl=newer?result.latest.url:"";latestVersion=newer?result.latest.version:"";
-                if(ok&&result!=null){
+                if(ok&&result!=null&&UpdateRules.compare(result.latest.version,Core.VERSION)>=0){
                     JSONArray history=new JSONArray();
                     for(UpdateHistory.Entry entry:result.history)
                         history.put(new JSONArray().put(entry.version).put(entry.notes));
@@ -93,11 +106,14 @@ public final class GithubUpdates {
         worker.setDaemon(true);worker.start();
     }
     static UpdateHistory.Selection fetch(String repo) throws Exception {
+        return fetch(repo,Core.VERSION);
+    }
+    static UpdateHistory.Selection fetch(String repo,String from) throws Exception {
         final String repository=UpdateRules.repository(repo);
         if(repository.isEmpty())return null;
         long deadline=SystemClock.elapsedRealtime()+8000;
         int[] total={0};
-        return UpdateHistory.load(page->fetchPage(repository,page,deadline,total),Core.VERSION);
+        return UpdateHistory.load(page->fetchPage(repository,page,deadline,total),from);
     }
     private static UpdateHistory.Page fetchPage(String repo,int page,long deadline,int[] total) throws Exception {
         long remaining=deadline-SystemClock.elapsedRealtime();
@@ -145,7 +161,7 @@ public final class GithubUpdates {
         statusView=new TextView(activity);statusView.setText(status);form.addView(statusView);
         announcementView=new TextView(activity);announcementView.setText(notesText());announcementView.setMaxLines(8);announcementView.setPadding(0,pad,0,0);form.addView(announcementView);
         Button notes=new Button(activity);notes.setText("查看完整更新公告（离线可用）");form.addView(notes);
-        notes.setOnClickListener(v->showNotes(false));
+        notes.setOnClickListener(v->showNotes());
         TextView help=new TextView(activity);help.setText("\n检查无响应时静默跳过，不影响下载任务。\n下载后先核验清单签名和 SHA-256；APK 证书先在应用内预检查，系统未提供证书时交由系统安装器核验。已知证书不匹配会阻止安装。\n下载更新时请保持应用在前台；安装前请暂停漫画下载任务。\n只信任本软件发布密钥签署的更新；不发送漫画编号或 Cookie。\n");form.addView(help);
         Button check=new Button(activity);check.setText("保存并检查");form.addView(check);
         downloadButton=new Button(activity);downloadButton.setText("下载新版");downloadButton.setEnabled(!latestUrl.isEmpty());form.addView(downloadButton);
@@ -167,18 +183,33 @@ public final class GithubUpdates {
                     history.add(new UpdateHistory.Entry(item.getString(0),"","",item.getString(1),""));
                 }
                 return UpdateHistory.announcement(prefs.getString("announcement_repo",""),prefs.getString("repository",""),
-                    prefs.getString("announcement_from",""),prefs.getString("announcement_version",""),Core.VERSION,history,CURRENT_NOTES);
-            }catch(JSONException error){return CURRENT_NOTES;}
+                    prefs.getString("announcement_from",""),prefs.getString("announcement_version",""),Core.VERSION,history,CURRENT_NOTES,historyFrom());
+            }catch(JSONException error){return UpdateHistory.pendingAnnouncement(Core.VERSION,historyFrom(),CURRENT_NOTES);}
         }
+        if(UpdateRules.compare(historyFrom(),Core.VERSION)<0)return UpdateHistory.pendingAnnouncement(Core.VERSION,historyFrom(),CURRENT_NOTES);
         return UpdateRules.announcement(prefs.getString("announcement_repo",""),prefs.getString("repository",""),
             prefs.getString("announcement_version",""),Core.VERSION,prefs.getString("announcement_notes",""),CURRENT_NOTES);
     }
-    private void showNotes(boolean local){
+    private void saveHistoryBaseline(String repo,String from){
+        prefs.edit().putString("announcement_upgrade_repo",repo).putString("announcement_installed_version",Core.VERSION)
+            .putString("announcement_upgrade_from",from).apply();
+    }
+    private String historyFrom(){
+        return UpdateHistory.baseline(prefs.getString("announcement_upgrade_repo",""),
+            prefs.getString("announcement_installed_version",""),prefs.getString("announcement_upgrade_from",""),
+            Core.VERSION,Core.VERSION,prefs.getString("repository",""));
+    }
+    private void showNotes(){
         if(activity.isDestroyed()||activity.isFinishing())return;
+        if(notesDialog!=null&&notesDialog.isShowing()){refresh();return;}
         int pad=(int)(20*activity.getResources().getDisplayMetrics().density);
-        TextView text=new TextView(activity);text.setPadding(pad,pad,pad,pad);text.setTextIsSelectable(true);text.setText(local?CURRENT_NOTES:notesText());
-        ScrollView content=new ScrollView(activity);content.addView(text);
-        new AlertDialog.Builder(activity).setTitle("更新公告").setView(content).setPositiveButton("关闭",null).show();
+        LinearLayout form=new LinearLayout(activity);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(pad,pad,pad,pad);
+        notesStatusView=new TextView(activity);notesStatusView.setText(status);form.addView(notesStatusView);
+        notesView=new TextView(activity);notesView.setPadding(0,pad,0,0);notesView.setTextIsSelectable(true);notesView.setText(notesText());form.addView(notesView);
+        ScrollView content=new ScrollView(activity);content.addView(form);
+        notesDialog=new AlertDialog.Builder(activity).setTitle("更新公告").setView(content).setPositiveButton("关闭",null).create();
+        notesDialog.setOnDismissListener(d->{notesDialog=null;notesView=null;notesStatusView=null;});
+        notesDialog.show();
     }
     private void download(){
         if(downloading){cancel.set(true);status="正在取消，当前网络请求结束后停止…";refresh();return;}
@@ -206,7 +237,7 @@ public final class GithubUpdates {
         if(downloading||ready!=null){Toast.makeText(activity,"当前更新完成前不能更改仓库",Toast.LENGTH_LONG).show();return false;}
         try{
             String repo=UpdateRules.repository(field.getText().toString());
-            if(!repo.equals(prefs.getString("repository",""))){generation++;latestUrl="";latestVersion="";}
+            if(!repo.equals(prefs.getString("repository",""))){generation++;latestUrl="";latestVersion="";saveHistoryBaseline(repo,Core.VERSION);}
             prefs.edit().putString("repository",repo).putBoolean("automatic",auto.isChecked()).putBoolean("repository_default_v1",true).apply();
             status=repo.isEmpty()?"仓库留空，不检查更新":"设置已保存";refresh();return true;
         }catch(IllegalArgumentException error){field.setError(error.getMessage());return false;}

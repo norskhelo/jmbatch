@@ -52,6 +52,72 @@ def stalled_worker(task, cookie, channel):
     time.sleep(120)
 
 
+def check_update_history_ui(root, directory):
+    """Exercise real announcement widgets before/after a multi-version upgrade."""
+    import core
+    import tkinter as tk
+    from tkinter import ttk
+    from types import SimpleNamespace
+    from unittest.mock import patch
+    from updates import UpdateUI, select_release
+    current = core.VERSION
+    home = directory / "history-profile"
+    home.mkdir(parents=True, exist_ok=True)
+    button = ttk.Button(root)
+    app = SimpleNamespace(root=root, home=home, update_button=button)
+    rows = []
+    for number, body in (("0.0.2", "Intermediate upgrade notes"), (current, "Installed upgrade notes")):
+        name = f"JMBatch-{number}-Windows-x64.zip"
+        rows.append(dict(body=body, assets=[dict(name=name, size=100, state="uploaded",
+                        browser_download_url=f"https://github.com/norskhelo/jmbatch/releases/download/test/{name}")]))
+    cached = select_release(rows, "norskhelo/jmbatch", "0.0.1", True)
+    with patch.object(core, "VERSION", "0.0.1"):
+        before = UpdateUI(app)
+        before.automatic = False
+        before.show()
+        before.show_notes()
+        popup = before.notes_window
+        before.show_notes()
+        assert before.notes_window is popup  # Reuse, rather than retain stale duplicate popups.
+        root.update()
+        before.checked_repo = before.repo
+        before.checker = SimpleNamespace(poll=lambda: ("ok", cached))
+        before.poll()
+        root.update()
+        for area in (before.announcement_area, before.notes_area):
+            text = area.get("1.0", "end")
+            assert all(row["body"] in text for row in rows)
+        assert current in before.notes_status_var.get()
+        before.seen_path.write_text("0.0.1", encoding="utf-8")
+        before.notes_window.destroy()
+        before.dialog.destroy()
+    # New process/version: migrate the old seen marker and preserve its cached range.
+    after = UpdateUI(app)
+    after.automatic = False
+    assert after.upgrade_from == "0.0.1"
+    after.startup()
+    root.update()
+    text = after.notes_area.get("1.0", "end")
+    assert "本次升级" in text and all(row["body"] in text for row in rows)
+    assert after.seen_path.read_text(encoding="utf-8") == current
+    after.checked_repo = after.repo
+    after.checker = SimpleNamespace(poll=lambda: ("ok", cached))
+    after.poll()  # A same-version successful recheck must not shrink the range.
+    assert all(row["body"] in after.notes_area.get("1.0", "end") for row in rows)
+    after.checker = SimpleNamespace(poll=lambda: ("skipped", None))
+    after.poll()
+    assert "未能取得完整" in after.notes_status_var.get()
+    assert all(row["body"] in after.notes_area.get("1.0", "end") for row in rows)
+    after.notes_window.destroy()
+    after.poll()  # Closing a popup while a check completes must remain safe.
+    reopened = UpdateUI(app)
+    assert reopened.upgrade_from == "0.0.1"
+    reopened.show_notes()
+    assert all(row["body"] in reopened.notes_area.get("1.0", "end") for row in rows)
+    reopened.notes_window.destroy()
+    button.destroy()
+
+
 def run_self_test(directory: Path):
     directory.mkdir(parents=True, exist_ok=True)
     report = {"ok": False, "network_used": False, "checks": []}
@@ -352,6 +418,10 @@ def run_self_test(directory: Path):
             application.updates.startup()
             assert shown.call_count == 1
         report["checks"].append("Full offline announcement rendered; first-start notice shown once")
+        check_update_history_ui(root, directory)
+        report["checks"].append("Open full announcement refreshes with async check; repeated open reuses window")
+        report["checks"].append("Multi-version upgrade startup and restart retain every cached release after successful recheck")
+        report["checks"].append("Failed checks preserve upgrade notes and refresh status; closed popup is safe")
         root.destroy()
         report["ok"] = True
     except Exception:

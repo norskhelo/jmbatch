@@ -14,7 +14,7 @@ PAGE_SIZE = 100
 MAX_PAGES = 10
 TIMEOUT = 8
 DEFAULT_REPOSITORY = "norskhelo/jmbatch"
-CURRENT_NOTES = "Windows 0.3.2 / Android 0.4.2 — 2026-10-16\n\n#软件内阅读\n\n• 从下载任务或漫画库打开 PDF、ZIP、图片文件夹，直接进入内置阅读器。\n• 支持章节列表、上一章/下一章、本章页码与总页码、输入总页码跳转。文件夹和 ZIP 按图片目录识别章节；PDF 作为一个章节，不恢复原章节。\n• 阅读时可快捷收藏/取消收藏，与已有漫画库共用收藏记录。\n• 支持添加、移除、查看和跳转书签。每本漫画分别保存书签、上次页码和阅读模式，重新打开恢复。\n• 可在连续滚动与左右翻页之间切换。Windows 支持滚轮、方向键、PageUp/PageDown 和点击两侧；Android 支持上下滚动、左右滑动、点击两侧及按钮翻页。\n• 页面按需后台加载，限制解码尺寸和缓存；关闭阅读器释放文件。阅读记录保存在应用内部，不向漫画文件夹或 ZIP 写入信息。\n• Android 外部 ZIP 先复制到应用临时缓存再按页读取，关闭后清理；最多支持 8 GB 文件、20000 页。首次打开大文件需要等待，返回可取消。无效、加密或无权限文件显示错误，单页损坏可继续翻页。\n\n#版本与验证\n\n• Windows 0.3.1 → 0.3.2；Android 0.4.1 → 0.4.2（versionCode 402）。保留原包名、APK 签名和更新公钥。\n• 同步源码、使用说明、更新日志、安装包、SHA-256 和签名更新清单。\n• 验证使用隔离素材、Windows 自动化界面与冻结成品自检、Android 宿主测试和编译；Android 真机手势及厂商 SAF 行为未因编译通过而视为验证通过。\n"
+CURRENT_NOTES = "Windows 0.3.3 / Android 0.4.3 — 2026-10-16\n\n跨版本更新公告修复\n\n• 已打开的“完整更新公告”和升级后自动公告会随后台检查结果刷新，同时显示检查状态；网络失败时保留已有日志，关闭公告后检查完成也不会访问已关闭窗口。\n• 单独保存升级前的版本，升级后的自动公告与完整公告均显示本次跨版本升级的全部已发布日志。重启应用或再次检查更新不会将其收缩成最后一版。\n• 本次升级日志按版本升序显示；发现更高版本时，另列“可用更新”，区分已经安装和仍可升级的内容。下一次实际升级后，以刚刚使用的版本作为新起点。\n• 兼容旧版本已查看标记和完整日志缓存。缓存不足时显示“完整日志尚未获取”，联网检查后补齐；首次安装、降级或切换仓库时不会混入不适用的升级记录。清除应用数据后无法恢复原升级起点。\n\n版本与验证\n\n• Windows 升至 0.3.3；Android 升至 0.4.3（versionCode 403），保留原包名、APK 签名身份及更新公钥。\n• 补充窗口打开期间检查完成、跨多版升级、重启、再次检查、失败回退、下一次升级和仓库隔离回归验证；Windows 同时在源码与冻结成品中执行真实 Tk 控件检查。\n• Android 执行宿主规则测试、编译和原证书签名验证；未将宿主测试或编译通过视为 Android 真机界面验收。\n• 同步源码、使用说明、同版日志、双端安装包、SHA-256 文件及签名更新清单。\n"
 
 
 def update_settings(data):
@@ -147,25 +147,72 @@ def fetch_bulletin(repo, current):
     return fetch_release(repo, current, include_current=True)
 
 
-def announcement_text(bulletin, repo, current, local_notes):
+def announcement_baseline(saved, seen, current, repo):
+    """Keep one installed upgrade range across checks/restarts, scoped to its repo."""
+    try:
+        if (saved.get("repository") == repo and saved.get("installed_version") == current
+                and version(saved["from_version"]) <= version(current)):
+            return saved["from_version"]
+    except (AttributeError, KeyError, ValueError, TypeError):
+        pass
+    try:
+        if version(seen) > version(current):
+            return current  # A downgrade is not an upgrade from an older cache.
+    except (ValueError, TypeError):
+        pass
+    previous = []
+    for candidate in (seen, saved.get("installed_version") if isinstance(saved, dict)
+                      and saved.get("repository") == repo else None):
+        try:
+            if version(candidate) < version(current):
+                previous.append(candidate)
+        except (ValueError, TypeError):
+            pass
+    return max(previous, key=version) if previous else current
+
+
+def announcement_text(bulletin, repo, current, local_notes, upgrade_from=None):
+    upgrading = False
+    try:
+        upgrading = version(upgrade_from) < version(current)
+    except (ValueError, TypeError):
+        pass
+    if upgrading:
+        fallback = (f"本次升级 {upgrade_from} → {current} 的完整日志尚未获取，联网检查后补齐。\n\n"
+                    + "本版更新日志\n\n" + local_notes)
+    else:
+        fallback = local_notes
     try:
         if bulletin.get("repository") == repo and version(bulletin["version"]) >= version(current):
             latest = bulletin["version"]
             if bulletin.get("history_schema") == 2:
                 baseline = version(bulletin["from_version"])
                 history = bulletin["history"]
-                if baseline > version(current) or not isinstance(history, list) or not history:
-                    return local_notes
+                required_from = version(upgrade_from) if upgrading else version(current)
+                if baseline > required_from or not isinstance(history, list) or not history:
+                    return fallback
                 previous = None
                 for entry in history:
                     number = version(entry["version"])
                     if (number < baseline or number > version(latest)
                             or (previous is not None and number <= previous)
                             or not isinstance(entry["notes"], str)):
-                        return local_notes
+                        return fallback
                     previous = number
                 if previous != version(latest):
-                    return local_notes
+                    return fallback
+                if upgrading:
+                    completed = [entry for entry in history
+                                 if required_from < version(entry["version"]) <= version(current)]
+                    if not completed or version(completed[-1]["version"]) != version(current):
+                        return fallback
+                    sections = [f"本次升级：{upgrade_from} → {current} 的全部更新（按版本升序）\n\n"
+                                + "\n\n────────\n\n".join("版本 " + e["version"] + "\n\n" + e["notes"] for e in completed)]
+                    pending = [entry for entry in history if version(entry["version"]) > version(current)]
+                    if pending:
+                        sections.append(f"可用更新：当前版本 {current} → 最新版本 {latest}\n\n"
+                                        + "\n\n────────\n\n".join("版本 " + e["version"] + "\n\n" + e["notes"] for e in pending))
+                    return "\n\n════════\n\n".join(sections)
                 if version(latest) == version(current):
                     notes = history[-1]["notes"]
                     return local_notes if notes == "发布者未填写更新日志。" else "版本 " + latest + " 更新公告\n\n" + notes
@@ -173,13 +220,15 @@ def announcement_text(bulletin, repo, current, local_notes):
                             for entry in history if version(entry["version"]) > version(current)]
                 return ("从当前版本 " + current + " → 最新版本 " + latest
                         + " 的全部更新（不含当前版，按版本升序）\n\n" + "\n\n────────\n\n".join(sections))
+            if upgrading:
+                return fallback  # A legacy one-release cache cannot prove the upgrade range.
             notes = bulletin.get("notes", "")
             if isinstance(notes, str) and notes.strip() and notes != "发布者未填写更新日志。":
                 warning = "旧缓存仅包含最新版日志；请检查更新以获取完整升级日志。\n\n" if version(latest) > version(current) else ""
                 return warning + "版本 " + latest + " 更新公告\n\n" + notes
     except (AttributeError, KeyError, ValueError, TypeError):
         pass
-    return local_notes
+    return fallback
 
 
 class Checker:
@@ -224,6 +273,7 @@ class UpdateUI:
         self.path = app.home / "updates.json"
         self.repo, self.automatic = DEFAULT_REPOSITORY, True
         self.latest, self.dialog, self.status = None, None, "等待检查"
+        self.notes_window = None
         self.downloading, self.ready = False, None
         self.cancel = threading.Event()
         self.download_events = queue.Queue()
@@ -249,6 +299,26 @@ class UpdateUI:
                 atomic_json(self.path, settings)
             except OSError:
                 pass  # A read-only config must not prevent startup or downloads.
+        from core import VERSION
+        self.history_state_path = app.home / "update-announcement-state.json"
+        try:
+            saved = json.loads(self.history_state_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            saved = {}
+        try:
+            seen = self.seen_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            seen = ""
+        self.upgrade_from = announcement_baseline(saved, seen, VERSION, self.repo)
+        self.save_history_state()
+
+    def save_history_state(self):
+        from core import VERSION, atomic_json
+        try:
+            atomic_json(self.history_state_path, {"repository": self.repo,
+                        "installed_version": VERSION, "from_version": self.upgrade_from})
+        except OSError:
+            pass
 
     def startup(self):
         from core import VERSION
@@ -257,7 +327,7 @@ class UpdateUI:
         except OSError:
             seen = ""
         if seen != VERSION:
-            self.show_notes(local=True)
+            self.show_notes()
             try:
                 self.seen_path.write_text(VERSION, encoding="utf-8")
             except OSError:
@@ -273,7 +343,7 @@ class UpdateUI:
             self.status = "仓库留空，已跳过检查"
             self.refresh()
             return
-        if not self.checker.start(self.repo, VERSION, fetch_bulletin):
+        if not self.checker.start(self.repo, self.upgrade_from, fetch_bulletin):
             self.status = "上次检查仍在结束中，已跳过本次检查"
             self.refresh()
             return
@@ -291,7 +361,7 @@ class UpdateUI:
             from core import VERSION, atomic_json
             state, bulletin = result
             self.latest = bulletin if bulletin and version(bulletin["version"]) > version(VERSION) else None
-            if state == "ok" and bulletin:
+            if state == "ok" and bulletin and version(bulletin["version"]) >= version(VERSION):
                 self.bulletin = bulletin
                 try:
                     atomic_json(self.bulletin_path, bulletin)
@@ -307,24 +377,42 @@ class UpdateUI:
             self.status_var.set(self.status)
             self.download_button.configure(state="normal" if self.latest or self.downloading else "disabled",
                                            text="取消下载" if self.downloading else "安装并重启" if self.ready else "下载新版")
-            self.announcement_area.configure(state="normal")
-            self.announcement_area.delete("1.0", "end")
-            self.announcement_area.insert("1.0", self.notes_text())
-            self.announcement_area.configure(state="disabled")
+            self.replace_notes(self.announcement_area, self.notes_text())
+        if self.notes_window is not None and self.notes_window.winfo_exists():
+            self.notes_status_var.set(self.status)
+            self.replace_notes(self.notes_area, self.notes_text())
+
+    @staticmethod
+    def replace_notes(area, text):
+        if area.get("1.0", "end-1c") == text:
+            return
+        position = area.yview()[0]
+        area.configure(state="normal")
+        area.delete("1.0", "end")
+        area.insert("1.0", text)
+        area.configure(state="disabled")
+        area.yview_moveto(position)
 
     def notes_text(self):
         from core import VERSION
-        return announcement_text(self.bulletin, self.repo, VERSION, CURRENT_NOTES)
+        return announcement_text(self.bulletin, self.repo, VERSION, CURRENT_NOTES, self.upgrade_from)
 
-    def show_notes(self, local=False):
+    def show_notes(self):
         import tkinter as tk
+        from tkinter import ttk
         from tkinter.scrolledtext import ScrolledText
-        window = tk.Toplevel(self.app.root)
+        if self.notes_window is not None and self.notes_window.winfo_exists():
+            self.refresh()
+            self.notes_window.lift()
+            return
+        window = self.notes_window = tk.Toplevel(self.app.root)
         window.title("更新公告")
         window.transient(self.app.root)
-        area = ScrolledText(window, width=76, height=24, wrap="word", padx=12, pady=12)
+        self.notes_status_var = tk.StringVar(value=self.status)
+        ttk.Label(window, textvariable=self.notes_status_var, wraplength=640, padding=12).pack(fill="x")
+        area = self.notes_area = ScrolledText(window, width=76, height=24, wrap="word", padx=12, pady=12)
         area.pack(fill="both", expand=True)
-        area.insert("1.0", CURRENT_NOTES if local else self.notes_text())
+        area.insert("1.0", self.notes_text())
         area.configure(state="disabled")
 
     def download(self):
@@ -416,8 +504,10 @@ class UpdateUI:
                 atomic_json(self.path, {"repository": repo, "automatic": auto_var.get(), "repository_default_v1": True})
                 if repo != self.repo:
                     self.latest = None
+                    self.upgrade_from = VERSION
                     self.app.update_button.configure(text="软件更新 / 公告")
                 self.repo, self.automatic = repo, auto_var.get()
+                self.save_history_state()
                 self.status = "设置已保存" if repo else "仓库留空，不检查更新"
                 self.refresh()
                 if check:

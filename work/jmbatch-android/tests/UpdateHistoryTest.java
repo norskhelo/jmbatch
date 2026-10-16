@@ -73,6 +73,24 @@ public class UpdateHistoryTest {
         }catch(IOException expected){check(pages[0]==UpdateHistory.MAX_PAGES,"bounded pagination fails closed");}
         check(UpdateRules.announcement(REPO,REPO,"0.3.11","0.3.8",longNotes,"local").contains("旧缓存仅包含最新版"),"legacy cache marked incomplete");
         check(UpdateRules.announcement(REPO,REPO,"0.3.11","0.3.8",longNotes,"local").endsWith(longNotes),"legacy notes untruncated");
+        check(UpdateHistory.baseline("","","","0.3.8","0.3.11",REPO).equals("0.3.8"),"migrate old seen marker");
+        check(UpdateHistory.baseline(REPO,"0.3.11","0.3.8","0.3.11","0.3.11",REPO).equals("0.3.8"),"restart retains baseline");
+        check(UpdateHistory.baseline(REPO,"0.3.11","0.3.8","0.3.11","0.3.12",REPO).equals("0.3.11"),"next upgrade starts at previous installed version");
+        check(UpdateHistory.baseline(REPO,"0.3.11","0.3.8","0.3.11","0.3.10",REPO).equals("0.3.10"),"downgrade resets baseline");
+        check(UpdateHistory.baseline(REPO,"0.3.11","0.3.8","0.3.11","0.3.11","other/app").equals("0.3.11"),"repo switch resets baseline");
+        check(UpdateHistory.baseline("","","","","0.3.11",REPO).equals("0.3.11"),"fresh install has no invented upgrade");
+        for(String invalidFrom:new String[]{"bad","9.0.0",null})
+            check(UpdateHistory.baseline(REPO,"0.3.11",invalidFrom,"0.3.11","0.3.11",REPO).equals("0.3.11"),"invalid state fallback");
+        String completed=UpdateHistory.announcement(REPO,REPO,"0.3.8","0.3.11","0.3.11",selected.history,"local","0.3.8");
+        check(completed.contains("本次升级：0.3.8 → 0.3.11"),"completed upgrade title");
+        check(completed.contains("nine")&&completed.contains("ten")&&completed.endsWith(longNotes),"all upgrade notes retained at latest");
+        String mixed=UpdateHistory.announcement(REPO,REPO,"0.3.8","0.3.11","0.3.10",selected.history,"local","0.3.8");
+        check(mixed.contains("可用更新：")&&mixed.indexOf("ten")<mixed.indexOf("可用更新：")&&mixed.indexOf(longNotes)>mixed.indexOf("可用更新："),"completed and future ranges separated");
+        check(UpdateHistory.announcement(REPO,"other/app","0.3.8","0.3.11","0.3.11",selected.history,"local","0.3.8").contains("完整日志尚未获取"),"foreign cache not full upgrade");
+        check(UpdateHistory.announcement(REPO,REPO,"0.3.10","0.3.11","0.3.11",Collections.singletonList(selected.latest),"local","0.3.8").contains("完整日志尚未获取"),"latest-only cache not full upgrade");
+        List<UpdateHistory.Entry> missingCurrent=Arrays.asList(selected.history.get(0),selected.latest);
+        check(UpdateHistory.announcement(REPO,REPO,"0.3.8","0.3.11","0.3.10",missingCurrent,"local","0.3.8").contains("完整日志尚未获取"),"missing current release detected");
+        check(UpdateHistory.pendingAnnouncement("0.3.11","0.3.8","local").endsWith("local"),"local notes visible while pending");
         System.out.println("UpdateHistoryTest: "+checks+" checks passed");
     }
 }

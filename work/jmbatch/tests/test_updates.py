@@ -13,6 +13,72 @@ def release(version, *, prerelease=False, draft=False, host="github.com", platfo
 
 
 class UpdateTests(unittest.TestCase):
+    def test_upgrade_baseline_migrates_and_survives_restart_and_resets_next_upgrade(self):
+        from updates import announcement_baseline
+        current="0.3.3"
+        self.assertEqual(announcement_baseline({},"0.2.2",current,"owner/app"),"0.2.2")
+        saved=dict(repository="owner/app",installed_version=current,from_version="0.2.2")
+        self.assertEqual(announcement_baseline(saved,current,current,"owner/app"),"0.2.2")
+        self.assertEqual(announcement_baseline(saved,current,"0.3.4","owner/app"),current)
+        self.assertEqual(announcement_baseline(saved,current,"0.3.1","owner/app"),"0.3.1")
+        self.assertEqual(announcement_baseline(saved,current,current,"other/app"),current)
+        for broken in (None,[],{},dict(saved,from_version="bad"),dict(saved,from_version="9.0.0")):
+            self.assertEqual(announcement_baseline(broken,current,current,"owner/app"),current)
+        self.assertEqual(announcement_baseline({},"",current,"owner/app"),current)
+
+    def test_completed_upgrade_history_is_retained_and_separated_from_future_updates(self):
+        rows=[]
+        for number in ("0.3.1","0.3.2","0.3.3"):
+            item=release(number);item['body']='body-'+number;rows.append(item)
+        saved=select_release(rows,"owner/app","0.3.0",True)
+        text=announcement_text(saved,"owner/app","0.3.2","local","0.3.0")
+        completed,pending=text.split("可用更新：")
+        self.assertIn("本次升级：0.3.0 → 0.3.2",completed)
+        self.assertIn("body-0.3.1",completed);self.assertIn("body-0.3.2",completed)
+        self.assertNotIn("body-0.3.3",completed);self.assertIn("body-0.3.3",pending)
+        at_latest=announcement_text(saved,"owner/app","0.3.3","local","0.3.0")
+        self.assertTrue(all(row['body'] in at_latest for row in rows))
+        self.assertNotIn("可用更新：",at_latest)
+
+    def test_upgrade_history_never_labels_incomplete_or_foreign_cache_as_complete(self):
+        rows=[]
+        for number in ("0.3.1","0.3.3"):
+            item=release(number);item['body']='body-'+number;rows.append(item)
+        missing_current=select_release(rows,"owner/app","0.3.0",True)
+        for data in (None,missing_current,dict(missing_current,repository="other/app"),
+                     dict(missing_current,from_version="0.3.2"),
+                     dict(repository="owner/app",version="0.3.2",notes="legacy")):
+            text=announcement_text(data,"owner/app","0.3.2","local","0.3.0")
+            self.assertIn("完整日志尚未获取",text)
+            self.assertTrue(text.endswith("local"))
+
+    def test_upgrade_baseline_is_persisted_before_seen_marker_changes_and_used_for_fetch(self):
+        import tempfile
+        from pathlib import Path
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        from updates import UpdateUI
+        with tempfile.TemporaryDirectory() as folder:
+            home=Path(folder);(home/'announcement-seen.txt').write_text('0.3.0',encoding='utf-8')
+            app=SimpleNamespace(home=home,root=Mock(),update_button=Mock())
+            with patch('core.VERSION','0.3.3'):
+                first=UpdateUI(app);first.automatic=False;first.show_notes=Mock()
+                first.startup()
+                self.assertEqual(first.upgrade_from,'0.3.0')
+                reopened=UpdateUI(app)
+                self.assertEqual(reopened.upgrade_from,'0.3.0')
+                reopened.refresh=Mock();reopened.checker=Mock();reopened.checker.start.return_value=True
+                reopened.check()
+                self.assertEqual(reopened.checker.start.call_args.args[1],'0.3.0')
+                row=release('0.3.3');row['body']='newest'
+                cached=select_release([row],'owner/app','0.3.0',True)
+                reopened.bulletin=cached;reopened.checked_repo=reopened.repo
+                reopened.checker.poll.return_value=('skipped',None)
+                reopened.poll()
+                self.assertIs(reopened.bulletin,cached)
+            with patch('core.VERSION','0.3.4'):
+                self.assertEqual(UpdateUI(app).upgrade_from,'0.3.3')
+
     def test_current_version_announcement_is_fetched_without_an_update(self):
         data=release("0.1.7");data["body"]="Full current release announcement"
         response=io.BytesIO(json.dumps([data]).encode());response.status=200

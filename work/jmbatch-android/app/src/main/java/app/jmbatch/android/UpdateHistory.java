@@ -9,6 +9,29 @@ public final class UpdateHistory {
     public static final String MISSING="发布者未填写更新日志。";
     private UpdateHistory() {}
 
+    public static String baseline(String savedRepo,String installed,String from,String seen,String current,String repo){
+        try{
+            if(repo.equals(savedRepo)&&current.equals(installed)&&UpdateRules.compare(from,current)<=0)return from;
+        }catch(IllegalArgumentException|NullPointerException ignored){}
+        try{if(UpdateRules.compare(seen,current)>0)return current;}
+        catch(IllegalArgumentException|NullPointerException ignored){}
+        String previous=null;
+        for(String candidate:new String[]{seen,repo.equals(savedRepo)?installed:null}){
+            try{
+                if(UpdateRules.compare(candidate,current)<0&&(previous==null||UpdateRules.compare(candidate,previous)>0))previous=candidate;
+            }catch(IllegalArgumentException|NullPointerException ignored){}
+        }
+        return previous==null?current:previous;
+    }
+
+    public static String pendingAnnouncement(String current,String from,String local){
+        try{
+            if(UpdateRules.compare(from,current)<0)return "本次升级 "+from+" → "+current+
+                " 的完整日志尚未获取，联网检查后补齐。\n\n本版更新日志\n\n"+local;
+        }catch(IllegalArgumentException|NullPointerException ignored){}
+        return local;
+    }
+
     public static final class Entry {
         public final String version, url, name, notes, published;
         public Entry(String version,String url,String name,String notes,String published){
@@ -86,5 +109,30 @@ public final class UpdateHistory {
             }
             return text.toString();
         }catch(IllegalArgumentException|NullPointerException error){return local;}
+    }
+
+    public static String announcement(String savedRepo,String repo,String fromVersion,String latestVersion,
+                                      String current,List<Entry> history,String local,String upgradeFrom){
+        String fallback=pendingAnnouncement(current,upgradeFrom,local);
+        if(fallback.equals(local))return announcement(savedRepo,repo,fromVersion,latestVersion,current,history,local);
+        // Validate the complete cached range against the version installed before this upgrade.
+        if(announcement(savedRepo,repo,fromVersion,latestVersion,upgradeFrom,history,null)==null)return fallback;
+        List<Entry> completed=new ArrayList<>(),pending=new ArrayList<>();
+        for(Entry entry:history){
+            if(UpdateRules.compare(entry.version,current)>0)pending.add(entry);
+            else if(UpdateRules.compare(entry.version,upgradeFrom)>0)completed.add(entry);
+        }
+        if(completed.isEmpty()||UpdateRules.compare(completed.get(completed.size()-1).version,current)!=0)return fallback;
+        String text="本次升级："+upgradeFrom+" → "+current+" 的全部更新（按版本升序）\n\n"+sections(completed);
+        if(!pending.isEmpty())text+="\n\n════════\n\n可用更新：当前版本 "+current+" → 最新版本 "+latestVersion+"\n\n"+sections(pending);
+        return text;
+    }
+    private static String sections(List<Entry> entries){
+        StringBuilder text=new StringBuilder();
+        for(Entry entry:entries){
+            if(text.length()>0)text.append("\n\n────────\n\n");
+            text.append("版本 ").append(entry.version).append("\n\n").append(entry.notes);
+        }
+        return text.toString();
     }
 }
