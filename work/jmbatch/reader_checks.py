@@ -85,3 +85,55 @@ def check_paging(reader, root, wait):
     return dict(transitions=100, cold_hold_ms=250, failure_retains_display=True,
                 canvas_items=3, cache_budget_bytes=32*1024*1024,
                 transition_ms=elapsed, measured='Tk event-loop completion including intentional animation; not frame-time or Android data')
+
+
+def check_chrome(reader, root, wait):
+    """Exercise the actual click bindings, clipping geometry and scroll anchor."""
+    measurements = []
+    def tap(x):
+        reader.canvas.event_generate('<ButtonPress-1>', x=x, y=100)
+        reader.canvas.event_generate('<ButtonRelease-1>', x=x, y=100)
+        root.update()
+    for mode in ('滚动阅读', '左右翻页'):
+        reader.mode.set(mode); reader.relayout(); root.update()
+        reader.go(1); wait(lambda: reader.current == 1 and not reader.pending)
+        wait(lambda: reader.resize_timer is None)
+        if reader.is_scroll():
+            reader.canvas.yview_moveto((reader.offsets[1]+90)/reader.extent)
+            root.update(); wait(lambda: not reader.pending)
+        before = (reader.current, reader.canvas.canvasy(0), reader.canvas.winfo_width(), reader.canvas.winfo_height())
+        generation = reader.generation
+        tap(20)  # Left edge, center and right edge all have the same action.
+        wait(lambda: not reader.chrome.animating and reader.resize_timer is None)
+        assert not reader.chrome.visible and not reader.top.winfo_ismapped() and not reader.bottom.winfo_ismapped()
+        assert not reader.scrollbar.winfo_ismapped()
+        assert reader.current == before[0] and reader.canvas.winfo_width() == before[2]
+        assert reader.canvas.winfo_height() > before[3]
+        if reader.is_scroll():
+            assert abs(reader.canvas.canvasy(0)-before[1]) <= 1
+            assert reader.generation == generation
+        else:
+            wait(lambda: not reader.pending)
+            assert reader.canvas.itemcget(reader.pager.front, 'image')
+        measurements.append(dict(mode=mode, before_height=before[3], hidden_height=reader.canvas.winfo_height()))
+        tap(reader.canvas.winfo_width()-20)
+        wait(lambda: not reader.chrome.animating and reader.resize_timer is None)
+        assert reader.chrome.visible and reader.top.winfo_ismapped() and reader.bottom.winfo_ismapped()
+        assert reader.canvas.winfo_height() == before[3] and reader.current == before[0]
+        # Reverse the animation before completion and verify it ends fully shown.
+        tap(reader.canvas.winfo_width()//2)
+        time.sleep(.06); root.update()
+        assert reader.chrome.animating
+        if not reader.is_scroll():
+            assert reader.canvas.coords(reader.pager.front) == [reader.canvas.winfo_width()/2, reader.canvas.winfo_height()/2]
+        tap(reader.canvas.winfo_width()//2)
+        wait(lambda: not reader.chrome.animating and reader.resize_timer is None)
+        assert reader.chrome.visible and reader.canvas.winfo_height() == before[3]
+        # A vertical drag returning to its start must not toggle controls.
+        reader.canvas.event_generate('<ButtonPress-1>', x=400, y=100)
+        reader.canvas.event_generate('<B1-Motion>', x=400, y=180)
+        reader.canvas.event_generate('<ButtonRelease-1>', x=400, y=100)
+        root.update(); assert reader.chrome.visible
+    reader.mode.set('滚动阅读'); reader.relayout(); root.update()
+    wait(lambda: not reader.pending and reader.resize_timer is None)
+    return measurements

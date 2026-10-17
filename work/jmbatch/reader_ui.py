@@ -7,6 +7,7 @@ from tkinter import ttk, messagebox
 
 from reader import ReaderState, ReaderWorker
 from reader_paging import CanvasPager
+from reader_chrome import ReaderChrome, TapGesture
 
 
 class ReaderWindow:
@@ -33,9 +34,17 @@ class ReaderWindow:
         if not hasattr(app, "reader_state"):
             app.reader_state = ReaderState(app.home)
         self.state = app.reader_state
-        outer = ttk.Frame(self.window, padding=10)
+        outer = ttk.Frame(self.window)
         outer.pack(fill="both", expand=True)
-        bar = ttk.Frame(outer)
+        self.top = ttk.Frame(outer)
+        self.top.pack(side='top', fill='x')
+        self.bottom = ttk.Frame(outer)
+        self.bottom.pack(side='bottom', fill='x')
+        top_content = ttk.Frame(self.top, padding=(10, 8))
+        top_content.pack(fill='x')
+        bottom_content = ttk.Frame(self.bottom, padding=(10, 6))
+        bottom_content.pack(fill='x')
+        bar = ttk.Frame(top_content)
         bar.pack(fill="x")
         ttk.Button(bar, text="上一章", command=lambda: self.chapter_step(-1)).pack(side="left")
         self.chapter_box = ttk.Combobox(bar, state="readonly", width=24)
@@ -44,7 +53,7 @@ class ReaderWindow:
         ttk.Button(bar, text="下一章", command=lambda: self.chapter_step(1)).pack(side="left")
         self.favorite_button = ttk.Button(bar, command=self.favorite)
         self.favorite_button.pack(side="right")
-        bar2 = ttk.Frame(outer)
+        bar2 = ttk.Frame(top_content)
         bar2.pack(fill="x", pady=8)
         modes = ttk.Combobox(bar2, textvariable=self.mode, state="readonly", values=("滚动阅读", "左右翻页"), width=12)
         modes.pack(side="left")
@@ -63,8 +72,8 @@ class ReaderWindow:
         holder.pack(fill="both", expand=True)
         self.canvas = tk.Canvas(holder, bg="#20252c", highlightthickness=0, yscrollincrement=30)
         self.scrollbar = ttk.Scrollbar(holder, orient="vertical", command=self.scroll)
-        self.scrollbar.pack(side="right", fill="y")
         self.canvas.pack(fill="both", expand=True)
+        self.scrollbar.place(relx=1, x=0, y=0, anchor='ne', relheight=1)
         self.canvas.configure(yscrollcommand=self.scrolled)
         self.canvas.bind("<Configure>", self.resize)
         self.canvas.bind("<MouseWheel>", self.wheel)
@@ -72,14 +81,18 @@ class ReaderWindow:
         self.canvas.bind("<Button-5>", lambda e: self.wheel_step(1))
         self.pager = CanvasPager(self.canvas, self.window, lambda i: self.images.get(i), self.draw, self.page_committed)
         self.pager.enabled = False
-        self.canvas.bind("<ButtonPress-1>", lambda e: (self.canvas.focus_set(), self.pager.press(e)))
-        self.canvas.bind("<B1-Motion>", self.pager.move)
-        self.canvas.bind("<ButtonRelease-1>", self.pager.release)
+        self.tap = TapGesture()
+        self.canvas.bind("<ButtonPress-1>", self.pointer_down)
+        self.canvas.bind("<B1-Motion>", self.pointer_move)
+        self.canvas.bind("<ButtonRelease-1>", self.pointer_up)
+        self.window.bind('<Escape>', lambda e: self.chrome.show(True))
         for sequence, delta in (("<Left>", -1), ("<Right>", 1), ("<Prior>", -1), ("<Next>", 1)):
             self.window.bind(sequence, lambda e, d=delta: self.key_page(e, d))
         self.status = tk.StringVar(value="正在读取漫画…")
-        ttk.Label(outer, textvariable=self.status).pack(anchor="w", pady=(8, 0))
-        ttk.Label(outer, text="左右翻页：方向键 / PageUp、PageDown / 点击页面两侧；滚动阅读：鼠标滚轮").pack(anchor="w")
+        ttk.Label(bottom_content, textvariable=self.status).pack(anchor="w")
+        ttk.Label(bottom_content, text="点击漫画隐藏或显示工具栏；左右拖动 / 方向键翻页，鼠标滚轮滚动；Esc 显示工具栏").pack(anchor="w")
+        self.chrome = ReaderChrome(outer, self.top, self.bottom, (top_content, bottom_content), holder, self.chrome_changed)
+        self.viewport_size = (0, 0)
         self.worker = ReaderWorker(entry["path"])
         self.timer = self.window.after(60, self.poll)
         self.refresh_buttons()
@@ -93,20 +106,67 @@ class ReaderWindow:
         self.step(delta)
         return "break"
 
-    def click_page(self, event):
+    def pointer_down(self, event):
         self.canvas.focus_set()
-        if not self.is_scroll():
-            self.go(self.current + (-1 if event.x < self.canvas.winfo_width() / 2 else 1))
+        self.tap.down(event.x_root, event.y_root)
+        self.pager.press(event)
+
+    def pointer_move(self, event):
+        self.tap.move(event.x_root, event.y_root)
+        self.pager.move(event)
+
+    def pointer_up(self, event):
+        tapped = self.tap.up(event.x_root, event.y_root)
+        self.pager.release(event)
+        if tapped and self.pages:
+            self.chrome.toggle()
+            self.update_scrollbar()
+
+    def update_scrollbar(self):
+        if self.is_scroll() and self.chrome.visible:
+            self.scrollbar.place(relx=1, x=0, y=0, anchor='ne', relheight=1)
+            self.scrollbar.lift()
+        else:
+            self.scrollbar.place_forget()
+
+    def chrome_changed(self):
+        self.update_scrollbar()
+        if self.resize_timer:
+            self.window.after_cancel(self.resize_timer)
+        self.resize_timer = self.window.after_idle(self.finish_resize)
+
+    def finish_resize(self):
+        self.resize_timer = None
+        if self.closed or self.chrome.animating or not self.pages:
+            return
+        size = (self.canvas.winfo_width(), self.canvas.winfo_height())
+        if size == self.viewport_size:
+            return
+        if self.is_scroll() and size[0] == self.viewport_size[0]:
+            # Height-only expansion keeps decoded pages and the exact scroll offset.
+            top = self.canvas.canvasy(0)
+            self.viewport_size = size
+            self.layout()
+            self.canvas.yview_moveto(top / self.extent)
+            self.draw()
+        else:
+            self.relayout()
 
     def resize(self, event):
         if self.resize_timer:
             self.window.after_cancel(self.resize_timer)
-        self.resize_timer = self.window.after(180, self.relayout)
+        if not hasattr(self, 'chrome') or self.chrome.animating:
+            self.resize_timer = None
+            if hasattr(self, 'pager') and self.pager.enabled and not self.pager.animating and self.pager.drag is None:
+                self.pager.place()
+            return
+        self.resize_timer = self.window.after(180, self.finish_resize)
 
     def relayout(self):
         self.resize_timer = None
         if not self.pages:
             return
+        self.viewport_size = (self.canvas.winfo_width(), self.canvas.winfo_height())
         target = self.pager.target if self.pager.enabled and not self.is_scroll() else self.current
         self.generation += 1
         self.images.clear()
@@ -115,9 +175,7 @@ class ReaderWindow:
         self.heights = [max(200, min(1600, self.canvas.winfo_width() - 32)) * 1.4] * len(self.pages)
         if self.is_scroll():
             self.pager.hide()
-            self.scrollbar.pack(side="right", fill="y", before=self.canvas)
-        else:
-            self.scrollbar.pack_forget()
+        self.update_scrollbar()
         self.layout()
         if not self.is_scroll():
             self.canvas.delete('scroll')
@@ -389,6 +447,7 @@ class ReaderWindow:
             return
         self.save()
         self.closed = True
+        self.chrome.close()
         self.pager.close()
         for timer in (self.timer, self.save_timer, self.resize_timer):
             if timer:

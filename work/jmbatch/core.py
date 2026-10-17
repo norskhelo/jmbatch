@@ -12,7 +12,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-VERSION = "0.3.14"
+VERSION = "0.3.15"
 ZIP_LAYOUT_VERSION = 3
 MAX_TASKS = 2000
 

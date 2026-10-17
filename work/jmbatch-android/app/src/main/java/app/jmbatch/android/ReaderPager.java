@@ -116,8 +116,7 @@ public final class ReaderPager extends FrameLayout {
                 target=commit?ReaderRules.clamp(page+dir,total):page;direction=dir;
                 releaseTouch();settle(dir,commit&&target!=page&&incoming!=null);listener.requested();
             }else{
-                boolean tap=!vertical&&Math.max(Math.abs(dx),Math.abs(dy))<=slop;float x=event.getX(index);releaseTouch();
-                if(tap){performClick();if(x<getWidth()*.35f)go(page-1);else if(x>getWidth()*.65f)go(page+1);}
+                releaseTouch(); // ReaderViewport handles taps; all positions toggle controls.
                 ready();
             }
             return true;

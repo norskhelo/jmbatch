@@ -65,6 +65,7 @@ f.touch(0,400,300);f.touch(2,410,600);f.touch(1,410,600);ValueAnimator.finishAll
 f.p.dispose();f=new Fixture();f.images.remove(1);f.touch(0,600,300);f.touch(2,50,300);check(Math.abs(f.p.children.get(0).x)<=96,"cold neighbor resists");
 f.touch(1,50,300);ValueAnimator.finishAll();check(f.p.displayed()==0&&f.has(0),"cold swipe keeps current after bounce");f.images.put(1,new Bitmap(1));f.p.ready();ValueAnimator.finishAll();check(f.p.displayed()==1,"cold destination commits when ready");
 f.p.dispose();f=new Fixture();f.p.go(-1);check(f.p.displayed()==0,"first boundary");ValueAnimator.enabled=false;f.p.go(1);check(f.p.displayed()==1,"system animations disabled");ValueAnimator.enabled=true;
+for(int x:new int[]{20,400,780}){f.touch(0,x,300);f.touch(1,x,300);check(f.p.displayed()==1&&f.p.target()==1,"tap must not turn the page");}
 f.p.go(0);f.p.dispose();ValueAnimator.finishAll();check(f.commits.size()==2,"destroy cancels callbacks");
 ReaderRequests q=new ReaderRequests();ReaderRequests.Job a=new ReaderRequests.Job(1,0,800,1000),b=new ReaderRequests.Job(1,1,800,1000);
 q.offer(a);check(q.take()==a,"take current");q.replace(Arrays.asList(b));q.replace(Arrays.asList(a,b,a));check(q.waiting()==1,"inflight dedup survives A B A");check(q.take()==null,"one active decoder");

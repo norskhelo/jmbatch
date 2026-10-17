@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.14 / Android 0.5.9 — 界面文案规范化\n\n界面与提示\n\n• 统一首页、任务列表、下载设置、漫画库、阅读器、导出、目录浏览、缓存清理及软件更新的名称和提示，减少重复说明与生硬的技术用语。\n• 常用入口统一为“漫画库”“导出漫画”“开始阅读”“软件更新”；统一连续编号、选择章节、页码跳转、书签和收藏操作的措辞。\n• 下载设置采用一致的参数名称与单位，自动恢复统一表述为“自动重连”；Windows 保留“保存速度”统计口径，Android 保留实际接收速度说明。\n• 整理空状态、操作结果和错误提示，明确继续操作的方法；移除记录、删除文件、取消任务和清理缓存的影响说明继续保留。\n• 更新应用内使用说明、离线更新日志和随包说明，使操作名称与界面一致。\n\n版本与兼容性\n\n• Windows 0.3.13 → 0.3.14；Android 0.5.8 → 0.5.9（versionCode 509）。保留原应用包名、APK 签名证书和更新公钥。\n• 本次以文案整理为主，保留下载、阅读、导出、续传和更新校验流程，已有设置、队列、收藏及文件格式继续兼容。\n• 执行双端既有回归、Windows 源码及成品自检、Android 构建与签名核验。未连接 Android 真机，宿主检查不代表真机视觉验收。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.15 / Android 0.5.10 — 沉浸阅读\n\n阅读体验\n\n• 在软件内阅读时，轻点漫画区域即可隐藏阅读工具栏、页码状态栏和滚动条，只保留漫画；再次轻点恢复。\n• 工具栏以约 220 毫秒的滑动过渡收起或展开，Android 同时淡入淡出；动画中再次点击可平滑反向。Android 遵循系统动画开关，隐藏时同时收起系统状态栏与导航栏。\n• 滚动阅读和左右翻页均支持。轻点页面任何位置统一切换工具栏，左右滑动/拖动继续翻页；Windows 还可使用方向键、PageUp/PageDown 或滚轮，工具栏显示时仍可点击上一页/下一页。\n• 区分轻点、滑动和长按，Android 多指操作不触发工具栏切换。收起与恢复保留当前页，滚动模式的高度变化不重新解码漫画。\n• Windows 按 Esc 可恢复工具栏；Android 隐藏时按返回先恢复工具栏，再次返回退出阅读。\n\n版本与兼容性\n\n• Windows 0.3.14 → 0.3.15；Android 0.5.9 → 0.5.10（versionCode 510）。保留原应用包名、APK 签名证书及更新公钥。\n• 图片文件夹、ZIP、PDF，以及章节、收藏、书签、阅读进度与下载设置继续兼容。\n• 验证覆盖 Windows 实际阅读窗口和冻结成品、Android 宿主手势/动画/布局检查及原签名构建。未连接 Android 真机，宿主检查不代表手机视觉验收。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

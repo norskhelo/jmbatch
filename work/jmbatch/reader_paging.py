@@ -160,8 +160,7 @@ class CanvasPager:
         x, y, started, moved = self.drag
         self.drag = None
         if not moved:
-            if abs(event.y - y) < 12:
-                self.go(self.page + (-1 if event.x < self.canvas.winfo_width() / 2 else 1))
+            self.ready()
             return
         dx = event.x - x
         direction = 1 if dx < 0 else -1

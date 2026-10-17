@@ -1,4 +1,4 @@
-JM Batch 0.5.9 — Android 使用说明
+JM Batch 0.5.10 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,16 +7,16 @@ JM Batch 0.5.9 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-17）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.14-0.5.9/JMBatch-0.5.9-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.14-0.5.9/JMBatch-0.5.9-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.14-0.5.9/JMBatch-0.5.9-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.14-0.5.9/SHA256-release-0.3.14-0.5.9.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.15-0.5.10/JMBatch-0.5.10-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.15-0.5.10/JMBatch-0.5.10-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.15-0.5.10/JMBatch-0.5.10-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.15-0.5.10/SHA256-release-0.3.15-0.5.10.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
 6. 漫画库 / 收藏列表默认显示第一页封面，多章节取第一章第一页。无法读取时显示占位图；恢复文件或授权后点击刷新。
 
-7. 在任务列表或漫画库中打开漫画，即可使用内置阅读器。支持章节切换、本章/总页码、跳页、快捷收藏、书签列表及跳转；再次打开恢复上次页码和模式。滚动阅读与左右翻页可随时切换，Windows 使用滚轮、方向键或页面两侧，Android 使用上下滚动、左右滑动或页面两侧。PDF 按一个章节显示。阅读记录绑定原文件路径/地址；移动文件或清除应用数据后不自动迁移。Android 外部 ZIP 首次打开需准备临时缓存，返回可取消，关闭后清理。
+7. 在任务列表或漫画库中打开漫画，即可使用内置阅读器。支持章节切换、本章/总页码、跳页、快捷收藏、书签列表及跳转；再次打开恢复上次页码和模式。滚动阅读与左右翻页可随时切换，轻点漫画隐藏或恢复工具栏，并有平滑过渡。Windows 使用滚轮、方向键或左右拖动，Android 使用上下滚动或左右滑动。Windows 按 Esc、Android 隐藏时按返回也可恢复工具栏。PDF 按一个章节显示。阅读记录绑定原文件路径/地址；移动文件或清除应用数据后不自动迁移。Android 外部 ZIP 首次打开需准备临时缓存，返回可取消，关闭后清理。
 
 8. 更新日志随后台检查结果刷新；升级后保留本次升级起点和全部中间版本日志，重启或再次检查仍可查看。未来新版另列为“可用更新”。日志未取全时保留本版说明并明确提示，联网检查后补齐。
 
@@ -28,18 +28,18 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.14-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.14 / Android 0.5.9 — 界面文案规范化
+Windows 0.3.15 / Android 0.5.10 — 沉浸阅读
 
-界面与提示
+阅读体验
 
-• 统一首页、任务列表、下载设置、漫画库、阅读器、导出、目录浏览、缓存清理及软件更新的名称和提示，减少重复说明与生硬的技术用语。
-• 常用入口统一为“漫画库”“导出漫画”“开始阅读”“软件更新”；统一连续编号、选择章节、页码跳转、书签和收藏操作的措辞。
-• 下载设置采用一致的参数名称与单位，自动恢复统一表述为“自动重连”；Windows 保留“保存速度”统计口径，Android 保留实际接收速度说明。
-• 整理空状态、操作结果和错误提示，明确继续操作的方法；移除记录、删除文件、取消任务和清理缓存的影响说明继续保留。
-• 更新应用内使用说明、离线更新日志和随包说明，使操作名称与界面一致。
+• 在软件内阅读时，轻点漫画区域即可隐藏阅读工具栏、页码状态栏和滚动条，只保留漫画；再次轻点恢复。
+• 工具栏以约 220 毫秒的滑动过渡收起或展开，Android 同时淡入淡出；动画中再次点击可平滑反向。Android 遵循系统动画开关，隐藏时同时收起系统状态栏与导航栏。
+• 滚动阅读和左右翻页均支持。轻点页面任何位置统一切换工具栏，左右滑动/拖动继续翻页；Windows 还可使用方向键、PageUp/PageDown 或滚轮，工具栏显示时仍可点击上一页/下一页。
+• 区分轻点、滑动和长按，Android 多指操作不触发工具栏切换。收起与恢复保留当前页，滚动模式的高度变化不重新解码漫画。
+• Windows 按 Esc 可恢复工具栏；Android 隐藏时按返回先恢复工具栏，再次返回退出阅读。
 
 版本与兼容性
 
-• Windows 0.3.13 → 0.3.14；Android 0.5.8 → 0.5.9（versionCode 509）。保留原应用包名、APK 签名证书和更新公钥。
-• 本次以文案整理为主，保留下载、阅读、导出、续传和更新校验流程，已有设置、队列、收藏及文件格式继续兼容。
-• 执行双端既有回归、Windows 源码及成品自检、Android 构建与签名核验。未连接 Android 真机，宿主检查不代表真机视觉验收。
+• Windows 0.3.14 → 0.3.15；Android 0.5.9 → 0.5.10（versionCode 510）。保留原应用包名、APK 签名证书及更新公钥。
+• 图片文件夹、ZIP、PDF，以及章节、收藏、书签、阅读进度与下载设置继续兼容。
+• 验证覆盖 Windows 实际阅读窗口和冻结成品、Android 宿主手势/动画/布局检查及原签名构建。未连接 Android 真机，宿主检查不代表手机视觉验收。

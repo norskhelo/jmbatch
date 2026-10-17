@@ -36,6 +36,7 @@ public final class ReaderActivity extends Activity {
     private boolean scroll=true,ready,stateWritable=true,favoriteBusy;
     private volatile boolean closed;
     private FrameLayout viewport;
+    private ReaderChrome chrome;
     private ListView list;
     private ReaderPager pager;
     private String lastSaved="";
@@ -56,25 +57,27 @@ public final class ReaderActivity extends Activity {
         super.onCreate(saved);
         try{entry=new LibraryStore.Entry(new JSONObject(getIntent().getStringExtra("entry")));}catch(Exception error){finish();return;}
         history=getSharedPreferences("reader-history",MODE_PRIVATE);
-        LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(6),dp(4),dp(6),dp(4));
         LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);
+        controls.setPadding(dp(6),dp(4),dp(6),dp(4));
         TextView title=new TextView(this);title.setText(entry.title);title.setTextSize(18);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);controls.addView(title);
         chapterButton=button("章节",this::chooseChapter);favoriteButton=button("☆ 收藏",this::favorite);modeButton=button("滚动阅读",this::toggleMode);
         row(controls,button("返回",this::finish),chapterButton,favoriteButton,modeButton);
         markButton=button("添加书签",this::toggleMark);row(controls,button("上一章",()->chapterStep(-1)),button("下一章",()->chapterStep(1)),markButton,button("书签列表",this::bookmarks));
-        body.addView(new ControlScroll(this,controls));
-        viewport=new FrameLayout(this);viewport.setBackgroundColor(Color.rgb(32,37,44));body.addView(viewport,new LinearLayout.LayoutParams(-1,0,1));
+        viewport=new ReaderViewport(this);viewport.setBackgroundColor(Color.rgb(32,37,44));
+        viewport.setOnClickListener(v->{if(ready&&!closed){chrome.toggle();updateChromeDescription();}});
         LinearLayout navigation=new LinearLayout(this);navigation.setOrientation(LinearLayout.VERTICAL);
+        navigation.setPadding(dp(6),dp(4),dp(6),dp(4));
         status=new TextView(this);status.setText("正在读取漫画…\n首次打开外部 ZIP 可能需要一些时间，点击返回可取消。");status.setTextSize(12);status.setLines(3);status.setEllipsize(android.text.TextUtils.TruncateAt.END);status.setGravity(Gravity.CENTER);navigation.addView(status);
         row(navigation,button("‹ 上一页",()->step(-1)),button("跳转页码",this::jumpPage),button("下一页 ›",()->step(1)));
-        body.addView(new ControlScroll(this,navigation));
-        setContentView(body);
+        chrome=new ReaderChrome(this,new ControlScroll(this,controls),new ControlScroll(this,navigation),viewport,()->{
+            if(closed)return;
+            getWindow().getDecorView().setSystemUiVisibility(chrome.controlsVisible()?View.SYSTEM_UI_FLAG_VISIBLE:
+                View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            resizeViewport();
+        });
+        setContentView(chrome);updateChromeDescription();
         viewport.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
-            if(!ready||closed||r-l==0||b-t==0)return;
-            if(viewportWidth!=r-l||viewportHeight!=b-t){
-                viewportWidth=r-l;viewportHeight=b-t;generation++;requests.clear();errors.clear();cache.evictAll();
-                if(pager!=null)pager.post(()->{if(!closed)loadVisible();});else loadVisible();
-            }
+            resizeViewport();
         });
         worker.execute(()->{
             try{
@@ -88,6 +91,19 @@ public final class ReaderActivity extends Activity {
                 });
             }catch(Exception|OutOfMemoryError error){main.post(()->{if(!closed){status.setText("无法阅读："+error.getMessage());message("无法阅读，请检查文件和目录授权："+error.getMessage());}});}
         });
+    }
+    private void updateChromeDescription(){
+        viewport.setContentDescription(chrome.controlsVisible()?"漫画阅读区，点按隐藏工具栏":"漫画阅读区，点按显示工具栏");
+        if(list!=null)list.setVerticalScrollBarEnabled(chrome.controlsVisible());
+    }
+    private void resizeViewport(){
+        if(!ready||closed||chrome.animating()||viewport.getWidth()==0||viewport.getHeight()==0)return;
+        int width=viewport.getWidth(),height=viewport.getHeight();
+        if(width==viewportWidth&&height==viewportHeight)return;
+        boolean reload=width!=viewportWidth||!scroll;
+        viewportWidth=width;viewportHeight=height;
+        if(reload){generation++;requests.clear();errors.clear();cache.evictAll();}
+        if(pager!=null)pager.post(()->{if(!closed)loadVisible();});else loadVisible();
     }
     private void restore(){
         try{
@@ -114,7 +130,7 @@ public final class ReaderActivity extends Activity {
         if(!ready)return;
         int chapter=ReaderRules.chapter(starts,page);
         chapterButton.setText("第 "+chapters[page]+" 章");
-        status.setText(statusText()+(!scroll?"\n左右拖动或点击两侧翻页":""));
+        status.setText(statusText()+"\n点按漫画隐藏或显示工具栏"+(!scroll?" · 左右滑动翻页":""));
     }
     private String statusText(){
         int chapter=ReaderRules.chapter(starts,page),end=chapter+1<starts.size()?starts.get(chapter+1):chapters.length;
@@ -122,6 +138,7 @@ public final class ReaderActivity extends Activity {
     }
     private void buildPages(){
         if(!ready||closed)return;
+        viewportWidth=viewport.getWidth();viewportHeight=viewport.getHeight();
         main.removeCallbacks(loadingNotice);noticeTarget=-1;generation++;requests.clear();errors.clear();cache.evictAll();
         if(pager!=null){pager.dispose();pager=null;}viewport.removeAllViews();
         if(scroll){
@@ -131,6 +148,7 @@ public final class ReaderActivity extends Activity {
                 public View getView(int position,View convert,ViewGroup parent){PageRow row=convert instanceof PageRow?(PageRow)convert:new PageRow();bind(row,position);return row;}
             };
             list.setAdapter(adapter);viewport.addView(list,new FrameLayout.LayoutParams(-1,-1));list.setSelection(page);
+            updateChromeDescription();
             list.setOnScrollListener(new AbsListView.OnScrollListener(){
                 public void onScrollStateChanged(AbsListView view,int state){if(state==SCROLL_STATE_IDLE)loadVisible();}
                 public void onScroll(AbsListView view,int first,int count,int total){if(count>0){page=first;update();scheduleSave();}}
@@ -159,7 +177,7 @@ public final class ReaderActivity extends Activity {
         if(errors.containsKey(index)||closed)return;
         requests.offer(job);pump();
     }
-    private ReaderRequests.Job job(int index){return new ReaderRequests.Job(generation,index,Math.max(100,viewport.getWidth()-(scroll?0:dp(8))),scroll?0:Math.max(100,viewport.getHeight()-dp(8)));}
+    private ReaderRequests.Job job(int index){return new ReaderRequests.Job(generation,index,Math.max(100,viewportWidth-(scroll?0:dp(8))),scroll?0:Math.max(100,viewportHeight-dp(8)));}
     private void planPages(){
         if(closed||scroll||pager==null)return;
         pager.ready();int target=pager.target();List<ReaderRequests.Job> jobs=new ArrayList<>();
@@ -236,8 +254,9 @@ public final class ReaderActivity extends Activity {
     }
     @Override public boolean onKeyDown(int code,android.view.KeyEvent event){if(ready&&(code==KeyEvent.KEYCODE_DPAD_LEFT||code==KeyEvent.KEYCODE_PAGE_UP)){step(-1);return true;}if(ready&&(code==KeyEvent.KEYCODE_DPAD_RIGHT||code==KeyEvent.KEYCODE_PAGE_DOWN)){step(1);return true;}return super.onKeyDown(code,event);}
     @Override protected void onPause(){main.removeCallbacks(savePosition);save();super.onPause();}
+    @Override public void onBackPressed(){if(chrome!=null&&!chrome.controlsVisible()){chrome.show(true);updateChromeDescription();}else super.onBackPressed();}
     @Override protected void onDestroy(){
-        closed=true;main.removeCallbacks(savePosition);main.removeCallbacks(loadingNotice);requests.clear();if(pager!=null)pager.dispose();
+        closed=true;if(chrome!=null)chrome.dispose();main.removeCallbacks(savePosition);main.removeCallbacks(loadingNotice);requests.clear();if(pager!=null)pager.dispose();
         worker.execute(()->{if(source!=null)source.close();});worker.shutdown();libraryWorker.shutdown();cache.evictAll();super.onDestroy();
     }
 }
