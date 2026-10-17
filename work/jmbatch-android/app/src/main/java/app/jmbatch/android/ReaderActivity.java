@@ -23,7 +23,8 @@ public final class ReaderActivity extends Activity {
     private final ThreadPoolExecutor worker=new ThreadPoolExecutor(1,1,0L,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(12));
     private final ExecutorService libraryWorker=Executors.newSingleThreadExecutor();
     private final LruCache<String,Bitmap> cache=new LruCache<String,Bitmap>(32*1024*1024){protected int sizeOf(String key,Bitmap value){return value.getByteCount();}};
-    private final Set<String> pending=new HashSet<>();
+    private final ReaderRequests requests=new ReaderRequests();
+    private static final ExecutorService historyWorker=Executors.newSingleThreadExecutor();
     private final Map<Integer,String> errors=new HashMap<>();
     private final TreeSet<Integer> marks=new TreeSet<>();
     private LibraryStore.Entry entry;
@@ -36,8 +37,12 @@ public final class ReaderActivity extends Activity {
     private volatile boolean closed;
     private FrameLayout viewport;
     private ListView list;
-    private PageRow single;
+    private ReaderPager pager;
+    private String lastSaved="";
+    private int viewportWidth,viewportHeight;
+    private int noticeTarget=-1;
     private TextView status;
+    private final Runnable loadingNotice=()->{if(!closed&&pager!=null&&pager.target()!=pager.displayed()&&cache.get(job(pager.target()).key)==null&&!errors.containsKey(pager.target()))status.setText(statusText()+"\n正在加载第 "+(pager.target()+1)+" 页…");};
     private Button chapterButton,favoriteButton,modeButton,markButton;
     private BaseAdapter adapter;
     private SharedPreferences history;
@@ -57,9 +62,16 @@ public final class ReaderActivity extends Activity {
         row(body,button("返回",this::finish),chapterButton,favoriteButton,modeButton);
         markButton=button("添加书签",this::toggleMark);row(body,button("上一章",()->chapterStep(-1)),button("下一章",()->chapterStep(1)),markButton,button("书签列表",this::bookmarks));
         viewport=new FrameLayout(this);viewport.setBackgroundColor(Color.rgb(32,37,44));body.addView(viewport,new LinearLayout.LayoutParams(-1,0,1));
-        status=new TextView(this);status.setText("正在读取漫画…\n外部 ZIP 首次打开需准备缓存，可返回取消。");status.setTextSize(12);status.setGravity(Gravity.CENTER);body.addView(status);
-        row(body,button("‹ 上一页",()->go(page-1)),button("页码 / 跳页",this::jumpPage),button("下一页 ›",()->go(page+1)));
+        status=new TextView(this);status.setText("正在读取漫画…\n外部 ZIP 首次打开需准备缓存，可返回取消。");status.setTextSize(12);status.setLines(3);status.setEllipsize(android.text.TextUtils.TruncateAt.END);status.setGravity(Gravity.CENTER);body.addView(status);
+        row(body,button("‹ 上一页",()->step(-1)),button("页码 / 跳页",this::jumpPage),button("下一页 ›",()->step(1)));
         setContentView(body);
+        viewport.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
+            if(!ready||closed||r-l==0||b-t==0)return;
+            if(viewportWidth!=r-l||viewportHeight!=b-t){
+                viewportWidth=r-l;viewportHeight=b-t;generation++;requests.clear();errors.clear();cache.evictAll();
+                if(pager!=null)pager.post(()->{if(!closed)loadVisible();});else loadVisible();
+            }
+        });
         worker.execute(()->{
             try{
                 LibraryStore library=LibraryStore.get(this);Store store=Store.get(this);
@@ -84,20 +96,30 @@ public final class ReaderActivity extends Activity {
         try{
             JSONArray items=new JSONArray();for(int mark:marks)items.put(mark);
             String value=new JSONObject().put("page",page).put("mode",scroll?"scroll":"paged").put("bookmarks",items).toString();
-            if(!history.edit().putString(entry.uri,value).commit())throw new IOException("存储不可写");
+            if(value.equals(lastSaved))return;
+            lastSaved=value;final String key=entry.uri;final SharedPreferences preferences=history;
+            historyWorker.execute(()->{
+                boolean ok=false;try{ok=preferences.edit().putString(key,value).commit();}catch(Exception ignored){}
+                if(!ok)main.post(()->{stateWritable=false;if(!closed)message("阅读记录未保存：存储不可写");});
+            });
         }catch(Exception error){stateWritable=false;message("阅读记录未保存："+error.getMessage());}
     }
     private void scheduleSave(){main.removeCallbacks(savePosition);main.postDelayed(savePosition,700);}
     private void update(){
         favoriteButton.setText(entry.favorite?"★ 已收藏":"☆ 收藏");modeButton.setText(scroll?"模式：滚动":"模式：左右");markButton.setText(marks.contains(page)?"移除书签":"添加书签");
         if(!ready)return;
-        int chapter=ReaderRules.chapter(starts,page),end=chapter+1<starts.size()?starts.get(chapter+1):chapters.length;
+        int chapter=ReaderRules.chapter(starts,page);
         chapterButton.setText("第 "+chapters[page]+" 章");
-        status.setText("本章 "+(page-starts.get(chapter)+1)+"/"+(end-starts.get(chapter))+" 页 · 总页码 "+(page+1)+"/"+chapters.length+(entry.format.equals("pdf")?" · PDF 单章节":"")+(!scroll?"\n左右滑动或点击两侧翻页":""));
+        status.setText(statusText()+(!scroll?"\n左右拖动或点击两侧翻页":""));
+    }
+    private String statusText(){
+        int chapter=ReaderRules.chapter(starts,page),end=chapter+1<starts.size()?starts.get(chapter+1):chapters.length;
+        return "本章 "+(page-starts.get(chapter)+1)+"/"+(end-starts.get(chapter))+" 页 · 总页码 "+(page+1)+"/"+chapters.length+(entry.format.equals("pdf")?" · PDF 单章节":"");
     }
     private void buildPages(){
         if(!ready||closed)return;
-        generation++;worker.getQueue().clear();pending.clear();errors.clear();cache.evictAll();viewport.removeAllViews();
+        main.removeCallbacks(loadingNotice);noticeTarget=-1;generation++;requests.clear();errors.clear();cache.evictAll();
+        if(pager!=null){pager.dispose();pager=null;}viewport.removeAllViews();
         if(scroll){
             list=new ListView(this);list.setDividerHeight(dp(8));list.setBackgroundColor(Color.rgb(32,37,44));
             adapter=new BaseAdapter(){
@@ -110,13 +132,12 @@ public final class ReaderActivity extends Activity {
                 public void onScroll(AbsListView view,int first,int count,int total){if(count>0){page=first;update();scheduleSave();}}
             });
         }else{
-            list=null;single=new PageRow();viewport.addView(single,new FrameLayout.LayoutParams(-1,-1));
-            final GestureDetector gestures=new GestureDetector(this,new GestureDetector.SimpleOnGestureListener(){
-                public boolean onDown(android.view.MotionEvent event){return true;}
-                public boolean onSingleTapUp(android.view.MotionEvent event){if(event.getX()<viewport.getWidth()*.35)go(page-1);else if(event.getX()>viewport.getWidth()*.65)go(page+1);return true;}
-                public boolean onFling(android.view.MotionEvent start,android.view.MotionEvent end,float vx,float vy){if(start!=null&&Math.abs(end.getX()-start.getX())>dp(45)&&Math.abs(vx)>Math.abs(vy)){go(page+(end.getX()<start.getX()?1:-1));return true;}return false;}
+            list=null;pager=new ReaderPager(this,chapters.length,page,new ReaderPager.Listener(){
+                public Bitmap lookup(int index){return index<0||index>=chapters.length?null:cache.get(job(index).key);}
+                public void requested(){planPages();}
+                public void committed(int index){page=index;main.removeCallbacks(loadingNotice);update();scheduleSave();}
             });
-            single.setOnTouchListener((v,event)->gestures.onTouchEvent(event));bind(single,page);
+            viewport.addView(pager,new FrameLayout.LayoutParams(-1,-1));pager.post(()->{if(!closed&&pager!=null)pager.go(page);});
         }
     }
     private final class PageRow extends LinearLayout {
@@ -124,37 +145,62 @@ public final class ReaderActivity extends Activity {
         PageRow(){super(ReaderActivity.this);setOrientation(VERTICAL);setGravity(Gravity.CENTER);image=new ImageView(ReaderActivity.this);image.setScaleType(ImageView.ScaleType.FIT_CENTER);label=new TextView(ReaderActivity.this);label.setTextColor(Color.LTGRAY);label.setGravity(Gravity.CENTER);label.setTextSize(12);addView(label,new LinearLayout.LayoutParams(-1,dp(25)));addView(image,new LinearLayout.LayoutParams(-1,dp(300)));}
     }
     private void bind(PageRow row,int index){
-        int width=Math.max(100,viewport.getWidth()-dp(8)),height=scroll?0:Math.max(100,viewport.getHeight()-dp(30));
-        String key=generation+":"+index;row.setTag(key);row.image.setImageDrawable(null);
+        ReaderRequests.Job job=job(index);int width=job.width;
+        String key=job.key;if(!key.equals(row.getTag())){row.setTag(key);row.image.setImageDrawable(null);}
         Bitmap bitmap=cache.get(key);row.label.setText(errors.containsKey(index)?"本页读取失败，可继续翻页："+errors.get(index):"第 "+(index+1)+" 页"+(bitmap==null?" · 正在加载…":""));
-        LinearLayout.LayoutParams params=(LinearLayout.LayoutParams)row.image.getLayoutParams();params.height=scroll?(bitmap==null?(int)(width*1.4):Math.max(1,(int)((long)bitmap.getHeight()*width/bitmap.getWidth()))):height;row.image.setLayoutParams(params);
+        LinearLayout.LayoutParams params=(LinearLayout.LayoutParams)row.image.getLayoutParams();int height=bitmap==null?(int)(width*1.4):Math.max(1,(int)((long)bitmap.getHeight()*width/bitmap.getWidth()));
+        if(params.height!=height){params.height=height;row.image.setLayoutParams(params);}
         if(bitmap!=null){row.image.setImageBitmap(bitmap);return;}
-        if(errors.containsKey(index)||pending.contains(key)||closed)return;
-        pending.add(key);final int ticket=generation;
+        if(errors.containsKey(index)||closed)return;
+        requests.offer(job);pump();
+    }
+    private ReaderRequests.Job job(int index){return new ReaderRequests.Job(generation,index,Math.max(100,viewport.getWidth()-dp(8)),scroll?0:Math.max(100,viewport.getHeight()-dp(8)));}
+    private void planPages(){
+        if(closed||scroll||pager==null)return;
+        pager.ready();int target=pager.target();List<ReaderRequests.Job> jobs=new ArrayList<>();
+        if(target!=noticeTarget){noticeTarget=target;main.removeCallbacks(loadingNotice);update();main.postDelayed(loadingNotice,180);}
+        ReaderRequests.Job first=job(target);
+        long estimate=Math.min(4000000L,(long)Math.min(1600,first.width)*Math.min(8192,first.height))*4;
+        int limit=(int)Math.max(1,Math.min(3,32L*1024*1024/Math.max(1,estimate)));
+        int[] desired=pager.busy()?new int[]{target}:new int[]{target,target+pager.direction(),target-pager.direction()};
+        int count=0;for(int index:desired){
+            if(index<0||index>=chapters.length)continue;if(count++>=limit)break;
+            ReaderRequests.Job candidate=job(index);if(cache.get(candidate.key)==null&&!errors.containsKey(index))jobs.add(candidate);
+        }
+        requests.replace(jobs);pump();
+        if(errors.containsKey(target)){main.removeCallbacks(loadingNotice);status.setText(statusText()+"\n第 "+(target+1)+" 页读取失败，可跳过或再次跳转重试："+errors.get(target));}
+    }
+    private void pump(){
+        if(closed)return;
+        ReaderRequests.Job job=requests.take();if(job==null)return;
         try{worker.execute(()->{
-            if(closed||ticket!=generation)return;
             Bitmap result=null;String failure=null;
-            try{result=source.render(index,width,height);}catch(Exception|OutOfMemoryError error){failure=error.getMessage()==null?"页面无法解码":error.getMessage();}
+            try{if(!closed&&job.generation==generation){result=source.render(job.index,job.width,job.height);result.prepareToDraw();}}catch(Exception|OutOfMemoryError error){failure=error.getMessage()==null?"页面无法解码":error.getMessage();}
             final Bitmap loaded=result;final String error=failure;
             main.post(()->{
-                pending.remove(key);if(closed||ticket!=generation){if(loaded!=null)loaded.recycle();return;}
-                if(loaded!=null)cache.put(key,loaded);else errors.put(index,error);
-                loadVisible();
+                requests.complete(job);
+                if(closed||job.generation!=generation){if(loaded!=null)loaded.recycle();pump();return;}
+                if(loaded!=null)cache.put(job.key,loaded);else errors.put(job.index,error);
+                loadVisible();pump();
             });
-        });}catch(RejectedExecutionException error){pending.remove(key);}
+        });}catch(RejectedExecutionException error){requests.complete(job);}
     }
     private void loadVisible(){
         if(closed||!ready)return;
         if(scroll&&list!=null){for(int i=0;i<list.getChildCount();i++){View row=list.getChildAt(i);if(row instanceof PageRow)bind((PageRow)row,list.getFirstVisiblePosition()+i);}}
-        else if(single!=null)bind(single,page);
+        else if(pager!=null)planPages();
     }
     private void go(int target){
         if(!ready)return;
-        page=ReaderRules.clamp(target,chapters.length);
-        if(!scroll){worker.getQueue().clear();pending.clear();}
-        if(scroll&&list!=null)list.setSelection(page);else if(single!=null)bind(single,page);
+        target=ReaderRules.clamp(target,chapters.length);
+        if(!scroll&&pager!=null){
+            errors.remove(target);main.removeCallbacks(loadingNotice);update();pager.go(target);main.postDelayed(loadingNotice,180);return;
+        }
+        page=target;
+        if(list!=null)list.setSelection(page);
         update();scheduleSave();
     }
+    private void step(int delta){go((!scroll&&pager!=null?pager.target():page)+delta);}
     private void chapterStep(int delta){if(ready)go(starts.get(ReaderRules.clamp(ReaderRules.chapter(starts,page)+delta,starts.size())));}
     private void chooseChapter(){
         if(!ready)return;
@@ -183,10 +229,10 @@ public final class ReaderActivity extends Activity {
         Integer[] pages=marks.toArray(new Integer[0]);String[] labels=new String[pages.length];for(int i=0;i<pages.length;i++)labels[i]="第 "+chapters[pages[i]]+" 章 · 第 "+pageNumbers[pages[i]]+" 页（总第 "+(pages[i]+1)+" 页）";
         new AlertDialog.Builder(this).setTitle("书签").setItems(labels,(dialog,index)->new AlertDialog.Builder(this).setTitle(labels[index]).setPositiveButton("跳转",(d,w)->go(pages[index])).setNeutralButton("删除书签",(d,w)->{marks.remove(pages[index]);save();update();}).setNegativeButton("取消",null).show()).setNegativeButton("关闭",null).show();
     }
-    @Override public boolean onKeyDown(int code,android.view.KeyEvent event){if(ready&&(code==KeyEvent.KEYCODE_DPAD_LEFT||code==KeyEvent.KEYCODE_PAGE_UP)){go(page-1);return true;}if(ready&&(code==KeyEvent.KEYCODE_DPAD_RIGHT||code==KeyEvent.KEYCODE_PAGE_DOWN)){go(page+1);return true;}return super.onKeyDown(code,event);}
+    @Override public boolean onKeyDown(int code,android.view.KeyEvent event){if(ready&&(code==KeyEvent.KEYCODE_DPAD_LEFT||code==KeyEvent.KEYCODE_PAGE_UP)){step(-1);return true;}if(ready&&(code==KeyEvent.KEYCODE_DPAD_RIGHT||code==KeyEvent.KEYCODE_PAGE_DOWN)){step(1);return true;}return super.onKeyDown(code,event);}
     @Override protected void onPause(){main.removeCallbacks(savePosition);save();super.onPause();}
     @Override protected void onDestroy(){
-        closed=true;main.removeCallbacks(savePosition);worker.getQueue().clear();
+        closed=true;main.removeCallbacks(savePosition);main.removeCallbacks(loadingNotice);requests.clear();if(pager!=null)pager.dispose();
         worker.execute(()->{if(source!=null)source.close();});worker.shutdown();libraryWorker.shutdown();cache.evictAll();super.onDestroy();
     }
 }

@@ -139,13 +139,19 @@ class ReaderWorker:
         self.condition = threading.Condition()
         self.closed = False
         self.requests = []
+        self.active = set()
         self.path = path
         threading.Thread(target=self.run, daemon=True, name="manga-reader").start()
 
     def request(self, requests):
         with self.condition:
-            self.requests = requests[:8]
+            self.requests = list(dict.fromkeys(tuple(r) for r in requests if tuple(r) not in self.active))[:8]
             self.condition.notify()
+
+    def acknowledge(self, token, index):
+        # Keep running AND undelivered work reserved across rapid A -> B -> A.
+        with self.condition:
+            self.active = {r for r in self.active if r[:2] != (token, index)}
 
     def post(self, value):
         import queue
@@ -169,6 +175,7 @@ class ReaderWorker:
                     if self.closed:
                         break
                     token, index, width, height = self.requests.pop(0)
+                    self.active.add((token, index, width, height))
                 try:
                     self.post(("image", token, index, source.render(index, width, height)))
                 except Exception as exc:

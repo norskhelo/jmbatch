@@ -112,6 +112,7 @@ run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/a
 run(java,'-cp',testout,'FolderSaveTest',testroot/'folder-save')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/ReaderRules.java',ROOT/'tests/ReaderTest.java')
 run(java,'-cp',testout,'ReaderTest')
+run(sys.executable,ROOT/'tests/test_reader_pager.py',jdk,testroot/'reader-pager')
 run(buildtools/'aapt2.exe','compile','--dir',ROOT/'app/src/main/res','-o',resources)
 run(buildtools/'aapt2.exe','link','-I',platform,'--manifest',ROOT/'app/src/main/AndroidManifest.xml','--java',generated,'--min-sdk-version','26','--target-sdk-version','34','--version-code',VERSION_CODE,'--version-name',VERSION,'-o',build/'resources.apk',resources)
 classes=build/'classes';classes.mkdir(exist_ok=True)

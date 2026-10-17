@@ -6,6 +6,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from reader import ReaderState, ReaderWorker
+from reader_paging import CanvasPager
 
 
 class ReaderWindow:
@@ -48,8 +49,8 @@ class ReaderWindow:
         modes = ttk.Combobox(bar2, textvariable=self.mode, state="readonly", values=("滚动阅读", "左右翻页"), width=12)
         modes.pack(side="left")
         modes.bind("<<ComboboxSelected>>", lambda e: self.relayout())
-        ttk.Button(bar2, text="‹ 上一页", command=lambda: self.go(self.current - 1)).pack(side="left", padx=(8, 3))
-        ttk.Button(bar2, text="下一页 ›", command=lambda: self.go(self.current + 1)).pack(side="left")
+        ttk.Button(bar2, text="‹ 上一页", command=lambda: self.step(-1)).pack(side="left", padx=(8, 3))
+        ttk.Button(bar2, text="下一页 ›", command=lambda: self.step(1)).pack(side="left")
         self.jump = tk.StringVar(value="1")
         jump = ttk.Entry(bar2, textvariable=self.jump, width=6)
         jump.pack(side="left", padx=(10, 2))
@@ -69,7 +70,11 @@ class ReaderWindow:
         self.canvas.bind("<MouseWheel>", self.wheel)
         self.canvas.bind("<Button-4>", lambda e: self.wheel_step(-1))
         self.canvas.bind("<Button-5>", lambda e: self.wheel_step(1))
-        self.canvas.bind("<Button-1>", self.click_page)
+        self.pager = CanvasPager(self.canvas, self.window, lambda i: self.images.get(i), self.draw, self.page_committed)
+        self.pager.enabled = False
+        self.canvas.bind("<ButtonPress-1>", lambda e: (self.canvas.focus_set(), self.pager.press(e)))
+        self.canvas.bind("<B1-Motion>", self.pager.move)
+        self.canvas.bind("<ButtonRelease-1>", self.pager.release)
         for sequence, delta in (("<Left>", -1), ("<Right>", 1), ("<Prior>", -1), ("<Next>", 1)):
             self.window.bind(sequence, lambda e, d=delta: self.key_page(e, d))
         self.status = tk.StringVar(value="正在读取漫画…")
@@ -85,7 +90,7 @@ class ReaderWindow:
     def key_page(self, event, delta):
         if isinstance(event.widget, (ttk.Entry, ttk.Combobox, tk.Listbox)):
             return
-        self.go(self.current + delta)
+        self.step(delta)
         return "break"
 
     def click_page(self, event):
@@ -102,17 +107,22 @@ class ReaderWindow:
         self.resize_timer = None
         if not self.pages:
             return
+        target = self.pager.target if self.pager.enabled and not self.is_scroll() else self.current
         self.generation += 1
         self.images.clear()
         self.errors.clear()
         self.pending.clear()
         self.heights = [max(200, min(1600, self.canvas.winfo_width() - 32)) * 1.4 + 30] * len(self.pages)
         if self.is_scroll():
+            self.pager.hide()
             self.scrollbar.pack(side="right", fill="y", before=self.canvas)
         else:
             self.scrollbar.pack_forget()
         self.layout()
-        self.go(self.current)
+        if not self.is_scroll():
+            self.canvas.delete('scroll')
+            self.pager.activate(len(self.pages), target)
+        self.go(target)
 
     def layout(self):
         self.offsets = [0]
@@ -140,13 +150,26 @@ class ReaderWindow:
         if self.is_scroll():
             self.scroll("scroll", delta * 3, "units")
         else:
-            self.go(self.current + delta)
+            self.step(delta)
         return "break"
+
+    def step(self, delta):
+        self.go((self.current if self.is_scroll() else self.pager.target) + delta)
+
+    def page_committed(self, index):
+        self.current = index
+        self.refresh_buttons()
+        self.schedule_save()
 
     def go(self, index):
         if not self.pages:
             return
-        self.current = max(0, min(len(self.pages) - 1, index))
+        index = max(0, min(len(self.pages) - 1, index))
+        if not self.is_scroll():
+            self.canvas.yview_moveto(0)
+            self.pager.go(index)
+            return
+        self.current = index
         if self.is_scroll():
             self.canvas.yview_moveto(self.offsets[self.current] / self.extent)
         else:
@@ -172,7 +195,10 @@ class ReaderWindow:
     def draw(self):
         if self.closed or not self.pages:
             return
-        self.canvas.delete("all")
+        if not self.is_scroll():
+            self.draw_paged()
+            return
+        self.canvas.delete("scroll")
         width, height = self.canvas.winfo_width(), self.canvas.winfo_height()
         if self.is_scroll():
             top = self.canvas.canvasy(0)
@@ -188,11 +214,11 @@ class ReaderWindow:
                 self.images.move_to_end(index)
                 if not self.is_scroll():
                     y = max(0, (height - photo.height()) / 2)
-                self.canvas.create_image(width / 2, y, image=photo, anchor="n")
+                self.canvas.create_image(width / 2, y, image=photo, anchor="n", tags='scroll')
             else:
-                self.canvas.create_text(width / 2, y + (50 if self.is_scroll() else height / 2), text=self.errors.get(index, "正在加载…"), fill="white", width=max(100, width - 80))
+                self.canvas.create_text(width / 2, y + (50 if self.is_scroll() else height / 2), text=self.errors.get(index, "正在加载…"), fill="white", width=max(100, width - 80), tags='scroll')
             if self.is_scroll():
-                self.canvas.create_text(width / 2, self.offsets[index] + 12, text=f"第 {index + 1} 页", fill="#aab7c4")
+                self.canvas.create_text(width / 2, self.offsets[index] + 12, text=f"第 {index + 1} 页", fill="#aab7c4", tags='scroll')
         # Replace obsolete work. Already decoded results are accepted only for this layout.
         needed = [i for i in visible if i not in self.images and i not in self.errors]
         self.pending = set(needed)
@@ -203,8 +229,41 @@ class ReaderWindow:
                 break
             self.images.pop(candidates[0])
 
+    def draw_paged(self):
+        self.pager.ready()
+        target = self.pager.target
+        width = max(100, self.canvas.winfo_width() - 32)
+        height = max(100, self.canvas.winfo_height() - 24)
+        desired = [target]
+        if target == self.pager.page and not self.pager.animating:
+            desired += [target + self.pager.direction, target - self.pager.direction]
+        budget = 32 * 1024 * 1024
+        estimate = min(4_000_000, min(1600, width) * min(8192, height)) * 4
+        desired = [i for i in desired if 0 <= i < len(self.pages)][:max(1, budget // max(1, estimate))]
+        for index in desired:
+            if index in self.images:
+                self.images.move_to_end(index)
+        size = sum(p.width() * p.height() * 4 for p in self.images.values())
+        for index in list(self.images):
+            if len(self.images) <= 6 and size <= budget:
+                break
+            if index in (self.pager.page, target):
+                continue
+            photo = self.images.pop(index)
+            size -= photo.width() * photo.height() * 4
+        needed = [i for i in desired if i not in self.images and i not in self.errors]
+        self.pending = set(needed)
+        self.worker.request([(self.generation, i, width, height) for i in needed])
+        if needed and getattr(self, 'timer', None):
+            self.window.after_cancel(self.timer)
+            self.timer = self.window.after(16, self.poll)
+        if target in self.errors:
+            self.pager.error(self.errors[target])
+
     def poll(self):
         from PIL import ImageTk
+        self.timer = None
+        dirty = False
         try:
             while True:
                 result = self.worker.results.get_nowait()
@@ -228,6 +287,7 @@ class ReaderWindow:
                     messagebox.showerror("无法阅读", result[1], parent=self.window)
                 else:
                     _, generation, index, value = result
+                    self.worker.acknowledge(generation, index)
                     if generation != self.generation:
                         if kind == "image":
                             value.close()
@@ -244,10 +304,12 @@ class ReaderWindow:
                         value.close()
                     else:
                         self.errors[index] = "本页读取失败，可跳到下一页：\n" + value
-                    self.draw()
+                    dirty = True
         except queue.Empty:
             pass
-        self.timer = self.window.after(80, self.poll)
+        if dirty:
+            self.draw()
+        self.timer = self.window.after(16 if self.pending or self.pager.animating else 80, self.poll)
 
     def refresh_buttons(self):
         entry = self.library.entries.get(self.key, {})
@@ -329,6 +391,7 @@ class ReaderWindow:
             return
         self.save()
         self.closed = True
+        self.pager.close()
         for timer in (self.timer, self.save_timer, self.resize_timer):
             if timer:
                 self.window.after_cancel(timer)

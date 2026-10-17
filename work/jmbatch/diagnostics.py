@@ -561,21 +561,40 @@ def run_self_test(directory: Path):
             reader.mode.set("左右翻页")
             reader.relayout()
             reader.go(3)
-            reader_wait(lambda: 3 in reader.images)
+            reader_wait(lambda: 3 in reader.images and reader.current == 3)
             assert reader.current == 3 and "4/5" in reader.status.get()
             if fmt != "pdf":
                 assert len(reader.starts) == 2
                 reader.chapter_step(-1)
+                reader_wait(lambda: reader.current == 0)
                 assert reader.current == 0
                 reader.chapter_step(1)
+                reader_wait(lambda: reader.current == reader.starts[1])
                 assert reader.current == reader.starts[1]
                 reader.go(3)
+                reader_wait(lambda: reader.current == 3)
             else:
                 assert len(reader.starts) == 1
             reader.mark()
             assert 3 in reader.marks
             reader.favorite()
             assert Library(application.home).entries[reader_key]["favorite"]
+            reader_wait(lambda: 2 in reader.images and 4 in reader.images)
+            old_photo = reader.pager.photo
+            reader.go(4)
+            assert reader.current == 3 and reader.pager.photo is old_photo
+            reader_wait(lambda: reader.current == 4)
+            # Real Tk events exercise follow-pointer movement and release settling.
+            width = reader.canvas.winfo_width()
+            reader.canvas.event_generate('<ButtonPress-1>', x=width // 3, y=100)
+            reader.canvas.event_generate('<B1-Motion>', x=width * 2 // 3, y=100)
+            assert reader.pager.dx > 0 and reader.current == 4
+            reader.canvas.event_generate('<ButtonRelease-1>', x=width * 2 // 3, y=100)
+            reader_wait(lambda: reader.current == 3)
+            assert len(reader.canvas.find_all()) == 3
+            if fmt == 'images':
+                from reader_checks import check_paging
+                report['reader_paging'] = check_paging(reader, root, reader_wait)
             for geometry in ("1000x820", "740x520"):
                 reader.window.geometry(geometry)
                 root.update()
@@ -596,6 +615,8 @@ def run_self_test(directory: Path):
             reader.close()
         report["checks"].append("Internal folder/ZIP/PDF reader: render, chapters, page count, favorite, bookmark and restart restore")
         report["checks"].append("Reader scroll/paged switching, last-page navigation, single-window reuse and controls at minimum size")
+        report["checks"].append("Reader adjacent predecode, persistent two-layer animation and real Tk drag preserve displayed page until commit")
+        report["checks"].append("Reader 100 transitions, gated slow decode and unreadable page retain pixels and bound cache without new canvas items")
         image_library.window.destroy()
         report["checks"].append("Default ordered-image download, library recognition and explicit PDF export dialog preserve originals")
         report["checks"].append("Library UI: scan orphan export, select all/invert, batch favorite/unfavorite, search and persistence")
