@@ -98,8 +98,9 @@ public final class DownloadService extends Service {
         DownloadJob(Store.Task task){this.task=task;}
         public synchronized void cancel(String reason){
             if(stop.isEmpty())stop=reason;
-            if(control!=null)control.cancel(stop);
             if(task.status.equals("running")||task.status.equals("resetting"))task.phase=stop.equals("CANCEL")?"正在取消…":"正在关闭请求并暂停…";
+            task.speed=0;
+            if(control!=null)control.cancel(stop);
         }
         private synchronized JmApi.Control attempt(){
             if(!stop.isEmpty())return null;

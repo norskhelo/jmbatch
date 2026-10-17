@@ -7,6 +7,7 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.*;
 import java.util.zip.GZIPInputStream;
@@ -33,9 +34,39 @@ public final class JmApi {
         public java.util.function.Consumer<String> routeMessage = message -> {};
         public volatile long lastData = SystemClock.elapsedRealtime();
         public final AtomicLong bytes = new AtomicLong();
-        private final Set<HttpURLConnection> active = Collections.newSetFromMap(new ConcurrentHashMap<HttpURLConnection, Boolean>());
+        private final Set<Request> active = Collections.newSetFromMap(new ConcurrentHashMap<Request, Boolean>());
         public void check() throws IOException { if (!stop.isEmpty() || Thread.currentThread().isInterrupted()) throw new IOException(stop.isEmpty() ? "操作已中断" : stop); }
-        public void cancel(String why) { stop = why; for (HttpURLConnection connection : active) connection.disconnect(); }
+        public void cancel(String why) {
+            stop = why;
+            // disconnect() can wait on a socket/stream lock. Never run it on the
+            // service's main thread, or let one connection delay closing others.
+            for (Request request : active) request.close(true);
+        }
+        private Request register(HttpURLConnection connection) {
+            Request request = new Request(connection); active.add(request); return request;
+        }
+        private final class Request {
+            final HttpURLConnection connection;
+            final AtomicBoolean closing = new AtomicBoolean();
+            Request(HttpURLConnection connection) { this.connection = connection; }
+            void close(boolean background) {
+                if (!closing.compareAndSet(false, true)) return;
+                Runnable disconnect = () -> {
+                    try { connection.disconnect(); }
+                    catch (RuntimeException ignored) { /* The request still has its own timeout. */ }
+                };
+                if (background) {
+                    // At most one closer per in-flight request (not per page),
+                    // shared by repeated cancel calls and the transfer's finally.
+                    Thread thread = new Thread(disconnect, "jm-disconnect");
+                    thread.setDaemon(true); thread.start();
+                } else disconnect.run();
+            }
+            void finish(boolean success) {
+                active.remove(this);
+                if (!success) close(false);
+            }
+        }
         void received(int count) { bytes.addAndGet(count); lastData = SystemClock.elapsedRealtime(); }
     }
 
@@ -139,7 +170,7 @@ public final class JmApi {
         for (Map.Entry<String,List<String>> header : cookies.get(url.toURI(), Collections.emptyMap()).entrySet())
             if (header.getKey() != null && !header.getValue().isEmpty()) connection.setRequestProperty(header.getKey(), String.join("; ", header.getValue()));
         if (api && !userCookie.trim().isEmpty()) connection.setRequestProperty("Cookie", userCookie);
-        control.active.add(connection);
+        Control.Request request = control.register(connection);
         boolean success = false;
         try {
             control.check(); int status = connection.getResponseCode();
@@ -158,9 +189,8 @@ public final class JmApi {
             }
             success = true;
         } finally {
-            control.active.remove(connection);
             // Closing the response permits Android's HTTP stack to reuse keep-alive connections.
-            if (!success) connection.disconnect();
+            request.finish(success);
         }
     }
 

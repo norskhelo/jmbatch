@@ -1,4 +1,4 @@
-JM Batch 0.5.2 — Android 使用说明
+JM Batch 0.5.3 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每个任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.5.2 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-17）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/JMBatch-0.5.2-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/JMBatch-0.5.2-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/JMBatch-0.5.2-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/SHA256-release-android-0.5.2.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/JMBatch-0.5.3-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/JMBatch-0.5.3-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/JMBatch-0.5.3-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/SHA256-release-android-0.5.3.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,19 +28,19 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Android 0.5.2 — 2026-10-17
+Android 0.5.3 — 2026-10-17
 
-原生文件管理与保存目录跳转
+下载取消响应优化
 
-• 修复荣耀 Play5 / Android 10 上“打开保存目录”误入云空间的问题：删除旧华为／荣耀包名兼容入口，并在自动打开、文档管理备用和其他应用选择中排除已确认的华为云空间包。
-• 改用 Android 原生文件应用选择机制，启动系统实际声明的文件管理活动，不再打开猜测包名对应的应用首页。原生“文件”与文件选择器分别判断，保留可用系统默认项及启动失败回退。
-• 文件管理器明确支持目录查看时，以目录地址请求直接打开保存目录；同时支持默认保存目录、自选目录及软件内当前子目录。默认目录使用只读文档目录树地址，供接收方读取子目录和图片。
-• 不支持目录跳转时打开原生文件应用首页，并显示可复制的保存位置；不会把打开首页显示为已定位。仍可手动使用文档管理或软件内查看。
-• 不移动文件、不更改保存设置、不新增存储权限。目录跳转取决于手机文件应用支持；系统应用可能忽略地址，原生界面也由设备决定。
+• 修复图片下载时取消或暂停容易卡住界面的问题：先停止派发后续页面，再在后台并行关闭当前网络连接，避免一个慢连接拖住取消按钮和其他连接。
+• 同一网络请求只关闭一次，重复点击取消不会重复清理连接；取消时立即显示停止状态并归零速度。
+• 图片压缩结束后及刷盘后及时检查取消，减少无用的后续处理；正常下载仍保留刷盘、图片尺寸和成品完整性校验。
+• 完整图片缓存保留，重试只补缺失或损坏页面；等待旧工作线程真正退出后才允许重试，避免同时写入缓存。取消单个任务不影响其他任务。
+• 个别设备的网络请求或当前图片处理仍可能等待系统操作结束或超时，不承诺所有情况下瞬间取消。
 
 版本与验证
 
-• Android 0.5.1 → 0.5.2，versionCode 502；Windows 保持 0.3.9。保留原包名、APK 签名证书与更新公钥，支持覆盖安装。
-• 检查云空间过滤、真实原生组件选择、目录地址与只读授权、首页回退、禁用或受限组件及备用选择；执行 Android 宿主回归、编译与签名核验。
-• 未连接荣耀 Play5 / Android 10 真机；模拟框架检查验证调用参数和选择策略，不代表已验证手机实际界面和目录定位。
-• 同步源码、应用内说明、同版更新日志、APK、SHA-256 校验文件及原密钥签名更新清单，正式发布 Android 0.5.2。
+• Android 0.5.2 → 0.5.3，versionCode 503；Windows 保持 0.3.9。沿用原包名、APK 签名证书与更新公钥，支持覆盖安装并保留设置、队列和收藏。
+• 7000 页、16 路受阻请求的取消场景通过，覆盖响应头/响应体等待、重复取消、后续页面停止、临时文件清理、完整缓存及任务互斥；完成 928 项 Android 宿主检查、编译和原证书签名验证。
+• 尚未连接 Android 真机；模拟测试验证取消调度，不代表手机上的实际耗时。未下载真实漫画图片或修改用户缓存。
+• 发布新版 APK、同版日志、SHA-256 校验文件、更新清单与原密钥签名，并同步源码和应用内公告。

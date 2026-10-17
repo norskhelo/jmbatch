@@ -75,6 +75,8 @@ stubs=transport/'stubs';stubs.mkdir(exist_ok=True)
 (stubs/'SystemClock.java').write_text('package android.os; public final class SystemClock { public static long elapsedRealtime(){return System.nanoTime()/1000000;} }',encoding='utf-8')
 run(javac,'-encoding','UTF-8','-cp',str(testout)+os.pathsep+str(platform),'-d',transport,stubs/'Store.java',stubs/'SystemClock.java',ROOT/'app/src/main/java/app/jmbatch/android/JmApi.java',ROOT/'tests/JmApiTransportTest.java')
 run(java,'-cp',str(transport)+os.pathsep+str(testout)+os.pathsep+str(platform),'app.jmbatch.android.JmApiTransportTest',transport/'data')
+run(javac,'-encoding','UTF-8','-cp',str(transport)+os.pathsep+str(testout)+os.pathsep+str(platform),'-d',transport,ROOT/'app/src/main/java/app/jmbatch/android/DownloadPool.java',ROOT/'tests/JmApiCancellationTest.java')
+run(java,'-cp',str(transport)+os.pathsep+str(testout)+os.pathsep+str(platform),'app.jmbatch.android.JmApiCancellationTest',transport/'cancellation')
 
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/DownloadDisplay.java',ROOT/'tests/DownloadDisplayTest.java')
 run(java,'-cp',testout,'DownloadDisplayTest')

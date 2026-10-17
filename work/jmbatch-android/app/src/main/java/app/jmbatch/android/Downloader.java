@@ -284,8 +284,10 @@ public final class Downloader {
             try (FileOutputStream stream = new FileOutputStream(output)) {
                 check.run();
                 if (!result.compress(Bitmap.CompressFormat.JPEG, 92, stream)) throw new IOException("无法保存解码图片");
+                check.run();
                 stream.getFD().sync();
             }
+            check.run();
             BitmapFactory.Options saved = dimensions(output);
             if (saved.outWidth != bounds.outWidth || saved.outHeight != bounds.outHeight) throw new IOException("处理后图片尺寸校验失败");
         } finally { if (source != null) source.recycle(); if (result != null) result.recycle(); }

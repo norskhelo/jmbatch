@@ -2,20 +2,20 @@
 
 支持 Windows 和 Android 的批量漫画下载工具。下载可选择 PDF、ZIP 或图片文件夹，三种成品可离线互相导出。
 
-当前源码及正式版本：**Windows 0.3.9 / Android 0.5.2（versionCode 502）**。Android 0.5.2 移除云空间入口，按原生文件应用能力打开保存目录，不支持定位时显示保存位置。安装包、更新日志与镜像入口见下方。
+当前源码及正式版本：**Windows 0.3.9 / Android 0.5.3（versionCode 503）**。Android 0.5.3 优化下载取消与暂停响应，后台并行关闭当前连接，保留完整图片及断点续传。安装包、更新日志与镜像入口见下方。
 
 ## 下载安装包（含国内镜像）
 
 GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
 
-当前正式版为 **Windows 0.3.9 / Android 0.5.2**（[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-android-0.5.2)，[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.9-0.4.9)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+当前正式版为 **Windows 0.3.9 / Android 0.5.3**（[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-android-0.5.3)，[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.9-0.4.9)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
 
 | 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
 | --- | --- | --- | --- |
 | Windows 0.3.9 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.9-0.4.9/JMBatch-0.3.9-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.9-0.4.9/JMBatch-0.3.9-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.9-0.4.9/JMBatch-0.3.9-Windows-x64.zip) |
-| Android 0.5.2 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/JMBatch-0.5.2-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/JMBatch-0.5.2-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/JMBatch-0.5.2-Android.apk) |
+| Android 0.5.3 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/JMBatch-0.5.3-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/JMBatch-0.5.3-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/JMBatch-0.5.3-Android.apk) |
 | Windows 0.3.9 的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.9-0.4.9/SHA256-release-0.3.9-0.4.9.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.9-0.4.9/SHA256-release-0.3.9-0.4.9.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.9-0.4.9/SHA256-release-0.3.9-0.4.9.txt) |
-| Android 0.5.2 的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/SHA256-release-android-0.5.2.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/SHA256-release-android-0.5.2.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/SHA256-release-android-0.5.2.txt) |
+| Android 0.5.3 的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/SHA256-release-android-0.5.3.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/SHA256-release-android-0.5.3.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/SHA256-release-android-0.5.3.txt) |
 
 镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像用于手动下载，应用内更新仓库仍填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
 
@@ -96,3 +96,5 @@ Android 0.5.0 下载优化：网络接收与图片处理使用有界流水线；
 Android 0.5.1：默认调用原生系统文件管理应用，支持目录跳转时传入保存地址；仅有应用入口时打开主界面并提示手动定位，返回后可复制保存位置。文档管理保留为备用。未改变保存目录、移动已有文件或新增存储权限；荣耀 Play5 / Android 10 尚待真机确认。
 
 Android 0.5.2：移除上一版误用的华为云空间入口，改用原生文件应用选择机制；支持目录查看时传入保存目录及只读授权，仅支持首页时显示保存位置。默认目录及子目录使用可浏览的文档目录树。未连接荣耀 Play5 / Android 10，实际定位取决于设备支持。
+
+Android 0.5.3：取消和暂停改为后台并行关闭当前连接，避免慢连接拖住界面；重复取消不重复关闭。保留完整图片和断点续传，等待旧线程退出再允许重试。7000 页模拟取消与 928 项宿主检查通过，实际手机耗时尚待真机确认。
