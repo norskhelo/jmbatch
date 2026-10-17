@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.13 / Android 0.5.7 — 应用内更新下载自动切换镜像\n\n更新下载\n\n• 双端下载更新清单、清单签名和安装包时，先使用 GitHub；连接失败、超时、HTTP 错误、返回网页或响应不完整时，依次尝试 GHFast、GH-Proxy。\n• 下载进度显示当前线路。切换线路时重新下载当前文件，清除上一次不完整内容并重置进度；三条线路均失败后明确提示重试。\n• 继续使用原更新公钥验证 RSA-SHA256 签名，核对仓库、版本、发布标签、文件名、大小与 SHA-256；Android 保留 APK 证书校验。签名或摘要不匹配会阻止安装。\n• 取消下载或本地写入失败不会触发镜像重试。镜像仅接收公开 GitHub Release 附件地址，保留 HTTPS 校验与重定向限制。\n• 版本查询仍使用 GitHub API；本次新增的是更新文件下载的镜像回退。旧版尚未具备此功能，升级到本版后生效。\n\n版本与验证\n\n• Windows 0.3.12 → 0.3.13；Android 0.5.6 → 0.5.7（versionCode 507），沿用包名、APK 原签名证书与更新公钥。\n• 验证直连成功、两级回退、部分下载、HTTP 错误、取消、磁盘错误、重定向限制、签名及摘要篡改；执行 Windows 回归与源码/冻结成品自检、Android 宿主测试与签名构建。\n• 未连接 Android 真机，宿主测试和编译不代表手机实测；第三方镜像可用性仍取决于当前网络。\n";
+    private static final String CURRENT_NOTES="Android 0.5.8 — 字体与按钮尺寸适配\n\n界面修复\n\n• 更换系统字体或放大字号时，应用自建按钮按文字实际高度伸缩，保留字体上下留白和至少 48dp 的点击高度，完整显示标签。\n• 首页、阅读器、漫画库和目录浏览的操作按钮按实际文字宽度自动调整每行数量，同排按钮保持等高；文字变化、按钮隐藏或屏幕宽度变化后重新排列。\n• 阅读器和漫画库在大字号或横屏空间不足时，操作区支持滚动，给漫画和列表保留可见区域。\n• 导出和更新页面使用相同的按钮尺寸规则；保留用户的系统字体和字号缩放。Android 原生对话框按钮继续由系统管理。\n\n版本与验证\n\n• Android 0.5.7 → 0.5.8，versionCode 508；Windows 保持 0.3.13。沿用原包名、APK 签名证书和更新公钥，可覆盖安装并保留设置、队列和收藏。\n• 完成 1086 项既有 Android 宿主检查、96 组合成字体尺寸/字号/屏宽场景（11962 项断言）、完整编译及原证书签名核验。\n• 在“设置 → 运行离线自检”加入 64 组 Android 原生文字测量检查。当前未连接安卓设备，新增原生检查未执行，宿主测试和编译不代表真机字体或视觉效果已验收。\n• 发布新版 APK、同版日志、SHA-256 校验文件、更新清单及原密钥签名，同步源码与应用内公告。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;
@@ -171,12 +171,12 @@ public final class GithubUpdates {
         CheckBox auto=new CheckBox(activity);auto.setText("启动时自动检查更新");auto.setChecked(prefs.getBoolean("automatic",true));form.addView(auto);
         statusView=new TextView(activity);statusView.setText(status);form.addView(statusView);
         announcementView=new TextView(activity);announcementView.setText(notesText());announcementView.setMaxLines(8);announcementView.setPadding(0,pad,0,0);form.addView(announcementView);
-        Button notes=new Button(activity);notes.setText("查看完整更新公告（离线可用）");form.addView(notes);
+        Button notes=new ActionButton(activity);notes.setText("查看完整更新公告（离线可用）");form.addView(notes);
         notes.setOnClickListener(v->showNotes());
         TextView help=new TextView(activity);help.setText("\n检查更新使用已保存的仓库，关闭自动检查后也可手动检查。\n失败或超时可再次点击重试，不影响下载任务。\n下载后先核验清单签名和 SHA-256；APK 证书先在应用内预检查，系统未提供证书时交由系统安装器核验。已知证书不匹配会阻止安装。\n下载更新时请保持应用在前台；安装前请暂停漫画下载任务。\n只信任本软件发布密钥签署的更新；不发送漫画编号或 Cookie。\n");form.addView(help);
-        checkButton=new Button(activity);checkButton.setText("检查更新");form.addView(checkButton,0);
+        checkButton=new ActionButton(activity);checkButton.setText("检查更新");form.addView(checkButton,0);
         checkButton.setOnClickListener(v->check());
-        downloadButton=new Button(activity);downloadButton.setText("下载新版");downloadButton.setEnabled(!latestUrl.isEmpty());form.addView(downloadButton);
+        downloadButton=new ActionButton(activity);downloadButton.setText("下载新版");downloadButton.setEnabled(!latestUrl.isEmpty());form.addView(downloadButton);
         downloadButton.setOnClickListener(v->download());
         ScrollView scroll=new ScrollView(activity);scroll.addView(form);
         dialog=new AlertDialog.Builder(activity).setTitle("软件更新").setView(scroll).setNegativeButton("关闭",null).setPositiveButton("保存",null).create();
@@ -216,7 +216,7 @@ public final class GithubUpdates {
         int pad=(int)(20*activity.getResources().getDisplayMetrics().density);
         LinearLayout form=new LinearLayout(activity);form.setOrientation(LinearLayout.VERTICAL);form.setPadding(pad,pad,pad,pad);
         notesStatusView=new TextView(activity);notesStatusView.setText(status);form.addView(notesStatusView);
-        notesCheckButton=new Button(activity);notesCheckButton.setText("检查更新");form.addView(notesCheckButton);
+        notesCheckButton=new ActionButton(activity);notesCheckButton.setText("检查更新");form.addView(notesCheckButton);
         notesCheckButton.setOnClickListener(v->{notesDialog.dismiss();showAndCheck();});
         notesView=new TextView(activity);notesView.setPadding(0,pad,0,0);notesView.setTextIsSelectable(true);notesView.setText(notesText());form.addView(notesView);
         ScrollView content=new ScrollView(activity);content.addView(form);

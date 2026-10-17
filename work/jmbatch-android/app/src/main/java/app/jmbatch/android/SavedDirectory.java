@@ -80,12 +80,11 @@ public final class SavedDirectory {
         LinearLayout form=new LinearLayout(activity); form.setOrientation(LinearLayout.VERTICAL);
         int pad=(int)(16*activity.getResources().getDisplayMetrics().density); form.setPadding(pad,pad,pad,pad);
         status=new TextView(activity); status.setTextIsSelectable(true); form.addView(status);
-        LinearLayout actions=new LinearLayout(activity);
-        up=new Button(activity); up.setText("上一级"); up.setEnabled(false);
+        up=new ActionButton(activity); up.setText("上一级"); up.setEnabled(false);
         up.setOnClickListener(v->{if(!parents.isEmpty()){parents.remove(parents.size()-1);load();}});
-        Button refresh=new Button(activity); refresh.setText("刷新"); refresh.setOnClickListener(v->load());
-        actions.addView(up,new LinearLayout.LayoutParams(0,-2,1)); actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1)); form.addView(actions);
-        Button external=new Button(activity);external.setText("用系统文件管理器打开此目录");external.setOnClickListener(v->{
+        Button refresh=new ActionButton(activity); refresh.setText("刷新"); refresh.setOnClickListener(v->load());
+        form.addView(new ActionRow(activity,up,refresh));
+        Button external=new ActionButton(activity);external.setText("用系统文件管理器打开此目录");external.setOnClickListener(v->{
             if(parents.isEmpty())openExternal();
             else try{
                 Uri current=parents.get(parents.size()-1).uri;

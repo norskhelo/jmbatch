@@ -45,26 +45,28 @@ public final class LibraryScreen {
     private int dp(int n){return (int)(n*activity.getResources().getDisplayMetrics().density);}
     private boolean visible(){return dialog!=null&&dialog.isShowing()&&!activity.isFinishing()&&!activity.isDestroyed();}
     private String title(LibraryStore.Entry e){return e.id.isEmpty()?e.title:"JM"+e.id+" · "+e.title;}
-    private Button button(String text,Runnable action){Button b=new Button(activity);b.setText(text);b.setTextSize(12);b.setOnClickListener(v->{if(!busy)action.run();});return b;}
-    private void row(LinearLayout body,Button... buttons){LinearLayout row=new LinearLayout(activity);for(Button b:buttons)row.addView(b,new LinearLayout.LayoutParams(0,-2,1));body.addView(row);}
+    private Button button(String text,Runnable action){Button b=new ActionButton(activity);b.setText(text);b.setTextSize(12);b.setOnClickListener(v->{if(!busy)action.run();});return b;}
+    private void row(LinearLayout body,Button... buttons){body.addView(new ActionRow(activity,buttons));}
     public void show(){
-        LinearLayout body=new LinearLayout(activity);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(12),dp(12),dp(12),dp(8));
+        LinearLayout root=new LinearLayout(activity);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(12),dp(12),dp(12),dp(8));
+        LinearLayout body=new LinearLayout(activity);body.setOrientation(LinearLayout.VERTICAL);
         TextView heading=new TextView(activity);heading.setText("已下载漫画 / 收藏");heading.setTextSize(21);body.addView(heading);
         TextView hint=new TextView(activity);hint.setText("封面默认取第一页。选择 PDF、ZIP 或文件夹可互相导出，长按可打开或分享。");hint.setTextSize(12);body.addView(hint);
         query=new EditText(activity);query.setSingleLine(true);query.setHint("搜索编号 / 标题");body.addView(query);
-        LinearLayout tools=new LinearLayout(activity);favorites=new CheckBox(activity);favorites.setText("只看收藏");tools.addView(favorites,new LinearLayout.LayoutParams(0,-2,1));tools.addView(button("扫描目录",this::scan));tools.addView(button("刷新",this::load));body.addView(tools);
+        favorites=new CheckBox(activity);favorites.setText("只看收藏");body.addView(new ActionRow(activity,favorites,button("扫描目录",this::scan),button("刷新",this::load)));
         row(body,button("全选结果",()->select(0)),button("反选",()->select(1)),button("清空选择",()->select(2)));
         status=new TextView(activity);status.setTextSize(12);body.addView(status);
         list=new ListView(activity);list.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);adapter=new CoverAdapter();list.setAdapter(adapter);
         list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScroll(AbsListView v,int first,int count,int total){}public void onScrollStateChanged(AbsListView v,int state){if(state==SCROLL_STATE_IDLE)adapter.notifyDataSetChanged();}});
-        body.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        root.addView(new ControlScroll(activity,body));root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout actions=new LinearLayout(activity);actions.setOrientation(LinearLayout.VERTICAL);
         list.setOnItemClickListener((p,v,position,id)->{if(busy||position>=entries.size())return;String uri=entries.get(position).uri;if(list.isItemChecked(position))selected.add(uri);else selected.remove(uri);counts();});
         list.setOnItemLongClickListener((p,v,position,id)->{if(!busy&&position<entries.size())details(entries.get(position));return true;});
-        row(body,button("批量收藏",()->favorite(true)),button("取消收藏",()->favorite(false)),button("软件内阅读",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1){dialog.dismiss();ReaderActivity.open(activity,items.get(0));}else message("请选择一本漫画阅读");}));
-        row(body,button("导出",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)new ExportScreen(activity,store,items.get(0)).show();else message("请选择一本 PDF、ZIP 或文件夹导出");}),button("删除文件",()->confirmRemove(true)),button("仅移除记录",()->confirmRemove(false)));
-        stop=new Button(activity);stop.setText("停止操作");stop.setTextSize(12);stop.setEnabled(false);stop.setOnClickListener(v->cancel());
-        row(body,stop,button("关闭",()->dialog.dismiss()));
-        dialog=new Dialog(activity);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);dialog.setContentView(body);
+        row(actions,button("批量收藏",()->favorite(true)),button("取消收藏",()->favorite(false)),button("软件内阅读",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1){dialog.dismiss();ReaderActivity.open(activity,items.get(0));}else message("请选择一本漫画阅读");}));
+        row(actions,button("导出",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)new ExportScreen(activity,store,items.get(0)).show();else message("请选择一本 PDF、ZIP 或文件夹导出");}),button("删除文件",()->confirmRemove(true)),button("仅移除记录",()->confirmRemove(false)));
+        stop=new ActionButton(activity);stop.setText("停止操作");stop.setTextSize(12);stop.setEnabled(false);stop.setOnClickListener(v->cancel());
+        row(actions,stop,button("关闭",()->dialog.dismiss()));root.addView(new ControlScroll(activity,actions));
+        dialog=new Dialog(activity);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);dialog.setContentView(root);
         dialog.setOnDismissListener(d->{generation++;resetCovers();cancel();worker.shutdown();coverWorker.shutdownNow();});dialog.show();dialog.getWindow().setLayout(-1,(int)(activity.getResources().getDisplayMetrics().heightPixels*0.93));dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int before,int count){load();}public void afterTextChanged(Editable e){}});
         favorites.setOnCheckedChangeListener((b,c)->load());load();

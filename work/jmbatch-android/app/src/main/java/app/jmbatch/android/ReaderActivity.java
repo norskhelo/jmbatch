@@ -49,21 +49,25 @@ public final class ReaderActivity extends Activity {
     private final Runnable savePosition=()->save();
 
     private int dp(int value){return (int)(value*getResources().getDisplayMetrics().density);}
-    private Button button(String title,Runnable action){Button result=new Button(this);result.setText(title);result.setTextSize(12);result.setPadding(dp(4),0,dp(4),0);result.setOnClickListener(v->action.run());return result;}
-    private void row(LinearLayout body,View...views){LinearLayout row=new LinearLayout(this);for(View view:views)row.addView(view,new LinearLayout.LayoutParams(0,dp(46),1));body.addView(row);}
+    private Button button(String title,Runnable action){Button result=new ActionButton(this);result.setText(title);result.setTextSize(12);result.setOnClickListener(v->action.run());return result;}
+    private void row(LinearLayout body,View...views){body.addView(new ActionRow(this,views));}
     private void message(String text){if(!closed)new AlertDialog.Builder(this).setMessage(text).setPositiveButton("关闭",null).show();}
     @Override public void onCreate(Bundle saved){
         super.onCreate(saved);
         try{entry=new LibraryStore.Entry(new JSONObject(getIntent().getStringExtra("entry")));}catch(Exception error){finish();return;}
         history=getSharedPreferences("reader-history",MODE_PRIVATE);
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(6),dp(4),dp(6),dp(4));
-        TextView title=new TextView(this);title.setText(entry.title);title.setTextSize(18);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);body.addView(title);
+        LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);
+        TextView title=new TextView(this);title.setText(entry.title);title.setTextSize(18);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);controls.addView(title);
         chapterButton=button("章节",this::chooseChapter);favoriteButton=button("☆ 收藏",this::favorite);modeButton=button("模式：滚动",this::toggleMode);
-        row(body,button("返回",this::finish),chapterButton,favoriteButton,modeButton);
-        markButton=button("添加书签",this::toggleMark);row(body,button("上一章",()->chapterStep(-1)),button("下一章",()->chapterStep(1)),markButton,button("书签列表",this::bookmarks));
+        row(controls,button("返回",this::finish),chapterButton,favoriteButton,modeButton);
+        markButton=button("添加书签",this::toggleMark);row(controls,button("上一章",()->chapterStep(-1)),button("下一章",()->chapterStep(1)),markButton,button("书签列表",this::bookmarks));
+        body.addView(new ControlScroll(this,controls));
         viewport=new FrameLayout(this);viewport.setBackgroundColor(Color.rgb(32,37,44));body.addView(viewport,new LinearLayout.LayoutParams(-1,0,1));
-        status=new TextView(this);status.setText("正在读取漫画…\n外部 ZIP 首次打开需准备缓存，可返回取消。");status.setTextSize(12);status.setLines(3);status.setEllipsize(android.text.TextUtils.TruncateAt.END);status.setGravity(Gravity.CENTER);body.addView(status);
-        row(body,button("‹ 上一页",()->step(-1)),button("页码 / 跳页",this::jumpPage),button("下一页 ›",()->step(1)));
+        LinearLayout navigation=new LinearLayout(this);navigation.setOrientation(LinearLayout.VERTICAL);
+        status=new TextView(this);status.setText("正在读取漫画…\n外部 ZIP 首次打开需准备缓存，可返回取消。");status.setTextSize(12);status.setLines(3);status.setEllipsize(android.text.TextUtils.TruncateAt.END);status.setGravity(Gravity.CENTER);navigation.addView(status);
+        row(navigation,button("‹ 上一页",()->step(-1)),button("页码 / 跳页",this::jumpPage),button("下一页 ›",()->step(1)));
+        body.addView(new ControlScroll(this,navigation));
         setContentView(body);
         viewport.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
             if(!ready||closed||r-l==0||b-t==0)return;

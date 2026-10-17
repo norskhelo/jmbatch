@@ -47,7 +47,7 @@ public final class MainActivity extends Activity {
 
         LinearLayout target=card();target.addView(text("新增任务保存到",13,MUTED));
         output=text(store.settings.outputLabel,14,INK);output.setPadding(0,dp(8),0,dp(6));target.addView(output);
-        LinearLayout targets=horizontal();targets.addView(button("选择目录",v->chooseDirectory()),new LinearLayout.LayoutParams(0,-2,1));targets.addView(button("应用目录",v->{store.settings.outputUri="";store.settings.outputLabel="应用下载目录";save();output.setText(store.settings.outputLabel);}),new LinearLayout.LayoutParams(0,-2,1));target.addView(targets);
+        target.addView(new ActionRow(this,button("选择目录",v->chooseDirectory()),button("应用目录",v->{store.settings.outputUri="";store.settings.outputLabel="应用下载目录";save();output.setText(store.settings.outputLabel);})));
         target.addView(button("打开保存目录",v->new SavedDirectory(this,store.settings.outputUri,store.settings.outputLabel).openExternal()));
         RadioGroup formats=new RadioGroup(this);formats.setOrientation(RadioGroup.HORIZONTAL);
         String[] labels={"PDF","ZIP","文件夹"},values={"pdf","zip","images"};
@@ -65,7 +65,7 @@ public final class MainActivity extends Activity {
         input.addView(button("添加连续区间",v->{if(addIds(rangeFirst.getText().toString().trim()+"-"+rangeLast.getText().toString().trim())){rangeFirst.setText("");rangeLast.setText("");}}));
         input.addView(text("自动去重 · 每次最多 2000 个编号\n保存目录和格式在加入队列时确定，下载后可互相导出",11,MUTED));add(input,0,12);
 
-        LinearLayout actions=horizontal();start=buttonAccent("开始 / 继续",v->startQueue());pause=button("暂停全部",v->send(DownloadService.PAUSE,null));actions.addView(start,new LinearLayout.LayoutParams(0,-2,1));actions.addView(pause,new LinearLayout.LayoutParams(0,-2,1));add(actions,0,8);
+        start=buttonAccent("开始 / 继续",v->startQueue());pause=button("暂停全部",v->send(DownloadService.PAUSE,null));add(new ActionRow(this,start,pause),0,8);
         summary=text("",13,MUTED);add(summary,0,4);global=text("",12,ACCENT);add(global,0,10);
         queue=column();layout.addView(queue);more=button("显示更多任务",v->{limit+=50;render();});layout.addView(more);
         layout.addView(button("移除已完成 / 已取消记录",v->new AlertDialog.Builder(this).setTitle("移除队列记录？").setMessage("成品和缓存不会删除；移除的记录不能继续用于续传。").setNegativeButton("返回",null).setPositiveButton("移除",(d,w)->{clearHistory();}).show()));
@@ -175,7 +175,7 @@ public final class MainActivity extends Activity {
             title=text("",15,INK);title.setTypeface(null,Typeface.BOLD);title.setMaxLines(2);description.addView(title);state=text("",12,MUTED);state.setPadding(0,dp(7),0,dp(6));description.addView(state);
             progress=new ProgressBar(MainActivity.this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(1000);card.addView(progress,new LinearLayout.LayoutParams(-1,dp(8)));
             phase=text("",12,MUTED);phase.setPadding(0,dp(7),0,0);card.addView(phase);
-            LinearLayout actions=horizontal();actions.addView(button("详情",v->details(task)),new LinearLayout.LayoutParams(0,-2,1));actions.addView(button("重试",v->retry(task)),new LinearLayout.LayoutParams(0,-2,1));open=button("打开",v->open(task,false));actions.addView(open,new LinearLayout.LayoutParams(0,-2,1));card.addView(actions);
+            open=button("打开",v->open(task,false));card.addView(new ActionRow(MainActivity.this,button("详情",v->details(task)),button("重试",v->retry(task)),open));
         }
     }
 
@@ -267,7 +267,7 @@ public final class MainActivity extends Activity {
     private LinearLayout card(){LinearLayout v=column();v.setPadding(dp(14),dp(14),dp(14),dp(14));GradientDrawable shape=new GradientDrawable();shape.setColor(Color.WHITE);shape.setCornerRadius(dp(14));v.setBackground(shape);return v;}
     private TextView text(String value,int size,int color){TextView v=new TextView(this);v.setText(value);v.setTextSize(size);v.setTextColor(color);v.setLineSpacing(dp(2),1);return v;}
     private EditText edit(String hint,boolean number){EditText v=new EditText(this);v.setTextSize(15);v.setTextColor(INK);v.setHintTextColor(MUTED);v.setHint(hint);v.setSingleLine(number);if(number)v.setInputType(InputType.TYPE_CLASS_NUMBER);v.setSelectAllOnFocus(false);return v;}
-    private Button button(String label,View.OnClickListener click){Button v=new Button(this);v.setText(label);v.setTextSize(13);v.setTextColor(ACCENT);v.setAllCaps(false);v.setMinHeight(dp(46));v.setPadding(dp(8),0,dp(8),0);v.setOnClickListener(click);return v;}
+    private Button button(String label,View.OnClickListener click){Button v=new ActionButton(this);v.setText(label);v.setTextSize(13);v.setTextColor(ACCENT);v.setOnClickListener(click);return v;}
     private Button buttonAccent(String label,View.OnClickListener click){Button v=button(label,click);v.setTextColor(Color.WHITE);v.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ACCENT));return v;}
     private void add(View view,int top,int bottom){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(top);p.bottomMargin=dp(bottom);layout.addView(view,p);}
 }

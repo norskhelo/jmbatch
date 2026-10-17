@@ -11,6 +11,7 @@ import java.util.zip.*;
 public final class Diagnostics {
     static final String VECTOR="HwoKLf5mI5eCAmt1zSQBMxSeVAtaes6+B1gnn+PxxGwW/BjFByGuhNemotgHMIeR";
     public static String run(Context context) throws Exception {
+        int fontScenarios=ActionLayoutDiagnostics.run(context);
         File root=new File(context.getFilesDir(),"self-test");if(!root.exists()&&!root.mkdirs())throw new IOException("无法创建自检目录");
         require(Core.parseIds("JM123456,123456,123457-123460").size()==5,"编号解析");
         require(Core.decrypt(VECTOR,"1700566805",Core.API_SECRET).equals("{\"id\":123456,\"name\":\"offline-test\"}"),"API 解密对照");
@@ -100,7 +101,7 @@ public final class Diagnostics {
             for(LibraryStore.Entry entry:exported)AlbumStorage.remove(context,android.net.Uri.parse(entry.uri));
             if(singleUri!=null)AlbumStorage.remove(context,singleUri);Downloader.deleteOwned(singleStage,root);
         }
-        String report="离线自检通过\n\n编号与区间解析、API 解密对照、图片分段和重排、JPEG 保存、PDF 系统渲染、排序图片目录保存、分章节 PDF、PDF / ZIP / 文件夹六向互转和源文件保留均通过。\n\n没有请求漫画网站；不代表真实网络和账号访问已经验证。";
+        String report="离线自检通过\n\n按钮字体布局 "+fontScenarios+" 个场景通过（系统字体、衬线、等宽、粗体，1–2 倍字号，窄屏及横屏宽度）。\n\n编号与区间解析、API 解密对照、图片分段和重排、JPEG 保存、PDF 系统渲染、排序图片目录保存、分章节 PDF、PDF / ZIP / 文件夹六向互转和源文件保留均通过。\n\n没有请求漫画网站；不代表真实网络和账号访问已经验证。";
         Downloader.writeTextAtomic(new File(root,"report.txt"),report);return report;
     }
     private static void require(boolean condition,String name)throws IOException{if(!condition)throw new IOException("自检未通过："+name);}

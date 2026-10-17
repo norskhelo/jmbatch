@@ -2,20 +2,20 @@
 
 支持 Windows 和 Android 的批量漫画下载工具。下载可选择 PDF、ZIP 或图片文件夹，三种成品可离线互相导出。
 
-当前源码及正式版本：**Windows 0.3.13 / Android 0.5.7（versionCode 507）**。本版应用内更新下载在 GitHub 失败后自动尝试 GHFast、GH-Proxy，保留签名和 SHA-256 校验。安装包、更新日志与镜像入口见下方。
+当前源码及正式版本：**Windows 0.3.13 / Android 0.5.8（versionCode 508）**。Android 本版修复更换系统字体、放大字号时的按钮尺寸与布局异常；Windows 保持 0.3.13。安装包、更新日志与镜像入口见下方。
 
 ## 下载安装包（含国内镜像）
 
 GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
 
-当前正式版为 **Windows 0.3.13 / Android 0.5.7**（[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.13-0.5.7)，[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.13-0.5.7)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+当前正式版为 **Windows 0.3.13 / Android 0.5.8**（[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-android-0.5.8)，[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.13-0.5.7)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
 
 | 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
 | --- | --- | --- | --- |
 | Windows 0.3.13 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/JMBatch-0.3.13-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/JMBatch-0.3.13-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/JMBatch-0.3.13-Windows-x64.zip) |
-| Android 0.5.7 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/JMBatch-0.5.7-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/JMBatch-0.5.7-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/JMBatch-0.5.7-Android.apk) |
+| Android 0.5.8 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.8/JMBatch-0.5.8-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.8/JMBatch-0.5.8-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.8/JMBatch-0.5.8-Android.apk) |
 | Windows 0.3.13 的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/SHA256-release-0.3.13-0.5.7.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/SHA256-release-0.3.13-0.5.7.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/SHA256-release-0.3.13-0.5.7.txt) |
-| Android 0.5.7 的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/SHA256-release-0.3.13-0.5.7.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/SHA256-release-0.3.13-0.5.7.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/SHA256-release-0.3.13-0.5.7.txt) |
+| Android 0.5.8 的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.8/SHA256-release-android-0.5.8.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.8/SHA256-release-android-0.5.8.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.8/SHA256-release-android-0.5.8.txt) |
 
 镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像同时用于手动下载及本版应用内更新文件下载的自动回退，版本查询仍使用 GitHub API，应用内更新仓库填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
 
@@ -105,3 +105,5 @@ Android 0.5.2：移除上一版误用的华为云空间入口，改用原生文�
 ## 翻页体验
 
 左右翻页保留旧图直到新页就绪，按阅读方向预加载邻页。Windows 可鼠标拖动，Android 可跟手滑动；短拖和越界回弹。页码、书签和阅读位置在新页显示后提交。缓存有内存上限，目标页尚未就绪时显示加载提示。
+
+Android 0.5.8：按钮按实际字体尺寸调整高度和每行数量，同排等高；大字号或横屏下阅读器/漫画库操作区可以滚动，并保留内容区域。保持系统字体与字号缩放。1086 项既有宿主检查、96 组合成布局场景和原签名构建通过，尚未进行真机字体视觉验收。

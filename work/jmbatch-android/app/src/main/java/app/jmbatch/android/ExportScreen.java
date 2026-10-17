@@ -34,8 +34,8 @@ public final class ExportScreen {
         formats.setOnCheckedChangeListener((g,id)->{split.setEnabled(id==pdf.getId()&&!entry.format.equals("pdf"));numeric.setEnabled(id!=images.getId());});
         split.setEnabled(pdf.isChecked()&&!entry.format.equals("pdf"));numeric.setEnabled(!images.isChecked());
         destination=new TextView(activity);destination.setText(label);form.addView(destination);
-        Button choose=new Button(activity);choose.setText("选择导出目录");choose.setOnClickListener(v->{pending=this;try{activity.startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION|Intent.FLAG_GRANT_PREFIX_URI_PERMISSION),DIRECTORY_REQUEST);}catch(Exception e){pending=null;error("系统目录选择器不可用");}});form.addView(choose);
-        Button app=new Button(activity);app.setText("导出到应用目录");app.setOnClickListener(v->{tree="";label="应用下载目录";destination.setText(label);});form.addView(app);
+        Button choose=new ActionButton(activity);choose.setText("选择导出目录");choose.setOnClickListener(v->{pending=this;try{activity.startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION|Intent.FLAG_GRANT_PREFIX_URI_PERMISSION),DIRECTORY_REQUEST);}catch(Exception e){pending=null;error("系统目录选择器不可用");}});form.addView(choose);
+        Button app=new ActionButton(activity);app.setText("导出到应用目录");app.setOnClickListener(v->{tree="";label="应用下载目录";destination.setText(label);});form.addView(app);
         ScrollView scroll=new ScrollView(activity);scroll.addView(form);
         dialog=new AlertDialog.Builder(activity).setTitle("导出："+entry.title).setView(scroll).setNegativeButton("取消",null).setPositiveButton("开始导出",null).create();
         dialog.setOnDismissListener(d->{if(pending==this)pending=null;});
