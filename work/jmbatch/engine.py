@@ -5,6 +5,7 @@ import json
 import multiprocessing as mp
 import queue
 import time
+import threading
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -40,6 +41,9 @@ class Engine:
         self.running = False
         self.cleaning = False
         self.active: dict[str, WorkerState] = {}
+        self.cancelling = {}
+        self.cancel_workers = {}
+        self.cancel_events = queue.Queue()
         self.last_saved = 0
         self.context = mp.get_context("spawn")
         self.load()
@@ -128,16 +132,63 @@ class Engine:
             self.save()
 
     def cancel(self, keys):
+        if self.cleaning:
+            self.notify("正在清理缓存，请稍后取消任务。")
+            return
         for task in self.tasks:
-            if task.key not in keys or task.status in ("done", "cancelled"):
+            if task.key not in keys or task.status == "done" or task.key in self.cancelling:
                 continue
-            state = self.active.pop(task.key, None)
-            if state:
-                self._stop_process(state)
-            task.status = "cancelled"
+            task.status = "cancelling"
             task.speed = 0
-            task.phase = "已取消，缓存保留供重试"
+            task.phase = "正在取消并删除任务文件…"
+            task.error = ""
+            self.save()  # Persist intent before stopping the worker or deleting.
+            state = self.active.pop(task.key, None) or self.cancel_workers.pop(task.key, None)
+            self.cancelling[task.key] = state
+            snapshot = task.to_dict()
+            def discard(task_key=task.key, worker=state, data=snapshot):
+                from cancellation import discard_task
+                from cache_cleanup import CleanupResult
+                try:
+                    if worker:
+                        self._stop_process(worker)
+                    result = discard_task(data)
+                except Exception:
+                    result = CleanupResult(errors=1)
+                self.cancel_events.put((task_key, result))
+            threading.Thread(target=discard, name="cancel-cleanup", daemon=True).start()
         self.save()
+
+    def _tick_cancellations(self):
+        while not self.cancel_events.empty():
+            key, result = self.cancel_events.get_nowait()
+            task = next((t for t in self.tasks if t.key == key), None)
+            worker = self.cancelling.pop(key, None)
+            if worker and worker.process is not None:
+                self.cancel_workers[key] = worker
+            if task is None:
+                continue
+            if result.errors:
+                task.status = "cancel_failed"
+                task.phase = "取消清理未完成；再次点击取消可重试清理"
+                task.error = "文件被占用、目录不可访问或路径异常；已保留记录。"
+            else:
+                task.status = "cancelled"
+                self.tasks.remove(task)
+            self.notify(f"JM{task.album_id} " + result.message(True)
+                        + ("；记录保留" if result.errors else "；已移除任务记录"))
+            try:
+                self.save()
+            except OSError:
+                # Keep a durable retryable intent when removing the record fails.
+                if task not in self.tasks:
+                    self.tasks.append(task)
+                task.status = "cancel_failed"
+                task.phase = "文件已清理，记录保存失败；再次取消可重试"
+                raise
+        pending = [t.key for t in self.tasks if t.status == "cancelling" and t.key not in self.cancelling]
+        if pending:
+            self.cancel(pending)
 
     def retry(self, keys, settings: Settings | None = None):
         if self.cleaning:
@@ -322,6 +373,7 @@ class Engine:
 
     def tick(self, now=None):
         now = time.monotonic() if now is None else now
+        self._tick_cancellations()
         for state in list(self.active.values()):
             self._tick_worker(state, now)
         if self.running and not self.cleaning:

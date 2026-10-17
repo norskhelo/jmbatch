@@ -12,7 +12,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-VERSION = "0.3.9"
+VERSION = "0.3.10"
 ZIP_LAYOUT_VERSION = 3
 MAX_TASKS = 2000
 
@@ -263,6 +263,8 @@ def export_images(task: dict, title: str, entries: list[dict], emit) -> Path:
         with zipfile.ZipFile(temporary) as archive:
             if archive.testzip() is not None or len(archive.infolist()) != len(paths):
                 raise ValueError("ZIP 完整性校验失败，成品未保存。")
+    from cancellation import remember_publication
+    remember_publication(task, temporary, final)
     # Windows rename fails atomically if the destination exists, including races.
     if os.name == "nt":
         os.rename(temporary, final)

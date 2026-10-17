@@ -66,5 +66,11 @@ public final class CacheCleanup {
         }catch(IOException|SecurityException error){result.errors++;}
         progress.update(result);return result;
     }
+    public static Result discard(File cache,File owner,Progress progress){
+        Result result=new Result();
+        if(!Files.exists(cache.toPath(),LinkOption.NOFOLLOW_LINKS))return result;
+        remove(cache,owner,result,progress);
+        progress.update(result);return result;
+    }
     private CacheCleanup(){}
 }

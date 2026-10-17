@@ -8,6 +8,7 @@ import java.util.zip.CRC32;
 /** One-copy image publication with write-time CRC and independent target readback. */
 public final class FolderSave {
     public interface Check { void run() throws Exception; }
+    public interface Ownership { void record(File file) throws Exception; }
     public interface Progress { void update(String phase,int done,int total,long bytes,long totalBytes) throws Exception; }
     public interface Target {
         OutputStream write() throws Exception;
@@ -63,6 +64,9 @@ public final class FolderSave {
         check.run();progress.update("saved_verify",done+1,total,bytes+entry.size,totalBytes);
     }
     public static File publish(File root,List<Entry> entries,String name,Check check,Progress progress) throws Exception {
+        return publish(root,entries,name,check,progress,file->{});
+    }
+    public static File publish(File root,List<Entry> entries,String name,Check check,Progress progress,Ownership ownership) throws Exception {
         if(name.isEmpty()||name.equals(".")||name.equals("..")||name.contains("/")||name.contains("\\"))
             throw new IOException("输出名称无效");
         long totalBytes=validate(entries);check.run();
@@ -71,6 +75,7 @@ public final class FolderSave {
         if(Files.exists(result.toPath(),LinkOption.NOFOLLOW_LINKS))throw new IOException("同名文件已存在，未覆盖："+name);
         Files.createDirectory(temporary.toPath());
         try{
+            ownership.record(temporary);
             int done=0;long bytes=0;
             for(Entry entry:entries){
                 check.run();File target=new File(temporary,entry.path);
@@ -83,9 +88,9 @@ public final class FolderSave {
                 },check,progress,done,entries.size(),bytes,totalBytes);
                 done++;bytes+=entry.size;
             }
-            check.run();Files.move(temporary.toPath(),result.toPath());return result;
+            check.run();Files.move(temporary.toPath(),result.toPath());ownership.record(result);return result;
         }finally{
-            if(temporary.exists())clean(temporary,root,()->{},progress);
+            if(temporary.exists()){clean(temporary,root,()->{},progress);ownership.record(null);}
         }
     }
     private static void collect(File file,String owner,List<File> ordered,Check check) throws Exception {

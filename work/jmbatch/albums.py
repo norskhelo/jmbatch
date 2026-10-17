@@ -107,6 +107,8 @@ def save_album(task, title, entries, emit):
             emit(dict(type="export_progress", message=f"保存图片 {len(records)}/{len(entries)}"))
         if not records:
             raise ValueError("没有可用图片")
+        from cancellation import remember_publication
+        remember_publication(task, staging, final)
         os.rename(staging, final)
         atomic_json(album_index(final), dict(version=LAYOUT_VERSION, id=task["album_id"], title=title, entries=records))
         read_album(final)

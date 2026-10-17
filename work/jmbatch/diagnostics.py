@@ -626,6 +626,9 @@ def run_self_test(directory: Path):
         from cleanup_checks import check_cleanup_ui
         check_cleanup_ui(application, directory)
         report["checks"].append("cache cleanup UI: real button, background work, accurate result, resume protection and start exclusion")
+        from cancellation_checks import check_cancel_ui
+        check_cancel_ui(application, directory)
+        report["checks"].append("Cancel button: background file deletion, row removal, persisted queue and minimum window layout")
         root.destroy()
         report["ok"] = True
     except Exception:

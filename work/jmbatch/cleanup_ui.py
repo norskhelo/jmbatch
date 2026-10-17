@@ -9,7 +9,7 @@ from cache_cleanup import clean_tasks
 
 def show_cleanup(app):
     engine = app.engine
-    if engine.running or engine.active or engine.cleaning:
+    if engine.running or engine.active or engine.cancelling or engine.cancel_workers or engine.cleaning:
         messagebox.showinfo('清理下载缓存', '请先暂停全部下载，等待请求结束；清理过程中不能开始下载。', parent=app.root)
         return
     engine.cleaning = True

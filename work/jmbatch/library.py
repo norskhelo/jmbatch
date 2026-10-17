@@ -173,7 +173,7 @@ class Library:
             raise OSError(self.error)
         item = self.entries[key]
         # Do not race a task which may currently publish into the same directory.
-        if any(t.status in ("queued", "running", "resetting") and
+        if any(t.status in ("queued", "running", "resetting", "cancelling", "cancel_failed") and
                self.key(t.settings["output"]) == self.key(item["root"]) and
                str(t.album_id) == item["id"] for t in tasks):
             raise OSError("这本漫画仍有待下载或进行中的任务，请先暂停或取消")

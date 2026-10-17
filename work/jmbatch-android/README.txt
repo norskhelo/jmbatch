@@ -1,16 +1,16 @@
-JM Batch 0.5.3 — Android 使用说明
+JM Batch 0.5.4 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每个任务图片线程数”控制单本图片并发。
-3. 调高任务数自动补位；调低时等待已运行任务结束。取消单个任务不会影响其他任务；暂停会停止全部下载并保留缓存。
+3. 调高任务数自动补位；调低时等待已运行任务结束。取消会删除该任务文件和记录，不影响其他任务；暂停会停止全部下载并保留缓存。
 4. 文件夹和 ZIP 只含图片：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。导出和文件删除前请暂停下载并等待请求退出。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-17）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/JMBatch-0.5.3-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/JMBatch-0.5.3-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/JMBatch-0.5.3-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.3/SHA256-release-android-0.5.3.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.10-0.5.4/JMBatch-0.5.4-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.10-0.5.4/JMBatch-0.5.4-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.10-0.5.4/JMBatch-0.5.4-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.10-0.5.4/SHA256-release-0.3.10-0.5.4.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,19 +28,19 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Android 0.5.3 — 2026-10-17
+Windows 0.3.10 / Android 0.5.4 — 2026-10-17
 
-下载取消响应优化
+取消任务后自动删除文件与记录
 
-• 修复图片下载时取消或暂停容易卡住界面的问题：先停止派发后续页面，再在后台并行关闭当前网络连接，避免一个慢连接拖住取消按钮和其他连接。
-• 同一网络请求只关闭一次，重复点击取消不会重复清理连接；取消时立即显示停止状态并归零速度。
-• 图片压缩结束后及刷盘后及时检查取消，减少无用的后续处理；正常下载仍保留刷盘、图片尺寸和成品完整性校验。
-• 完整图片缓存保留，重试只补缺失或损坏页面；等待旧工作线程真正退出后才允许重试，避免同时写入缓存。取消单个任务不影响其他任务。
-• 个别设备的网络请求或当前图片处理仍可能等待系统操作结束或超时，不承诺所有情况下瞬间取消。
+• 取消未完成任务后，自动停止下载，后台删除该任务已下载图片、章节缓存、下载/导出临时文件及尚未确认完成的任务输出；清理成功后自动移除队列记录，无需再手动删除。
+• 取消与暂停明确区分：暂停继续保留完整图片和断点续传；取消会放弃进度，即使设置了保留图片缓存也会删除该取消任务的缓存。重新添加相同编号时创建新任务。
+• 清理先等待下载进程及图片、章节工作线程退出，避免清理后又写回文件；重复取消不会重复启动清理，取消单个任务不影响其他任务。
+• 显示取消清理状态和结果。文件占用、目录权限失效或异常路径导致清理失败时保留任务记录；再次点击取消或重试会重试清理，不会重新下载。应用重开后继续处理未完成的取消清理。
+• 仅清理该任务记录的文件和缓存，不按漫画编号或文件名批量删除；保护其他任务、已完成任务、已有同名成品、收藏与书签，拒绝跟随链接目录。旧版已取消记录不会在升级时被批量删除，可再次取消以清理。
 
 版本与验证
 
-• Android 0.5.2 → 0.5.3，versionCode 503；Windows 保持 0.3.9。沿用原包名、APK 签名证书与更新公钥，支持覆盖安装并保留设置、队列和收藏。
-• 7000 页、16 路受阻请求的取消场景通过，覆盖响应头/响应体等待、重复取消、后续页面停止、临时文件清理、完整缓存及任务互斥；完成 928 项 Android 宿主检查、编译和原证书签名验证。
-• 尚未连接 Android 真机；模拟测试验证取消调度，不代表手机上的实际耗时。未下载真实漫画图片或修改用户缓存。
-• 发布新版 APK、同版日志、SHA-256 校验文件、更新清单与原密钥签名，并同步源码和应用内公告。
+• Windows 0.3.9 → 0.3.10；Android 0.5.3 → 0.5.4（versionCode 504），沿用 Android 包名、APK 签名证书与更新公钥。
+• 验证取消后的文件及队列持久化、暂停保护、重复取消、失败重试、重启恢复、成品保存竞争和链接路径边界；使用隔离测试数据，不清理用户真实下载。
+• Windows 执行回归、源码与冻结成品自检；Android 执行宿主检查、编译与原证书签名核验。未连接 Android 真机，不将宿主结果作为手机实测。
+• 发布双端安装包、同版日志、SHA-256 校验文件、更新清单及原密钥签名，并推送源码和使用说明。

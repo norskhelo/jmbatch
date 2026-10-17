@@ -20,7 +20,7 @@ BG = "#f3f5f8"
 INK = "#172c3e"
 MUTED = "#617387"
 ACCENT = "#087f8c"
-STATUS = {"selecting": "待选章节", "queued": "等待", "running": "进行中", "paused": "已暂停", "resetting": "重建连接", "failed": "失败", "done": "下载完成", "cancelled": "已取消"}
+STATUS = {"cancelling": "取消清理中", "cancel_failed": "取消清理失败", "selecting": "待选章节", "queued": "等待", "running": "进行中", "paused": "已暂停", "resetting": "重建连接", "failed": "失败", "done": "下载完成", "cancelled": "已取消"}
 
 
 def app_home():
@@ -157,7 +157,8 @@ class App:
         self.pause_button = ttk.Button(bar, text="暂停全部", command=self.pause)
         self.pause_button.pack(side="left", padx=7)
         ttk.Button(bar, text="重试选中", command=self.retry).pack(side="left")
-        ttk.Button(bar, text="取消选中", command=self.cancel).pack(side="left", padx=7)
+        self.cancel_button = ttk.Button(bar, text="取消并删除", command=self.cancel)
+        self.cancel_button.pack(side="left", padx=7)
         ttk.Button(bar, text="移除记录", command=self.remove).pack(side="left")
         ttk.Button(bar, text="已下载漫画", command=self.show_library).pack(side="left", padx=6)
         ttk.Button(bar, text="软件内阅读", command=self.open_selected).pack(side="right")
@@ -308,17 +309,23 @@ class App:
 
     def retry(self):
         try:
+            cancelling = {t.key for t in self.engine.tasks if t.key in self.tree.selection() and t.status == "cancel_failed"}
+            if cancelling:
+                self.engine.cancel(cancelling)
             count = self.engine.retry(set(self.tree.selection()), self.current_settings())
             if count:
                 self.engine.start()
                 self.log(f"重新排队 {count} 个任务，使用当前网络设置；保留原输出路径和下载格式。")
-            else:
+            elif not cancelling:
                 messagebox.showinfo("重试任务", "请选中失败、暂停或取消的任务。", parent=self.root)
         except (ValueError, OSError) as exc:
             messagebox.showerror("无法重试", str(exc), parent=self.root)
 
     def cancel(self):
-        self.engine.cancel(set(self.tree.selection()))
+        try:
+            self.engine.cancel(set(self.tree.selection()))
+        except OSError as exc:
+            messagebox.showerror("无法保存取消状态", str(exc), parent=self.root)
         self.render()
 
     def show_library(self):

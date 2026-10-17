@@ -66,8 +66,14 @@ public class FolderSaveTest {
         check(first.exists()&&second.exists());
         File retried=FolderSave.publish(exports.toFile(),entries,"retry",CONTINUE,QUIET);check(retried.isDirectory());
         // Flat single-chapter layout and cleanup progress are independent of original source paths.
-        File flat=FolderSave.publish(exports.toFile(),Arrays.asList(new FolderSave.Entry(second,"00001.jpg",3)),"flat",CONTINUE,QUIET);
+        List<File> owned=new ArrayList<>();
+        File flat=FolderSave.publish(exports.toFile(),Arrays.asList(new FolderSave.Entry(second,"00001.jpg",3)),"flat",CONTINUE,QUIET,owned::add);
         check(new File(flat,"00001.jpg").isFile());
+        check(owned.size()==2);check(owned.get(0).getName().endsWith(".partial"));check(owned.get(1).equals(flat));
+        owned.clear();
+        fails(()->FolderSave.publish(exports.toFile(),Arrays.asList(new FolderSave.Entry(second,"00001.jpg",3)),"cancel-owned",CONTINUE,
+            (phase,done,total,bytes,size)->{if(phase.equals("save"))throw new IOException("cancel");},owned::add));
+        check(owned.size()==2);check(owned.get(1)==null);check(!owned.get(0).exists());
         fails(()->FolderSave.clean(sources.toFile(),exports.toFile(),CONTINUE,QUIET));check(first.exists());
         List<Integer> cleaned=new ArrayList<>();
         FolderSave.clean(sources.toFile(),root.toFile(),CONTINUE,(phase,done,total,bytes,size)->{if(total>0){check(total==2);cleaned.add(done);}});

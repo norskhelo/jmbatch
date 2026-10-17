@@ -93,7 +93,7 @@ class ConcurrentQueueTests(unittest.TestCase):
         self.engine.tick()
         self.assertEqual(processes, {k: s.process.pid for k, s in self.engine.active.items()})
         self.engine.cancel([a.key])
-        self.engine.tick()
+        self.until(lambda: a not in self.engine.tasks)
         self.assertEqual(a.status, 'cancelled')
         self.assertEqual(c.status, 'queued')
         self.assertEqual(self.engine.active[b.key].process.pid, processes[b.key])
@@ -163,6 +163,7 @@ class ConcurrentQueueTests(unittest.TestCase):
         self.engine.tick()
         self.assertEqual(b.status, 'resetting')
         self.engine.cancel([b.key])
+        self.until(lambda: b not in self.engine.tasks)
         self.assertNotIn(b.key, self.engine.active)
         self.assertEqual(b.status, 'cancelled')
 

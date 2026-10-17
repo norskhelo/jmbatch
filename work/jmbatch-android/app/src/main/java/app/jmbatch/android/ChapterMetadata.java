@@ -16,7 +16,9 @@ public final class ChapterMetadata {
     public interface Fetch { Detail get(String id) throws Exception; }
     public interface Progress { void update(int done,int total,int cached) throws Exception; }
     public static final class UnstoppedWorkers extends IOException {
-        UnstoppedWorkers(){super("旧章节线程未能退出，请重启应用后重试");}
+        private final ExecutorService pool;
+        UnstoppedWorkers(ExecutorService pool){super("旧章节线程未能退出，等待退出后再处理任务");this.pool=pool;}
+        public void awaitStopped(){WorkerDrain.await(pool);}
     }
     public static final class Detail {
         public final List<String> images;
@@ -112,8 +114,8 @@ public final class ChapterMetadata {
                 if(!success)abort.run();
                 for(Future<Result> future:active)future.cancel(true);
                 pool.shutdownNow();
-                try{if(!pool.awaitTermination(timeout+10L,TimeUnit.SECONDS))throw new UnstoppedWorkers();}
-                catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new UnstoppedWorkers();}
+                try{if(!pool.awaitTermination(timeout+10L,TimeUnit.SECONDS))throw new UnstoppedWorkers(pool);}
+                catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new UnstoppedWorkers(pool);}
             }
         }
         check.run();List<Detail> ordered=new ArrayList<>();for(String id:ids)ordered.add(values.get(id));return ordered;

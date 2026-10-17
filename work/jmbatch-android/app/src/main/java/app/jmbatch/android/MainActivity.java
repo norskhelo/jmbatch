@@ -35,6 +35,7 @@ public final class MainActivity extends Activity {
 
     public void onCreate(Bundle state){
         super.onCreate(state);store=Store.get(this);downloadCovers=new DownloadCovers(this);
+        for(Store.Task task:store.snapshot())if(task.discardRequested&&task.status.equals("cancelling"))send(DownloadService.CANCEL,task.key);
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
         layout=column();layout.setPadding(dp(18),dp(20),dp(18),dp(28));scroll.addView(layout);setContentView(scroll);
@@ -179,6 +180,7 @@ public final class MainActivity extends Activity {
     }
 
     private void retry(Store.Task task){
+        if(task.discardRequested){send(DownloadService.CANCEL,task.key);return;}
         if(store.activeKeys.contains(task.key)){toast("旧请求正在结束，请稍后重试");return;}
         if(!Arrays.asList("failed","paused","cancelled").contains(task.status)){toast("仅失败、暂停或取消的任务可重试");return;}
         String outputUri=task.settings.outputUri,outputLabel=task.settings.outputLabel,format=task.settings.format;
@@ -191,7 +193,7 @@ public final class MainActivity extends Activity {
         TextView content=text(message,14,INK);content.setPadding(dp(20),dp(10),dp(20),dp(10));content.setTextIsSelectable(true);ScrollView scroll=new ScrollView(this);LinearLayout details=column();details.addView(content);details.addView(button("打开此任务保存目录",v->new SavedDirectory(this,task.settings.outputUri,task.settings.outputLabel).openExternal()));scroll.addView(details);
         AlertDialog.Builder builder=new AlertDialog.Builder(this).setTitle("任务详情").setView(scroll).setNegativeButton("关闭",null);
         if(task.status.equals("done"))builder.setPositiveButton("格式互转 / 导出",(d,w)->new ExportScreen(this,store,albumEntry(task)).show());
-        else builder.setPositiveButton("取消任务",(d,w)->{send(DownloadService.CANCEL,task.key);});
+        else builder.setPositiveButton(task.discardRequested?"重试取消清理":"取消并删除文件",(d,w)->{send(DownloadService.CANCEL,task.key);});
         if(!task.status.equals("running")&&!task.status.equals("resetting"))builder.setNeutralButton("清理临时缓存",(d,w)->CleanupScreen.show(this,store,task));
         builder.show();
     }

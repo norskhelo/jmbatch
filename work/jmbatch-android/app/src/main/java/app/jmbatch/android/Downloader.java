@@ -97,7 +97,7 @@ public final class Downloader {
         try{details=ChapterMetadata.load(selectedIds,metadata,fetch,control::check,
             ()->{if(control.stop.isEmpty())control.cancel("ABORT");},
             (done,total,cached)->{control.lastData=SystemClock.elapsedRealtime();task.phase="读取所选章节 "+done+"/"+total+"（复用 "+cached+" 章，最多 "+task.settings.chapterWorkers+" 章并行）";},task.settings.timeout,task.settings.chapterWorkers);}
-        catch(ChapterMetadata.UnstoppedWorkers error){control.cancel("FATAL");throw error;}
+        catch(ChapterMetadata.UnstoppedWorkers error){control.cancel("FATAL");task.phase="等待旧章节线程退出后处理任务";error.awaitStopped();throw error;}
         List<ImageJob> jobs = new ArrayList<>(); Set<String> chapterIds = new HashSet<>(); int detailIndex=0;
         for (ChapterRules.Chapter chapter : chosen) {
             control.check(); String id = chapter.id;
@@ -134,7 +134,7 @@ public final class Downloader {
                     control::check, () -> { if (control.stop.isEmpty()) control.cancel("ABORT"); }, task.settings.timeout))
                 failed.add(new SinglePageRecovery.Failure<>(failure.page, failure.error,
                     "第 " + failure.page.chapter + " 章第 " + failure.page.page + " 页"));
-        } catch (ImagePipeline.UnstoppedWorkers error) { control.cancel("FATAL"); throw error; }
+        } catch (ImagePipeline.UnstoppedWorkers error) { control.cancel("FATAL");task.phase="等待旧图片线程退出后处理任务";error.awaitStopped();throw error; }
         control.check();
         for(SinglePageRecovery.Failure<ImageJob> failure:failed)metadata.invalidate(failure.page.chapterId);
         SinglePageRecovery.recover(failed,(job,round)->downloadImage(api,job,round),control::check,
@@ -159,7 +159,7 @@ public final class Downloader {
                 entries.put(new JSONObject().put("chapter",job.chapter).put("page",job.page).put("file",relative).put("size",size));
             }
             String filename=Core.outputName(task.id,task.title,"images",false);String folderName=filename.substring(0,filename.length()-7);
-            String uri=AlbumStorage.publishImages(context,sources,task.settings.outputUri,folderName,control::check,this::saveProgress).toString();
+            String uri=AlbumStorage.publishImages(context,sources,task.settings.outputUri,folderName,control::check,this::saveProgress,this::rememberOutput).toString();
             AlbumStorage.remember(context,Uri.parse(uri),new JSONObject().put("version",AlbumRules.LAYOUT_VERSION).put("id",task.id).put("title",task.title).put("entries",entries));
             // Once published, finish the marker even if pause arrived during the last rename.
             AlbumStorage.load(context,Uri.parse(uri),()->{},this::saveProgress);
@@ -303,10 +303,15 @@ public final class Downloader {
             if (!directory.exists() && !directory.mkdirs()) throw new IOException("无法创建输出目录");
             File partial = new File(directory, name + "." + task.key + ".partial"), result = new File(directory,name);
             if (result.exists()) throw duplicate(name);
+            if(!partial.createNewFile())throw new IOException("临时输出已存在，请取消任务清理后重新添加");
+            try {
+            rememberOutput(ExportProvider.uri(context,partial));
             try (InputStream input = new FileInputStream(source); FileOutputStream output = new FileOutputStream(partial)) { copyChecked(input,output); output.getFD().sync(); }
             if (partial.length() != source.length() || crc(partial) != crc(source)) throw new IOException("输出文件校验失败");
             control.check(); Files.move(partial.toPath(),result.toPath()); source.delete();
+            rememberOutput(ExportProvider.uri(context,result));
             return ExportProvider.uri(context, result).toString();
+            } finally { if(partial.exists()){if(partial.delete())rememberOutput(null);else task.phase="临时文件清理失败，取消时将重试";} }
         }
         Uri tree = Uri.parse(task.settings.outputUri);
         Uri parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
@@ -315,6 +320,7 @@ public final class Downloader {
         if (partial == null) throw new IOException("无法在所选目录创建文件，请重新选择输出目录");
         boolean committed = false;
         try {
+            rememberOutput(partial);
             CRC32 expected = new CRC32(); long count = 0;
             try (InputStream input = new FileInputStream(source); OutputStream output = context.getContentResolver().openOutputStream(partial,"w")) {
                 if (output == null) throw new IOException("所选目录不可写"); byte[] buffer = new byte[65536]; int n;
@@ -330,14 +336,16 @@ public final class Downloader {
             Uri result = DocumentsContract.renameDocument(context.getContentResolver(),partial,name);
             if (result == null) throw new IOException("所选目录不支持安全重命名，请选择手机本地目录");
             partial = result;
+            rememberOutput(result);
             if (task.settings.numericFilename) {
                 try (Cursor cursor = context.getContentResolver().query(result, new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {
                     if (cursor == null || !cursor.moveToFirst() || !name.equals(cursor.getString(0))) throw new IOException("存储提供方更改了文件名，无法保留纯编号；请选择其他本机目录");
                 }
             }
             committed = true; source.delete(); return result.toString();
-        } finally { if (!committed) try { DocumentsContract.deleteDocument(context.getContentResolver(),partial); } catch (Exception ignored) {} }
+        } finally { if (!committed) try { if(DocumentsContract.deleteDocument(context.getContentResolver(),partial))rememberOutput(null); } catch (Exception ignored) {} }
     }
+    private void rememberOutput(Uri uri)throws IOException {task.cleanupUri=uri==null?"":uri.toString();store.save();}
     private IOException duplicate(String name) { return new IOException("同名成品已存在：" + name + "，未覆盖。请移动已有文件、更换目录或关闭纯编号命名后重试。"); }
     private void ensureAbsent(Uri tree, String name) throws IOException {
         Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));

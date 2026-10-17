@@ -40,6 +40,14 @@ public class CacheCleanupTest {
             check(result.files==0);check(result.errors>0);check(locked.exists());check(result.message(true).contains("未能清理"));
         }
         result=CacheCleanup.clean(cache,owner,true,false,r->{});check(result.files==1);check(result.bytes==3);check(result.errors==0);
+        // Explicit cancellation removes the whole task, including complete images,
+        // metadata and its marker; conservative maintenance above stays unchanged.
+        put(cache,"images/0001/00001.jpg");put(cache,"chapters/1.meta");
+        result=CacheCleanup.discard(cache,owner,r->{});
+        check(result.errors==0);check(result.files==4);check(!cache.exists());check(important.exists());
+        check(CacheCleanup.discard(cache,owner,r->{}).errors==0);check(!cache.exists());
+        result=CacheCleanup.discard(new File(links,"work/task"),new File(links,"work"),r->{});
+        check(result.errors>0);check(new File(links,"outside/keep.jpg").length()==8);
         System.out.println("CacheCleanupTest: "+checks+" checks passed");
     }
 }

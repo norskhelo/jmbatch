@@ -14,6 +14,7 @@ import java.util.zip.CRC32;
 /** Ordered album storage in the application folder or a user-selected SAF tree. */
 public final class AlbumStorage {
     public interface Check { void run() throws Exception; }
+    public interface Ownership { void record(Uri uri) throws Exception; }
     public static final class Node {
         public final String name; public final Uri uri; public final boolean directory; public final long size;
         Node(String n, Uri u, boolean d, long s) { name=n;uri=u;directory=d;size=s; }
@@ -71,6 +72,10 @@ public final class AlbumStorage {
     public static void remember(Context context,Uri folder,JSONObject metadata)throws Exception {
         File file=index(context,folder);if(!file.getParentFile().isDirectory()&&!file.getParentFile().mkdirs()&&!file.getParentFile().isDirectory())throw new IOException("无法保存图片索引");
         Downloader.writeTextAtomic(file,metadata.toString());
+    }
+    public static void forget(Context context,Uri folder)throws Exception {
+        File file=index(context,folder);
+        if(file.exists()&&!file.delete())throw new IOException("无法删除任务图片索引");
     }
     private static JSONObject scan(Context context,Uri folder)throws Exception {
         File local=local(context,folder);String name;
@@ -169,12 +174,17 @@ public final class AlbumStorage {
     }
     public static Uri publishImages(Context context,List<FolderSave.Entry> entries,String tree,String name,
                                     FolderSave.Check check,FolderSave.Progress progress)throws Exception {
-        if(tree.isEmpty())return ExportProvider.uri(context,FolderSave.publish(root(context),entries,name,check,progress));
+        return publishImages(context,entries,tree,name,check,progress,uri->{});
+    }
+    public static Uri publishImages(Context context,List<FolderSave.Entry> entries,String tree,String name,
+                                    FolderSave.Check check,FolderSave.Progress progress,Ownership ownership)throws Exception {
+        if(tree.isEmpty())return ExportProvider.uri(context,FolderSave.publish(root(context),entries,name,check,progress,file->ownership.record(file==null?null:ExportProvider.uri(context,file))));
         long totalBytes=FolderSave.validate(entries);check.run();absent(context,tree,name);
         Uri treeUri=Uri.parse(tree),parent=DocumentsContract.buildDocumentUriUsingTree(treeUri,DocumentsContract.getTreeDocumentId(treeUri));
         Uri temporary=DocumentsContract.createDocument(context.getContentResolver(),parent,DocumentsContract.Document.MIME_TYPE_DIR,name+"."+UUID.randomUUID()+".partial");
         if(temporary==null)throw new IOException("无法创建临时输出");boolean committed=false;
         try{
+            ownership.record(temporary);
             Map<String,Uri> directories=new HashMap<>();int done=0;long bytes=0;
             for(FolderSave.Entry entry:entries){
                 check.run();String[] parts=entry.path.split("/");Uri directory=temporary;
@@ -196,12 +206,12 @@ public final class AlbumStorage {
             }
             check.run();absent(context,tree,name);
             Uri renamed=DocumentsContract.renameDocument(context.getContentResolver(),temporary,name);
-            if(renamed==null)throw new IOException("所选目录不支持安全重命名");temporary=renamed;
+            if(renamed==null)throw new IOException("所选目录不支持安全重命名");temporary=renamed;ownership.record(renamed);
             try(Cursor c=context.getContentResolver().query(renamed,new String[]{"_display_name"},null,null,null)){
                 if(c==null||!c.moveToFirst()||!name.equals(c.getString(0)))throw new IOException("存储服务更改了输出名称");
             }
             committed=true;return renamed;
-        }finally{if(!committed)try{progress.update("cleanup",0,0,0,0);DocumentsContract.deleteDocument(context.getContentResolver(),temporary);}catch(Exception ignored){}}
+        }finally{if(!committed)try{progress.update("cleanup",0,0,0,0);if(DocumentsContract.deleteDocument(context.getContentResolver(),temporary))ownership.record(null);}catch(Exception ignored){}}
     }
     public static Uri publish(Context context,File source,String tree,String name,Check check)throws Exception {
         absent(context,tree,name);String tempName=name+"."+UUID.randomUUID()+".partial";

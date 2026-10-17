@@ -11,6 +11,7 @@ public final class DownloadService extends Service {
     private static final String CHANNEL="downloads";
     private Store store;
     private final DownloadPool<String,DownloadJob> pool=new DownloadPool<>();
+    private final Set<String> cleaningKeys=ConcurrentHashMap.newKeySet();
     private ScheduledExecutorService monitor;
     private PowerManager.WakeLock wake;
     private final Handler main=new Handler(Looper.getMainLooper());
@@ -23,7 +24,7 @@ public final class DownloadService extends Service {
             accepting=false;pool.cancelAll("PAUSE");
             try{store.pauseQueued();}catch(Exception ignored){}
         }
-        if(accepting||pool.size()>0)main.postDelayed(this,250);else finishQueue();
+        if(accepting||pool.size()>0||!cleaningKeys.isEmpty())main.postDelayed(this,250);else finishQueue();
     }};
 
     public void onCreate(){
@@ -41,14 +42,22 @@ public final class DownloadService extends Service {
         if(PAUSE.equals(action)){
             accepting=false;pool.cancelAll("PAUSE");
             try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}
-            if(pool.size()==0)finishQueue();
+            if(pool.size()==0&&cleaningKeys.isEmpty())finishQueue();
             return START_NOT_STICKY;
         }
         if(CANCEL.equals(action)){
             String key=intent.getStringExtra("key");DownloadJob job=pool.get(key);
+            synchronized(store){
+                if(store.libraryBusy){store.note="正在管理文件，请结束后再取消任务";return START_NOT_STICKY;}
+                Store.Task target=null;for(Store.Task task:store.snapshot())if(task.key.equals(key))target=task;
+                if(target==null||target.status.equals("done"))return START_NOT_STICKY;
+                boolean wasRequested=target.discardRequested;String previousStatus=target.status,previousPhase=target.phase;
+                target.discardRequested=true;target.status="cancelling";target.phase="正在取消并删除任务文件…";target.speed=0;target.error="";
+                try{store.save();}catch(Exception error){target.discardRequested=wasRequested;target.status=previousStatus;target.phase=previousPhase;store.note="无法保存取消状态，未开始删除："+error.getMessage();return START_NOT_STICKY;}
+            }
             if(job!=null)job.cancel("CANCEL");
-            else synchronized(store){for(Store.Task task:store.snapshot())if(task.key.equals(key)&&!task.status.equals("done")){task.status="cancelled";task.phase="已取消，缓存保留";}}
-            saveQuietly();if(!accepting&&pool.size()==0)finishQueue();return START_NOT_STICKY;
+            if(!foreground){startForeground(1,notification());foreground=true;}
+            main.removeCallbacks(dispatch);main.post(dispatch);return START_NOT_STICKY;
         }
         if(accepting||pool.size()>0){store.note=accepting?"队列已在运行":"正在停止旧请求，请稍后继续";return START_NOT_STICKY;}
         startForeground(1,notification());foreground=true;
@@ -64,6 +73,7 @@ public final class DownloadService extends Service {
 
     private void dispatch(){
         for(String key:pool.reap())store.activeKeys.remove(key);
+        cleanCancelled();
         if(!accepting)return;
         synchronized(store){
             while(pool.size()<store.settings.concurrentTasks){
@@ -77,6 +87,32 @@ public final class DownloadService extends Service {
                 }
             }
             if(pool.size()==0&&store.next()==null)accepting=false;
+        }
+    }
+
+    private void cleanCancelled(){
+        synchronized(store){
+            if(store.libraryBusy)return;
+            for(Store.Task task:store.snapshot()){
+                if(cleaningKeys.size()>=2)break;
+                if(!task.discardRequested||!task.status.equals("cancelling")||store.activeKeys.contains(task.key)||!cleaningKeys.add(task.key))continue;
+                store.activeKeys.add(task.key);store.running=true;
+                new Thread(()->{
+                    CacheCleanup.Result result;
+                    try{result=CancelledTaskCleanup.run(store,task);}
+                    catch(Exception error){result=new CacheCleanup.Result();result.errors=1;task.error=Core.error(error,store.cookie);}
+                    synchronized(store){
+                        if(result.errors==0){store.tasks.remove(task);store.cleanupNotice="JM"+task.id+" 已取消，文件和任务记录已删除；"+result.message(true);}
+                        else{task.status="cancel_failed";task.phase="取消清理未完成；再次取消可重试清理";store.cleanupNotice="JM"+task.id+" "+task.phase;}
+                        try{store.save();}catch(Exception error){
+                            if(!store.tasks.contains(task))store.tasks.add(task);
+                            task.status="cancel_failed";task.phase="记录保存失败；再次取消可重试";task.error=Core.error(error,store.cookie);
+                        }
+                        store.activeKeys.remove(task.key);cleaningKeys.remove(task.key);
+                        if(destroyed&&store.activeKeys.isEmpty())store.running=false;
+                    }
+                },"jm-cancel-cleanup").start();
+            }
         }
     }
 
@@ -97,7 +133,7 @@ public final class DownloadService extends Service {
         final Deque<long[]> samples=new ArrayDeque<>();
         DownloadJob(Store.Task task){this.task=task;}
         public synchronized void cancel(String reason){
-            if(stop.isEmpty())stop=reason;
+            if(stop.isEmpty()||reason.equals("CANCEL"))stop=reason;
             if(task.status.equals("running")||task.status.equals("resetting"))task.phase=stop.equals("CANCEL")?"正在取消…":"正在关闭请求并暂停…";
             task.speed=0;
             if(control!=null)control.cancel(stop);
@@ -107,7 +143,7 @@ public final class DownloadService extends Service {
             control=new JmApi.Control();control.routeMessage=message->task.phase=message;
             return control;
         }
-        private void stopped(){task.status=stop.equals("CANCEL")?"cancelled":"paused";task.phase=stop.equals("CANCEL")?"已取消，缓存保留":"已暂停，缓存保留";}
+        private void stopped(){task.status=task.discardRequested?"cancelling":"paused";task.phase=task.discardRequested?"正在取消并删除任务文件…":"已暂停，缓存保留";}
         public void run(){
             long begin=SystemClock.elapsedRealtime();
             try{
@@ -118,9 +154,14 @@ public final class DownloadService extends Service {
                     task.resultBytes=0;task.downloadStarted=0;task.stage="metadata";saveQuietly();
                     try{
                         String result=new Downloader(DownloadService.this,store,task,attempt,store.cookie).run();
-                        // Keep an already committed output successful if cancellation arrived just after publishing it.
-                        task.resultUri=result;task.status="done";task.phase="下载完成"+(task.cleanupNote.isEmpty()?"":"；"+task.cleanupNote);task.error="";
-                        try{LibraryStore.get(DownloadService.this).sync(store.snapshot());}catch(Exception error){store.note="文件已下载，但漫画列表保存失败："+error.getMessage();}
+                        synchronized(store){
+                            task.resultUri=result;
+                            if(task.discardRequested){task.cleanupUri=result;stopped();}
+                            else{
+                                task.status="done";task.cleanupUri="";task.phase="下载完成"+(task.cleanupNote.isEmpty()?"":"；"+task.cleanupNote);task.error="";
+                                try{LibraryStore.get(DownloadService.this).sync(store.snapshot());}catch(Exception error){store.note="文件已下载，但漫画列表保存失败："+error.getMessage();}
+                            }
+                        }
                         break;
                     }catch(Throwable error){
                         if(!stop.isEmpty()){stopped();break;}
@@ -143,7 +184,7 @@ public final class DownloadService extends Service {
                 }
             }catch(Throwable error){
                 if(!stop.isEmpty())stopped();else{task.status="failed";task.error=Core.error(error,store.cookie);task.phase="任务异常，缓存保留";}
-            }finally{control=null;task.speed=0;saveQuietly();}
+            }finally{control=null;task.speed=0;if(task.discardRequested)stopped();saveQuietly();}
         }
 
         synchronized void monitor(long now){
@@ -196,11 +237,12 @@ public final class DownloadService extends Service {
         destroyed=true;accepting=false;main.removeCallbacks(dispatch);pool.cancelAll("PAUSE");
         if(monitor!=null)monitor.shutdownNow();if(wake!=null&&wake.isHeld())wake.release();
         // Retain the busy guard until every old worker has left its cache files.
-        if(pool.size()>0)new Thread(()->{
+        if(pool.size()>0||!cleaningKeys.isEmpty())new Thread(()->{
             while(true){
                 synchronized(store){
                     for(String key:pool.reap())store.activeKeys.remove(key);
-                    if(pool.size()==0){store.running=false;try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}break;}
+                    cleanCancelled();
+                    if(pool.size()==0&&cleaningKeys.isEmpty()){store.running=false;try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}break;}
                 }
                 try{Thread.sleep(100);}catch(InterruptedException ignored){}
             }

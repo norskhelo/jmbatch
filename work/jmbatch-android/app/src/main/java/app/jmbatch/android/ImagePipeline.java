@@ -14,7 +14,9 @@ public final class ImagePipeline {
         Failure(T page, Exception error) { this.page = page; this.error = error; }
     }
     public static final class UnstoppedWorkers extends IOException {
-        UnstoppedWorkers() { super("旧图片线程未能及时退出；已停止该任务以避免重复写入。请重启应用后重试。"); }
+        private final ExecutorService pool;
+        UnstoppedWorkers(ExecutorService pool) { super("旧图片线程未能及时退出；等待退出后再处理任务。");this.pool=pool; }
+        public void awaitStopped(){WorkerDrain.await(pool);}
     }
     public static <T> List<Failure<T>> run(List<T> pages, int networkWorkers, int imageWorkers,
             Action<T> fetch, Action<T> process, Action<T> cleanup, Check check, Runnable abort, int timeout) throws Exception {
@@ -76,7 +78,7 @@ public final class ImagePipeline {
                 }
             }
             finally { if (interrupted) Thread.currentThread().interrupt(); }
-            if (!stopped) throw new UnstoppedWorkers();
+            if (!stopped) throw new UnstoppedWorkers(pool);
             for (T page : ready) cleanup.run(page);
         }
         check.run(); return new ArrayList<>(failures);

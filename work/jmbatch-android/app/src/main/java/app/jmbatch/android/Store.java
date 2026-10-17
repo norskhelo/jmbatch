@@ -66,6 +66,8 @@ public final class Store {
         public volatile long imageBytes, resultBytes, downloadStarted;
         public volatile String stage = "metadata";
         public volatile String cleanupNote = "";
+        public volatile boolean discardRequested;
+        public volatile String cleanupUri = "";
         public volatile List<ChapterRules.Chapter> chapterOptions = Collections.emptyList(), selectedChapters = Collections.emptyList();
         public String progressText() { return DownloadDisplay.progress(done, total, status); }
         public String sizeText() { return DownloadDisplay.sizeText(done, total, imageBytes, resultBytes, status); }
@@ -79,17 +81,20 @@ public final class Store {
             settings = new Settings(json.getJSONObject("settings")); title = json.optString("title"); status = json.optString("status", "paused");
             phase = json.optString("phase"); error = json.optString("error"); resultUri = json.optString("resultUri");
             cleanupNote = json.optString("cleanupNote");
+            discardRequested = json.optBoolean("discardRequested"); cleanupUri = json.optString("cleanupUri");
             done = json.optInt("done"); total = json.optInt("total"); cached = json.optInt("cached"); resets = json.optInt("resets"); elapsed = json.optLong("elapsed");
             imageBytes = json.optLong("imageBytes"); resultBytes = json.optLong("resultBytes");
             chapterOptions = ChapterSelection.read(json.optJSONArray("chapterOptions"));
             selectedChapters = ChapterSelection.read(json.optJSONArray("selectedChapters"));
             if (status.equals("running") || status.equals("queued") || status.equals("resetting")) { status = "paused"; phase = "已恢复，点击开始继续"; }
+            if (discardRequested && !status.equals("cancel_failed")) { status="cancelling"; phase="等待继续清理取消的任务"; }
         }
         public JSONObject json() {
             JSONObject json = new JSONObject();
             try { json.put("chapterOptions", ChapterSelection.json(chapterOptions)).put("selectedChapters", ChapterSelection.json(selectedChapters)).put("id", id).put("key", key).put("settings", settings.json()).put("title", title).put("status", status).put("phase", phase).put("error", error)
                 .put("resultUri", resultUri).put("done", done).put("total", total).put("cached", cached).put("resets", resets).put("elapsed", elapsed)
-                .put("imageBytes", imageBytes).put("resultBytes", resultBytes).put("cleanupNote",cleanupNote); }
+                .put("imageBytes", imageBytes).put("resultBytes", resultBytes).put("cleanupNote",cleanupNote)
+                .put("discardRequested",discardRequested).put("cleanupUri",cleanupUri); }
             catch (JSONException impossible) { throw new IllegalStateException(impossible); }
             return json;
         }
@@ -137,6 +142,8 @@ public final class Store {
         return target;
     }
     public static String status(String status) {
+        if(status.equals("cancelling"))return "取消清理中";
+        if(status.equals("cancel_failed"))return "取消清理失败";
         switch (status) { case "selecting": return "待选章节"; case "running": return "下载中"; case "done": return "下载完成"; case "failed": return "失败"; case "paused": return "已暂停"; case "cancelled": return "已取消"; case "resetting": return "正在恢复"; default: return "排队中"; }
     }
 }
