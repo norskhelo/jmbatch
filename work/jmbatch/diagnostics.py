@@ -653,6 +653,9 @@ def run_self_test(directory: Path):
         from cancellation_checks import check_cancel_ui
         check_cancel_ui(application, directory)
         report["checks"].append("Cancel button: background file deletion, row removal, persisted queue and minimum window layout")
+        from update_download_checks import check_update_download
+        check_update_download(directory)
+        report["checks"].append("Update downloads: GitHub/GHFast/GH-Proxy fallback resets partial bytes and progress; cancellation and SHA-256 rejection retained")
         root.destroy()
         report["ok"] = True
     except Exception:

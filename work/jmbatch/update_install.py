@@ -18,43 +18,11 @@ from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto.Signature import pkcs1_15
 from update_trust import PUBLIC_KEY
+from update_download import HOSTS, SafeRedirect, allowed_url, transfer
 
 MAX_PACKAGE = 512 * 1024 * 1024
 ROOT_ITEMS = {"JMBatch.exe", "_internal", "README.txt", "THIRD_PARTY_LICENSES", "CHANGELOG.md"}
-HOSTS = {"github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com", "github-releases.githubusercontent.com"}
 
-def allowed_url(url):
-    p = urllib.parse.urlsplit(url)
-    return p.scheme == "https" and p.hostname in HOSTS and not p.username and not p.password and p.port in (None, 443)
-
-class SafeRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if not allowed_url(newurl):
-            raise ValueError("更新下载重定向到不可信地址，已阻止")
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
-
-def transfer(url, output, limit, cancel, progress=lambda n: None):
-    if not allowed_url(url):
-        raise ValueError("更新地址不可信")
-    deadline = time.monotonic() + 1800
-    request = urllib.request.Request(url, headers={"User-Agent": "JMBatch-Updater", "Accept-Encoding": "identity"})
-    with urllib.request.build_opener(SafeRedirect).open(request, timeout=15) as response:
-        if response.status != 200:
-            raise ValueError("更新服务器未返回文件")
-        total = 0
-        while True:
-            if cancel.is_set():
-                raise InterruptedError("已取消更新下载")
-            if time.monotonic() > deadline:
-                raise TimeoutError("更新下载超时，请重试")
-            chunk = response.read(65536)
-            if not chunk:
-                return
-            total += len(chunk)
-            if total > limit:
-                raise ValueError("更新文件超过允许大小")
-            output.write(chunk)
-            progress(total)
 
 def verify_manifest(raw, signature, repo, tag, name, expected_version, current):
     from updates import version
@@ -87,16 +55,22 @@ def prepare(home, release, current, cancel, progress):
     tag = urllib.parse.unquote(base.rstrip("/").rsplit("/", 1)[1])
     raw, signature = io.BytesIO(), io.BytesIO()
     progress("正在验证更新清单签名…")
-    transfer(base + "update-manifest.json", raw, 65536, cancel)
-    transfer(base + "update-manifest.sig", signature, 4096, cancel)
+    transfer(base + "update-manifest.json", raw, 65536, cancel,
+             route_notice=lambda name: progress(f"下载更新清单 · {name}"))
+    transfer(base + "update-manifest.sig", signature, 4096, cancel,
+             route_notice=lambda name: progress(f"下载清单签名 · {name}"))
     package = verify_manifest(raw.getvalue(), signature.getvalue(), repo, tag, release["name"], release["version"], current)
     directory = home / "updates" / uuid.uuid4().hex
     directory.mkdir(parents=True)
     archive = directory / "package.zip"
     try:
+        route = ["GitHub"]
+        def route_notice(name):
+            route[0] = name
+            progress(f"下载更新 · {name}")
         with archive.open("xb") as stream:
             transfer(release["url"], stream, package["size"], cancel,
-                     lambda n: progress(f"下载更新 {n * 100 // package['size']}% · {n / 1048576:.1f}/{package['size'] / 1048576:.1f} MB"))
+                     lambda n: progress(f"下载更新 · {route[0]} · {n * 100 // package['size']}% · {n / 1048576:.1f}/{package['size'] / 1048576:.1f} MB"), route_notice=route_notice)
         verify_file(archive, package)
         if cancel.is_set():
             raise InterruptedError("已取消更新下载")

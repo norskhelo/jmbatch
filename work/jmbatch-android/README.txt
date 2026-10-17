@@ -1,4 +1,4 @@
-JM Batch 0.5.6 — Android 使用说明
+JM Batch 0.5.7 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每个任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.5.6 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-17）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/JMBatch-0.5.6-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/JMBatch-0.5.6-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/JMBatch-0.5.6-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/SHA256-release-0.3.12-0.5.6.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/JMBatch-0.5.7-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/JMBatch-0.5.7-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/JMBatch-0.5.7-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.13-0.5.7/SHA256-release-0.3.13-0.5.7.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,18 +28,18 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.12 / Android 0.5.6 — 上下滚动无缝阅读
+Windows 0.3.13 / Android 0.5.7 — 应用内更新下载自动切换镜像
 
-阅读体验
+更新下载
 
-• 上下滚动阅读时，相邻图片直接相接，移除软件添加的页间空白、分隔线和逐页页码栏，跨章节连续阅读同样无间隔。
-• 本章页码、总页码及章节信息继续显示在阅读状态栏；加载中和读取失败的提示保留在对应页面区域。
-• Android 按阅读区域宽度计算图片高度，消除图片容器与实际图片尺寸不一致造成的边缘空隙。
-• 保留图片自身内容，不裁掉原图已有白边；继续支持图片文件夹、ZIP、PDF、章节跳转、书签和阅读位置恢复。
+• 双端下载更新清单、清单签名和安装包时，先使用 GitHub；连接失败、超时、HTTP 错误、返回网页或响应不完整时，依次尝试 GHFast、GH-Proxy。
+• 下载进度显示当前线路。切换线路时重新下载当前文件，清除上一次不完整内容并重置进度；三条线路均失败后明确提示重试。
+• 继续使用原更新公钥验证 RSA-SHA256 签名，核对仓库、版本、发布标签、文件名、大小与 SHA-256；Android 保留 APK 证书校验。签名或摘要不匹配会阻止安装。
+• 取消下载或本地写入失败不会触发镜像重试。镜像仅接收公开 GitHub Release 附件地址，保留 HTTPS 校验与重定向限制。
+• 版本查询仍使用 GitHub API；本次新增的是更新文件下载的镜像回退。旧版尚未具备此功能，升级到本版后生效。
 
 版本与验证
 
-• Windows 0.3.11 → 0.3.12；Android 0.5.5 → 0.5.6（versionCode 506）。沿用 Android 包名、APK 原签名证书和应用更新公钥。
-• Windows 执行回归、源码及冻结成品自检，并检查三种格式、两种窗口尺寸和章节边界的实际图片接缝；Android 执行宿主检查、完整编译和原签名核验。
-• 未连接 Android 真机，宿主检查和编译不代表手机界面实测。
-• 提供双端安装包、同版日志、SHA-256、更新清单及原密钥签名，并发布对应源码与使用说明。
+• Windows 0.3.12 → 0.3.13；Android 0.5.6 → 0.5.7（versionCode 507），沿用包名、APK 原签名证书与更新公钥。
+• 验证直连成功、两级回退、部分下载、HTTP 错误、取消、磁盘错误、重定向限制、签名及摘要篡改；执行 Windows 回归与源码/冻结成品自检、Android 宿主测试与签名构建。
+• 未连接 Android 真机，宿主测试和编译不代表手机实测；第三方镜像可用性仍取决于当前网络。

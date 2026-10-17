@@ -43,6 +43,8 @@ run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java
 run(java,'-cp',testout,'UpdateHistoryTest')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/UpdateTrust.java',ROOT/'app/src/main/java/app/jmbatch/android/UpdateCrypto.java',ROOT/'tests/UpdateCryptoTest.java')
 run(java,'-cp',testout,'UpdateCryptoTest',ROOT/'tests/fixtures')
+run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/UpdateDownload.java',ROOT/'tests/UpdateDownloadTest.java')
+run(java,'-cp',testout,'UpdateDownloadTest',testroot/'update-download',ROOT/'tests/fixtures')
 run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/SinglePageRecovery.java',ROOT/'tests/RecoveryTest.java')
 run(java,'-cp',testout,'RecoveryTest')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/UpdateCertificateCheck.java',ROOT/'tests/CertificateTest.java')

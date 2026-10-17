@@ -25,46 +25,22 @@ public final class UpdateInstaller {
         String verificationMessage(){return certificateMatched?"清单签名、SHA-256 和 APK 证书校验通过，可以安装":
             "清单签名与 SHA-256 校验通过。此系统未提供完整 APK 证书信息，安装时由安卓系统核验；可以继续安装。";}
     }
-    public static boolean allowed(URL url){
-        return url.getProtocol().equals("https")&&url.getUserInfo()==null&&(url.getPort()==-1||url.getPort()==443)
-            &&Arrays.asList("github.com","release-assets.githubusercontent.com","objects.githubusercontent.com","github-releases.githubusercontent.com").contains(url.getHost());
-    }
-    private static void transfer(String address,OutputStream output,long limit,AtomicBoolean cancel,Progress progress)throws Exception{
-        URL url=new URL(address);long start=SystemClock.elapsedRealtime();
-        for(int redirects=0;redirects<=5;redirects++){
-            if(cancel.get())throw new InterruptedIOException("已取消更新下载");
-            if(!allowed(url))throw new SecurityException("更新下载地址不可信");
-            HttpURLConnection c=(HttpURLConnection)url.openConnection();
-            c.setInstanceFollowRedirects(false);c.setConnectTimeout(15000);c.setReadTimeout(15000);
-            c.setRequestProperty("User-Agent","JMBatch-Updater");c.setRequestProperty("Accept-Encoding","identity");
-            try{
-                int code=c.getResponseCode();
-                if(code==301||code==302||code==303||code==307||code==308){String location=c.getHeaderField("Location");if(location==null)throw new IOException("重定向地址缺失");url=new URL(url,location);continue;}
-                if(code!=200)throw new IOException("更新下载 HTTP "+code+"，请检查发布附件或网络");
-                try(InputStream input=c.getInputStream()){
-                    byte[] buffer=new byte[65536];int n;long total=0,last=0;
-                    while((n=input.read(buffer))!=-1){
-                        if(cancel.get())throw new InterruptedIOException("已取消更新下载");
-                        if(SystemClock.elapsedRealtime()-start>1800000)throw new IOException("更新下载超时，请重试");
-                        total+=n;if(total>limit)throw new IOException("更新文件超过允许大小");
-                        output.write(buffer,0,n);
-                        if(progress!=null&&SystemClock.elapsedRealtime()-last>150){last=SystemClock.elapsedRealtime();progress.update("下载更新 "+(total*100/limit)+"% · "+(total/1024)+"/"+(limit/1024)+" KB");}
-                    }
-                }return;
-            }finally{c.disconnect();}
-        }throw new IOException("更新重定向次数过多");
+    public static boolean allowed(URL url){return UpdateDownload.allowed(url,null);}
+    private static byte[] metadata(String address,long limit,AtomicBoolean cancel,Progress progress,String label)throws Exception {
+        ByteArrayOutputStream bytes=new ByteArrayOutputStream();
+        UpdateDownload.transfer(address,()->{bytes.reset();return bytes;},limit,cancel,(route,n)->progress.update(label+" · "+route));
+        return bytes.toByteArray();
     }
     public static Ready download(Context context,String url,String repo,String version,AtomicBoolean cancel,Progress progress)throws Exception{
         String name="JMBatch-"+version+"-Android.apk";
         if(!UpdateRules.validUrl(url,repo,name))throw new SecurityException("更新地址不匹配");
         String base=url.substring(0,url.lastIndexOf('/')+1);
         String path=new URI(base).getPath();String tag=path.substring(0,path.length()-1);tag=tag.substring(tag.lastIndexOf('/')+1);
-        ByteArrayOutputStream manifest=new ByteArrayOutputStream(),signature=new ByteArrayOutputStream();
+        byte[] manifest=metadata(base+"update-manifest.json",65536,cancel,progress,"下载更新清单");
+        byte[] signature=metadata(base+"update-manifest.sig",4096,cancel,progress,"下载清单签名");
         progress.update("正在验证更新清单签名…");
-        transfer(base+"update-manifest.json",manifest,65536,cancel,null);
-        transfer(base+"update-manifest.sig",signature,4096,cancel,null);
-        UpdateCrypto.verify(manifest.toByteArray(),signature.toByteArray());
-        JSONObject data=new JSONObject(new String(manifest.toByteArray(),StandardCharsets.UTF_8));
+        UpdateCrypto.verify(manifest,signature);
+        JSONObject data=new JSONObject(new String(manifest,StandardCharsets.UTF_8));
         if(data.getInt("schema")!=1||!data.getString("repository").equals(repo)||!data.getString("tag").equals(tag))throw new SecurityException("更新清单与仓库或发布版本不匹配");
         JSONObject pkg=data.getJSONObject("packages").getJSONObject("android");
         if(!pkg.getString("name").equals(name)||!pkg.getString("version").equals(version)||UpdateRules.compare(version,Core.VERSION)<=0)throw new SecurityException("更新包版本不匹配或不是新版");
@@ -72,7 +48,7 @@ public final class UpdateInstaller {
         if(size<=0||size>512L*1024*1024||!hash.matches("[0-9a-f]{64}"))throw new SecurityException("更新包大小或摘要无效");
         File file=apk(context);file.getParentFile().mkdirs();
         try{
-            try(OutputStream out=new FileOutputStream(file)){transfer(url,out,size,cancel,progress);}
+            UpdateDownload.transfer(url,()->new FileOutputStream(file),size,cancel,(route,n)->progress.update("下载更新 · "+route+" · "+(n*100/size)+"% · "+(n/1024)+"/"+(size/1024)+" KB"));
             UpdateCrypto.verifyFile(file,size,hash);
             if(cancel.get())throw new InterruptedIOException("已取消更新下载");
             Ready ready=new Ready(file,version,hash,size);verifyApk(context,ready);return ready;

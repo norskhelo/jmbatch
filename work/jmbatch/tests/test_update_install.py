@@ -101,7 +101,7 @@ class InstallTests(unittest.TestCase):
     def test_cancel_cleans_partial_download(self):
         import threading
         raw,sig=self.manifest()
-        def transfer(url,out,limit,cancel,progress=lambda n:None):
+        def transfer(url,out,limit,cancel,progress=lambda n:None,route_notice=lambda name:None):
             if url.endswith(".json"):out.write(raw)
             elif url.endswith(".sig"):out.write(sig)
             else:out.write(b"he");raise InterruptedError("cancel")
