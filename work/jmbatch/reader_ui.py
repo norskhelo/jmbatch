@@ -55,7 +55,7 @@ class ReaderWindow:
         jump = ttk.Entry(bar2, textvariable=self.jump, width=6)
         jump.pack(side="left", padx=(10, 2))
         jump.bind("<Return>", lambda e: self.jump_page())
-        ttk.Button(bar2, text="跳页", command=self.jump_page).pack(side="left")
+        ttk.Button(bar2, text="跳转页码", command=self.jump_page).pack(side="left")
         ttk.Button(bar2, text="书签列表", command=self.bookmarks).pack(side="right")
         self.mark_button = ttk.Button(bar2, text="添加书签", command=self.mark)
         self.mark_button.pack(side="right", padx=4)
@@ -190,7 +190,7 @@ class ReaderWindow:
                 raise ValueError()
             self.go(page - 1)
         except ValueError:
-            messagebox.showinfo("跳页", f"请输入 1 至 {len(self.pages)} 的总页码。", parent=self.window)
+            messagebox.showinfo("跳转页码", f"请输入 1 至 {len(self.pages)} 的总页码。", parent=self.window)
 
     def draw(self):
         if self.closed or not self.pages:
@@ -343,7 +343,7 @@ class ReaderWindow:
 
     def bookmarks(self):
         dialog = tk.Toplevel(self.window)
-        dialog.title("书签 · 点击选择后跳转或删除")
+        dialog.title("书签列表")
         dialog.geometry("430x380")
         box = tk.Listbox(dialog)
         box.pack(fill="both", expand=True, padx=12, pady=12)
@@ -351,7 +351,7 @@ class ReaderWindow:
         for i in marks:
             box.insert("end", f"第 {self.pages[i]['chapter']} 章 · 第 {self.pages[i]['page']} 页（总第 {i+1} 页）")
         if not marks:
-            box.insert("end", "还没有书签，阅读时点击“添加书签”。")
+            box.insert("end", "暂无书签。阅读时点击“添加书签”保存当前页。")
         def choose(remove=False):
             if not marks or not box.curselection():
                 return

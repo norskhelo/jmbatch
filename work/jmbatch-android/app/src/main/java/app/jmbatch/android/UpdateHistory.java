@@ -98,7 +98,7 @@ public final class UpdateHistory {
             if(UpdateRules.compare(previous,latestVersion)!=0)return local;
             if(UpdateRules.compare(latestVersion,current)==0){
                 String notes=history.get(history.size()-1).notes;
-                return MISSING.equals(notes)?local:"版本 "+latestVersion+" 更新公告\n\n"+notes;
+                return MISSING.equals(notes)?local:"版本 "+latestVersion+" 更新日志\n\n"+notes;
             }
             StringBuilder text=new StringBuilder("从当前版本 "+current+" → 最新版本 "+latestVersion+
                 " 的全部更新（不含当前版，按版本升序）\n\n");

@@ -30,7 +30,7 @@ class Library:
                             raise ValueError("漫画记录无效")
             except Exception as exc:
                 self.entries = {}
-                self.error = f"已下载漫画列表无法读取，原文件已保留；本次禁止修改列表：{exc}"
+                self.error = f"无法读取漫画库，原记录已保留。为保护数据，本次无法修改记录：{exc}"
 
     @staticmethod
     def key(path):
@@ -197,7 +197,7 @@ class Library:
                 task.result = ""
                 if delete_file:
                     task.status = "cancelled"
-                    task.phase = "成品已删除，可重试下载"
+                    task.phase = "文件已删除，可重新下载"
         previous = self.entries.pop(key)
         try:
             self.save()

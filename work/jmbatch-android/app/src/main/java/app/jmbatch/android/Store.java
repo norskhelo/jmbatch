@@ -45,7 +45,7 @@ public final class Store {
             check(chapterWorkers, 1, ChapterMetadata.MAX_WORKERS, "章节读取并行数");
             if (!format.equals("images") && !format.equals("pdf") && !format.equals("zip")) throw new IllegalArgumentException("输出格式无效");
             check(threads, 1, 16, "图片线程"); check(timeout, 5, 120, "请求超时"); check(retries, 0, 5, "请求重试");
-            check(slowKB, 0, 10240, "慢速阈值"); check(window, 15, 600, "观察窗口"); check(stall, 30, 1800, "无进度超时"); check(maxResets, 0, 10, "重置次数");
+            check(slowKB, 0, 10240, "慢速阈值"); check(window, 15, 600, "慢速检测时长"); check(stall, 30, 1800, "无进度超时"); check(maxResets, 0, 10, "自动重连上限");
         }
         private static void check(int n, int min, int max, String label) { if (n < min || n > max) throw new IllegalArgumentException(label + "应为 " + min + "–" + max); }
         public JSONObject json() {
@@ -142,8 +142,8 @@ public final class Store {
         return target;
     }
     public static String status(String status) {
-        if(status.equals("cancelling"))return "取消清理中";
-        if(status.equals("cancel_failed"))return "取消清理失败";
-        switch (status) { case "selecting": return "待选章节"; case "running": return "下载中"; case "done": return "下载完成"; case "failed": return "失败"; case "paused": return "已暂停"; case "cancelled": return "已取消"; case "resetting": return "正在恢复"; default: return "排队中"; }
+        if(status.equals("cancelling"))return "正在取消";
+        if(status.equals("cancel_failed"))return "清理失败";
+        switch (status) { case "selecting": return "待选章节"; case "running": return "下载中"; case "done": return "下载完成"; case "failed": return "下载失败"; case "paused": return "已暂停"; case "cancelled": return "已取消"; case "resetting": return "正在重连"; default: return "等待下载"; }
     }
 }

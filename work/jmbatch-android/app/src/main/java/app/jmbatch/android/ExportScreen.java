@@ -26,18 +26,18 @@ public final class ExportScreen {
     private void error(String message){new AlertDialog.Builder(activity).setMessage(message).setPositiveButton("关闭",null).show();}
     public void show(){
         LinearLayout form=new LinearLayout(activity);form.setOrientation(LinearLayout.VERTICAL);int pad=(int)(20*activity.getResources().getDisplayMetrics().density);form.setPadding(pad,pad,pad,pad);
-        TextView hint=new TextView(activity);hint.setText("PDF、ZIP、图片文件夹可互相导出，源文件保留。PDF 转图片按页渲染（可能损失画质），按一个章节处理。");form.addView(hint);
-        RadioGroup formats=new RadioGroup(activity);RadioButton pdf=new RadioButton(activity),zip=new RadioButton(activity),images=new RadioButton(activity);pdf.setId(android.view.View.generateViewId());zip.setId(android.view.View.generateViewId());images.setId(android.view.View.generateViewId());pdf.setText("PDF");zip.setText("ZIP 图片包");images.setText("图片文件夹");formats.addView(pdf);formats.addView(zip);formats.addView(images);formats.check(entry.format.equals("pdf")?images.getId():pdf.getId());form.addView(formats);
-        CheckBox numeric=new CheckBox(activity);numeric.setText("文件名仅编号（分章节时附章节序号）");form.addView(numeric);
-        TextView layout=new TextView(activity);layout.setText("ZIP / 文件夹：单章节图片平铺，多章节分目录；仅包含图片。");form.addView(layout);
-        CheckBox split=new CheckBox(activity);split.setText("PDF 分章节导出（不勾选则统一导出）");form.addView(split);
+        TextView hint=new TextView(activity);hint.setText("支持 PDF、ZIP 和图片文件夹之间的格式转换，保留源文件。PDF 转图片可能损失画质，所有页面归为一个章节。");form.addView(hint);
+        RadioGroup formats=new RadioGroup(activity);RadioButton pdf=new RadioButton(activity),zip=new RadioButton(activity),images=new RadioButton(activity);pdf.setId(android.view.View.generateViewId());zip.setId(android.view.View.generateViewId());images.setId(android.view.View.generateViewId());pdf.setText("PDF");zip.setText("ZIP 压缩包");images.setText("图片文件夹");formats.addView(pdf);formats.addView(zip);formats.addView(images);formats.check(entry.format.equals("pdf")?images.getId():pdf.getId());form.addView(formats);
+        CheckBox numeric=new CheckBox(activity);numeric.setText("仅使用编号命名（分章节导出时附加章节序号）");form.addView(numeric);
+        TextView layout=new TextView(activity);layout.setText("ZIP 和图片文件夹仅保存图片；多章节按章节分文件夹保存。");form.addView(layout);
+        CheckBox split=new CheckBox(activity);split.setText("按章节分别导出 PDF（未勾选时合并为一本）");form.addView(split);
         formats.setOnCheckedChangeListener((g,id)->{split.setEnabled(id==pdf.getId()&&!entry.format.equals("pdf"));numeric.setEnabled(id!=images.getId());});
         split.setEnabled(pdf.isChecked()&&!entry.format.equals("pdf"));numeric.setEnabled(!images.isChecked());
         destination=new TextView(activity);destination.setText(label);form.addView(destination);
         Button choose=new ActionButton(activity);choose.setText("选择导出目录");choose.setOnClickListener(v->{pending=this;try{activity.startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION|Intent.FLAG_GRANT_PREFIX_URI_PERMISSION),DIRECTORY_REQUEST);}catch(Exception e){pending=null;error("系统目录选择器不可用");}});form.addView(choose);
         Button app=new ActionButton(activity);app.setText("导出到应用目录");app.setOnClickListener(v->{tree="";label="应用下载目录";destination.setText(label);});form.addView(app);
         ScrollView scroll=new ScrollView(activity);scroll.addView(form);
-        dialog=new AlertDialog.Builder(activity).setTitle("导出："+entry.title).setView(scroll).setNegativeButton("取消",null).setPositiveButton("开始导出",null).create();
+        dialog=new AlertDialog.Builder(activity).setTitle("导出漫画 · "+entry.title).setView(scroll).setNegativeButton("取消",null).setPositiveButton("开始导出",null).create();
         dialog.setOnDismissListener(d->{if(pending==this)pending=null;});
         dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
             synchronized(store){if(store.running||store.libraryBusy){error("请先暂停下载，并等待其他文件操作完成");return;}for(Store.Task t:store.snapshot())if(t.status.equals("running")||t.status.equals("resetting")){error("下载正在停止，请稍后重试");return;}store.libraryBusy=true;}
@@ -46,7 +46,7 @@ public final class ExportScreen {
             new Thread(()->{
                 String result;
                 try{List<LibraryStore.Entry> files=AlbumExporter.export(activity,Uri.parse(entry.uri),entry.format,entry.id,entry.title,outputTree,outputLabel,format,numbered,flatten,separate,()->{if(cancelled.get())throw new java.io.InterruptedIOException("导出已取消，源文件保留");},message->activity.runOnUiThread(()->{if(progress.isShowing())progress.setMessage(message);}));
-                    LibraryStore.get(activity).importFound(files);result="导出完成："+files.size()+" 个成品\n保存到："+outputLabel+"\n源文件保留，可在已下载漫画中打开或继续导出。";
+                    LibraryStore.get(activity).importFound(files);result="导出完成，已保存 "+files.size()+" 项\n保存到："+outputLabel+"\n源文件已保留，可在漫画库查看导出结果。";
                 }catch(Exception e){result="导出未完成："+e.getMessage();}finally{store.libraryBusy=false;}
                 String message=result;activity.runOnUiThread(()->{progress.dismiss();if(!activity.isFinishing()&&!activity.isDestroyed())error(message);});
             },"album-export").start();

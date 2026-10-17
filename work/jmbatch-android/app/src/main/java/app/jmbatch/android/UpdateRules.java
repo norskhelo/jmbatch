@@ -34,7 +34,7 @@ public final class UpdateRules {
         try{
             if(savedRepo.equals(repo)&&compare(savedVersion,current)>=0&&notes!=null&&!notes.trim().isEmpty()&&!notes.equals("发布者未填写更新日志。"))
                 return (compare(savedVersion,current)>0?"旧缓存仅包含最新版日志；请检查更新以获取完整升级日志。\n\n":"")+
-                    "版本 "+savedVersion+" 更新公告\n\n"+notes;
+                    "版本 "+savedVersion+" 更新日志\n\n"+notes;
         }catch(IllegalArgumentException ignored){}
         return local;
     }

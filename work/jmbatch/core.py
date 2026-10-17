@@ -12,7 +12,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-VERSION = "0.3.13"
+VERSION = "0.3.14"
 ZIP_LAYOUT_VERSION = 3
 MAX_TASKS = 2000
 
@@ -68,7 +68,7 @@ class Settings:
             ("threads", 1, 16, "图片线程数"), ("timeout", 5, 120, "请求超时"),
             ("request_retries", 0, 5, "请求重试次数"), ("slow_kbps", 0, 10240, "慢速阈值"),
             ("slow_seconds", 15, 600, "慢速观察窗口"), ("stall_seconds", 30, 1800, "无进度超时"),
-            ("max_resets", 0, 10, "最大重置次数"),
+            ("max_resets", 0, 10, "自动重连上限"),
         ]:
             value = getattr(self, name)
             if not isinstance(value, int) or not low <= value <= high:
@@ -133,7 +133,7 @@ def explain_error(exc: Exception, cookie: str = "") -> str:
     if "所有可用线路均失败" in raw:
         return raw
     if isinstance(exc, FileExistsError):
-        tip = "同名成品已存在，未覆盖。请移动已有文件、更换目录或关闭纯编号命名后重试。"
+        tip = "同名文件已存在，未覆盖。请移动已有文件、更换目录或关闭纯编号命名后重试。"
     elif isinstance(exc, PermissionError):
         tip = "输出目录不可写，或文件正被占用。请更换目录并关闭占用文件的程序。"
     elif isinstance(exc, OSError) and getattr(exc, "errno", None) == 28:
@@ -149,7 +149,7 @@ def explain_error(exc: Exception, cookie: str = "") -> str:
     elif any(word in lower for word in ("connect", "resolve", "ssl", "curl", "proxy")):
         tip = "网络连接失败。请检查网络、代理、DNS 或证书状态。"
     elif "partialdownload" in lower:
-        tip = "部分章节或图片下载失败，未生成成品。可重试并复用已验证图片。"
+        tip = "部分章节或图片下载失败，未生成完整文件。可重试并复用已验证图片。"
     else:
         tip = "任务未完成。下方为具体原因；修正后可选中任务重试。"
     return f"{tip}\n{name}: {raw}"
@@ -182,7 +182,7 @@ class SpeedWatch:
         if now - self.start >= 30 + window and elapsed >= window:
             avg = max(0, received - self.samples[0][1]) / max(1, elapsed)
             if avg < self.settings.slow_kbps * 1024:
-                return speed, f"最近 {window} 秒平均落盘速度 {avg / 1024:.1f} KB/s，低于 {self.settings.slow_kbps} KB/s"
+                return speed, f"最近 {window} 秒平均保存速度 {avg / 1024:.1f} KB/s，低于 {self.settings.slow_kbps} KB/s"
         return speed, None
 
 
@@ -253,7 +253,7 @@ def export_images(task: dict, title: str, entries: list[dict], emit) -> Path:
             img2pdf.convert(*map(str, paths), outputstream=stream, engine=img2pdf.Engine.internal)
         with temporary.open("rb") as stream:
             if len(PdfReader(stream).pages) != len(paths):
-                raise ValueError("PDF 页数与图片数不一致，成品未保存。")
+                raise ValueError("PDF 页数与图片数不一致，文件未保存。")
     else:
         with zipfile.ZipFile(temporary, "w", zipfile.ZIP_STORED, allowZip64=True) as archive:
             for n, (entry, path) in enumerate(zip(entries, paths), 1):
@@ -262,7 +262,7 @@ def export_images(task: dict, title: str, entries: list[dict], emit) -> Path:
                 emit({"type": "export_progress", "message": f"打包图片 {n}/{len(paths)}"})
         with zipfile.ZipFile(temporary) as archive:
             if archive.testzip() is not None or len(archive.infolist()) != len(paths):
-                raise ValueError("ZIP 完整性校验失败，成品未保存。")
+                raise ValueError("ZIP 完整性校验失败，文件未保存。")
     from cancellation import remember_publication
     remember_publication(task, temporary, final)
     # Windows rename fails atomically if the destination exists, including races.

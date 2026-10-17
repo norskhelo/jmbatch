@@ -51,7 +51,7 @@ def check_chapter_ui(app, directory):
         assert all(t.selected_chapters==engine.tasks[i].selected_chapters for i,t in enumerate(restored.tasks))
         app.settings_dialog();app.root.update()
         settings=next(w for w in app.root.winfo_children() if w.winfo_class()=='Toplevel' and w.title()=='下载设置')
-        toggle=next(w for w in controls(settings) if w.winfo_class()=='TCheckbutton' and '默认下载全章节' in w.cget('text'))
+        toggle=next(w for w in controls(settings) if w.winfo_class()=='TCheckbutton' and '默认下载全部章节' in w.cget('text'))
         toggle.invoke()
         next(w for w in controls(settings) if w.winfo_class()=='TButton' and w.cget('text')=='保存设置').invoke()
         assert Engine(engine.home).settings.download_all_chapters

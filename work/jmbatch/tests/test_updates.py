@@ -188,7 +188,7 @@ class UpdateTests(unittest.TestCase):
         self.assertNotIn("body-0.1.9",text)
         self.assertIn("body-0.1.10",text)
         self.assertIn("body-0.1.11",text)
-        self.assertEqual(announcement_text(cached,"owner/app","0.1.11","local"),"版本 0.1.11 更新公告\n\nbody-0.1.11")
+        self.assertEqual(announcement_text(cached,"owner/app","0.1.11","local"),"版本 0.1.11 更新日志\n\nbody-0.1.11")
         for repo,current in (("other/app","0.1.8"),("owner/app","0.1.12"),("owner/app","0.1.7")):
             self.assertEqual(announcement_text(cached,repo,current,"local"),"local")
 
@@ -211,7 +211,7 @@ class UpdateTests(unittest.TestCase):
         ui.refresh=lambda:None
         ui.poll()
         self.assertIs(ui.bulletin,cached)
-        self.assertIn("保留离线公告",ui.status)
+        self.assertIn("保留本地日志",ui.status)
 
     def test_http_response_selection_and_size_limit(self):
         for payload, oversized in ((json.dumps([release("0.1.5")]).encode(), False), (b" " * (LIMIT + 1), True)):

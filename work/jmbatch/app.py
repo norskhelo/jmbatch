@@ -20,7 +20,7 @@ BG = "#f3f5f8"
 INK = "#172c3e"
 MUTED = "#617387"
 ACCENT = "#087f8c"
-STATUS = {"cancelling": "取消清理中", "cancel_failed": "取消清理失败", "selecting": "待选章节", "queued": "等待", "running": "进行中", "paused": "已暂停", "resetting": "重建连接", "failed": "失败", "done": "下载完成", "cancelled": "已取消"}
+STATUS = {"cancelling": "正在取消", "cancel_failed": "清理失败", "selecting": "待选章节", "queued": "等待下载", "running": "下载中", "paused": "已暂停", "resetting": "正在重连", "failed": "下载失败", "done": "下载完成", "cancelled": "已取消"}
 
 
 def app_home():
@@ -59,7 +59,7 @@ class App:
         self.notices = []
         self.engine = Engine(home, self.log)
         self.detail_cache = None
-        self.root.title(f"JM Batch · 批量下载器 {VERSION}")
+        self.root.title(f"JM Batch {VERSION}")
         self.root.geometry("1160x850")
         self.root.minsize(1020, 820)
         self.root.configure(bg=BG)
@@ -107,19 +107,19 @@ class App:
         header = ttk.Frame(outer)
         header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         ttk.Label(header, text="JM Batch", font=("Segoe UI", 26, "bold"), foreground=INK).pack(side="left")
-        ttk.Label(header, text="  /  编号批量下载", font=("Microsoft YaHei UI", 12), foreground=MUTED).pack(side="left", pady=(10, 0))
+        ttk.Label(header, text="  批量漫画下载", font=("Microsoft YaHei UI", 12), foreground=MUTED).pack(side="left", pady=(10, 0))
         from cleanup_ui import show_cleanup
         self.cleanup_button = ttk.Button(header, text="清理下载缓存", command=lambda: show_cleanup(self))
         self.cleanup_button.pack(side="right", padx=(6, 0))
         ttk.Button(header, text="下载设置", command=self.settings_dialog).pack(side="right")
-        self.update_button = ttk.Button(header, text="检查更新 / 公告")
+        self.update_button = ttk.Button(header, text="软件更新")
         self.update_button.pack(side="right", padx=6)
-        ttk.Label(header, text=f"WINDOWS  ·  {VERSION}", foreground=ACCENT, font=("Segoe UI", 10, "bold")).pack(side="right", padx=18)
+        ttk.Label(header, text=f"Windows  ·  {VERSION}", foreground=ACCENT, font=("Segoe UI", 10, "bold")).pack(side="right", padx=18)
 
         dest = ttk.Frame(outer)
         dest.grid(row=1, column=0, sticky="ew", pady=(0, 8))
         dest.columnconfigure(1, weight=1)
-        ttk.Label(dest, text="保存到").grid(row=0, column=0, padx=(0, 12))
+        ttk.Label(dest, text="保存位置").grid(row=0, column=0, padx=(0, 12))
         self.output_var = tk.StringVar(value=self.engine.settings.output)
         ttk.Entry(dest, textvariable=self.output_var).grid(row=0, column=1, sticky="ew")
         ttk.Button(dest, text="选择目录", command=self.choose_dir).grid(row=0, column=2, padx=(8, 18))
@@ -128,47 +128,47 @@ class App:
         formats.grid(row=0, column=3, padx=7)
         for label, value in (("PDF", "pdf"), ("ZIP", "zip"), ("文件夹", "images")):
             ttk.Radiobutton(formats, text=label, value=value, variable=self.format_var, command=self.save_format).pack(side="left")
-        ttk.Button(dest, text="格式互转 / 导出", command=self.export_selected).grid(row=0, column=4)
+        ttk.Button(dest, text="导出漫画", command=self.export_selected).grid(row=0, column=4)
 
         entry = ttk.Frame(outer, style="Card.TFrame", padding=12)
         entry.grid(row=2, column=0, sticky="ew", pady=(0, 8))
         entry.columnconfigure(0, weight=1)
         ttk.Label(entry, text="添加下载编号", font=("Microsoft YaHei UI", 11, "bold"), style="Card.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(entry, text="例如 123456, 123460-123465   ·   支持空格、换行、逗号及 JM 前缀", foreground=MUTED, style="Card.TLabel").grid(row=1, column=0, sticky="w", pady=(5, 8))
+        ttk.Label(entry, text="示例：123456, 123460-123465  ·  支持空格、换行、逗号及 JM 前缀", foreground=MUTED, style="Card.TLabel").grid(row=1, column=0, sticky="w", pady=(5, 8))
         self.input = tk.Text(entry, height=2, wrap="word", bg="#f7f9fb", fg=INK, relief="flat", highlightthickness=1, highlightbackground="#dce4eb", padx=10, pady=8, undo=True)
         self.input.grid(row=2, column=0, sticky="ew", padx=(0, 16))
         self.input.bind("<Control-Return>", lambda _: self.add_input())
         quick = ttk.Frame(entry, style="Card.TFrame")
         quick.grid(row=0, column=1, rowspan=3, sticky="ns")
-        ttk.Label(quick, text="连号快捷添加", style="Card.TLabel").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
+        ttk.Label(quick, text="连续编号", style="Card.TLabel").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
         self.range_start = tk.StringVar()
         self.range_end = tk.StringVar()
         ttk.Entry(quick, textvariable=self.range_start, width=10).grid(row=1, column=0)
         ttk.Label(quick, text=" 至 ", style="Card.TLabel").grid(row=1, column=1)
         ttk.Entry(quick, textvariable=self.range_end, width=10).grid(row=1, column=2)
-        ttk.Button(quick, text="添加区间", command=self.add_range).grid(row=2, column=0, columnspan=3, sticky="ew", pady=(10, 0))
+        ttk.Button(quick, text="添加连续编号", command=self.add_range).grid(row=2, column=0, columnspan=3, sticky="ew", pady=(10, 0))
         ttk.Button(entry, text="加入队列  Ctrl + Enter", style="Accent.TButton", command=self.add_input).grid(row=3, column=0, sticky="w", pady=(10, 0))
-        ttk.Label(entry, text="加入队列时确定下载格式；下载后 PDF、ZIP、文件夹可互相导出。", foreground=MUTED, style="Card.TLabel").grid(row=4, column=0, columnspan=2, sticky="w", pady=(9, 0))
+        ttk.Label(entry, text="新任务使用当前保存位置和格式。下载完成后可在漫画库转换格式。", foreground=MUTED, style="Card.TLabel").grid(row=4, column=0, columnspan=2, sticky="w", pady=(9, 0))
 
         bar = ttk.Frame(outer)
         bar.grid(row=3, column=0, sticky="ew", pady=(0, 10))
-        self.start_button = ttk.Button(bar, text="▶  开始 / 继续", style="Accent.TButton", command=self.start)
+        self.start_button = ttk.Button(bar, text="开始下载", style="Accent.TButton", command=self.start)
         self.start_button.pack(side="left")
         self.pause_button = ttk.Button(bar, text="暂停全部", command=self.pause)
         self.pause_button.pack(side="left", padx=7)
-        ttk.Button(bar, text="重试选中", command=self.retry).pack(side="left")
+        ttk.Button(bar, text="重试任务", command=self.retry).pack(side="left")
         self.cancel_button = ttk.Button(bar, text="取消并删除", command=self.cancel)
         self.cancel_button.pack(side="left", padx=7)
         ttk.Button(bar, text="移除记录", command=self.remove).pack(side="left")
-        ttk.Button(bar, text="已下载漫画", command=self.show_library).pack(side="left", padx=6)
-        ttk.Button(bar, text="软件内阅读", command=self.open_selected).pack(side="right")
-        ttk.Button(bar, text="打开目录", command=self.open_output).pack(side="right", padx=7)
+        ttk.Button(bar, text="漫画库", command=self.show_library).pack(side="left", padx=6)
+        ttk.Button(bar, text="开始阅读", command=self.open_selected).pack(side="right")
+        ttk.Button(bar, text="打开保存目录", command=self.open_output).pack(side="right", padx=7)
 
         stats = ttk.Frame(outer)
         stats.grid(row=4, column=0, sticky="ew", pady=(0, 9))
-        self.summary = tk.StringVar(value="还没有任务")
+        self.summary = tk.StringVar(value="暂无任务，请添加下载编号")
         ttk.Label(stats, textvariable=self.summary, foreground=MUTED).pack(side="left")
-        self.speed_text = tk.StringVar(value="落盘速度  —")
+        self.speed_text = tk.StringVar(value="保存速度  —")
         ttk.Label(stats, textvariable=self.speed_text, foreground=ACCENT).pack(side="right")
 
         table = ttk.Frame(outer)
@@ -180,7 +180,7 @@ class App:
         self.tree.column("#0", width=76, minwidth=76, stretch=False)
         from download_covers import DownloadCovers
         self.download_covers = DownloadCovers(self.tree)
-        for key, label, width in [("id", "编号", 100), ("title", "标题", 220), ("status", "状态", 95), ("progress", "完成进度", 180), ("size", "漫画大小", 125), ("format", "格式", 65), ("resets", "重置", 60)]:
+        for key, label, width in [("id", "编号", 100), ("title", "标题", 220), ("status", "状态", 95), ("progress", "完成进度", 180), ("size", "漫画大小", 125), ("format", "格式", 65), ("resets", "重连", 60)]:
             self.tree.heading(key, text=label)
             self.tree.column(key, width=width, minwidth=60, stretch=key == "title", anchor="w")
         for tag, color in [("failed", "#b42336"), ("done", "#117767"), ("paused", MUTED), ("cancelled", MUTED), ("resetting", "#9d6507")]:
@@ -205,11 +205,11 @@ class App:
         notebook.grid(row=7, column=0, sticky="ew")
         details_frame = ttk.Frame(notebook)
         logs_frame = ttk.Frame(notebook)
-        notebook.add(details_frame, text="任务详情 / 失败原因")
+        notebook.add(details_frame, text="任务详情")
         notebook.add(logs_frame, text="运行记录")
         self.details = self._text_panel(details_frame, 4)
         self.logs = self._text_panel(logs_frame, 4)
-        self._set_text(self.details, "选中任务可查看完整错误、输出路径和缓存位置。\n慢速重置会保留已验证图片；PDF / ZIP 导出阶段不触发慢速重置。")
+        self._set_text(self.details, "选择任务可查看进度、保存位置和失败原因。\n自动重连会保留完整图片，导出期间不执行。")
 
     def _text_panel(self, parent, height):
         text = tk.Text(parent, height=height, wrap="word", relief="flat", bg="white", fg=INK, padx=12, pady=10, state="disabled", font=("Microsoft YaHei UI", 9))
@@ -289,7 +289,7 @@ class App:
 
     def add_range(self):
         if not self.range_start.get().strip() or not self.range_end.get().strip():
-            messagebox.showinfo("连号输入", "请填写起始编号和结束编号。", parent=self.root)
+            messagebox.showinfo("连续编号", "请填写起始编号和结束编号。", parent=self.root)
             return
         if self._add(self.range_start.get().strip() + "-" + self.range_end.get().strip()):
             self.range_start.set("")
@@ -297,7 +297,7 @@ class App:
 
     def start(self):
         if not any(t.status in ("queued", "paused", "selecting") for t in self.engine.tasks):
-            messagebox.showinfo("没有待下载任务", "请添加编号，或选中失败任务后点击“重试选中”。", parent=self.root)
+            messagebox.showinfo("没有待下载任务", "请添加编号，或选中失败任务后点击“重试任务”。", parent=self.root)
             return
         self.engine.start()
         self.log("队列开始运行，按同时下载任务数调度；每本图片独立并发下载。")
@@ -317,7 +317,7 @@ class App:
                 self.engine.start()
                 self.log(f"重新排队 {count} 个任务，使用当前网络设置；保留原输出路径和下载格式。")
             elif not cancelling:
-                messagebox.showinfo("重试任务", "请选中失败、暂停或取消的任务。", parent=self.root)
+                messagebox.showinfo("重试任务", "请选择已失败、已暂停或已取消的任务，然后重试。", parent=self.root)
         except (ValueError, OSError) as exc:
             messagebox.showerror("无法重试", str(exc), parent=self.root)
 
@@ -341,13 +341,13 @@ class App:
         keys = set(self.tree.selection())
         removable = [t for t in self.engine.tasks if t.key in keys and t.status in ("done", "failed", "cancelled", "paused")]
         if not removable:
-            messagebox.showinfo("移除记录", "请选中已完成、失败、取消或暂停的任务。", parent=self.root)
+            messagebox.showinfo("移除记录", "请选择已结束或已暂停的任务。正在下载的任务无法移除。", parent=self.root)
             return
-        if messagebox.askyesno("移除队列记录", f"移除 {len(removable)} 条记录？\n成品和缓存均保留在原目录。移除后无法通过此记录续传。", parent=self.root):
+        if messagebox.askyesno("移除队列记录", f"确定移除所选的 {len(removable)} 条任务记录？\n已保存文件和缓存将保留。移除后无法通过这些记录继续下载。", parent=self.root):
             try:
                 self.engine.library.sync(self.engine.tasks)
             except OSError as exc:
-                messagebox.showerror("请先恢复漫画列表", str(exc), parent=self.root)
+                messagebox.showerror("无法移除记录", str(exc), parent=self.root)
                 return
             self.engine.tasks = [t for t in self.engine.tasks if t not in removable]
             self.engine.save()
@@ -378,7 +378,7 @@ class App:
 
     def _open(self, path):
         if not path.exists():
-            messagebox.showinfo("路径尚不存在", str(path), parent=self.root)
+            messagebox.showinfo("保存位置不存在", str(path), parent=self.root)
             return
         try:
             if os.name == "nt":
@@ -394,13 +394,13 @@ class App:
         if not task:
             return
         from core import task_cache
-        value = f"JM{task.album_id}  ·  {task.title}\n{STATUS.get(task.status, task.status)}：{task.phase}\n输出：{task.result or task.settings['output']}\n图片 {task.done}/{task.total or '?'}，本轮复用 {task.cached} 张；自动重置 {task.resets}/{task.settings['max_resets']}\n缓存：{task_cache(task.to_dict())}"
+        value = f"JM{task.album_id}  ·  {task.title}\n{STATUS.get(task.status, task.status)}：{task.phase}\n保存位置：{task.result or task.settings['output']}\n图片 {task.done}/{task.total or '?'}，本轮复用 {task.cached} 张；自动重连 {task.resets}/{task.settings['max_resets']}\n缓存：{task_cache(task.to_dict())}"
         value += "\n完成进度 " + progress_text(task.done, task.total, task.status) + " · " + size_text(task.done, task.total, task.image_bytes, task.result_bytes, task.status)
         if task.error:
             value += "\n\n失败原因：\n" + task.error
         if task.metrics:
             value += f"\n\n本轮耗时：{task.metrics['total_seconds']:.2f} 秒"
-            labels = {"startup": "准备", "metadata": "连接/元数据", "download": "图片下载与处理", "verify": "导出前校验", "export": "导出与清理"}
+            labels = {"startup": "准备", "metadata": "读取漫画信息", "download": "图片下载与处理", "verify": "导出前校验", "export": "导出与清理"}
             value += "\n" + "；".join(f"{labels.get(key, key)} {seconds:.2f}s" for key, seconds in task.metrics.get("stages", {}).items())
         if value != self.detail_cache:
             self._set_text(self.details, value)
@@ -435,7 +435,7 @@ class App:
         self.start_button.configure(state="disabled" if self.engine.running else "normal")
         self.pause_button.configure(state="normal" if self.engine.running or selecting else "disabled")
         if current:
-            self.speed_text.set(f"同时下载 {len(active)} 本 · 总落盘速度  " + format_speed(sum(s.task.speed for s in active)))
+            self.speed_text.set(f"同时下载 {len(active)} 本 · 总保存速度  " + format_speed(sum(s.task.speed for s in active)))
             estimate = eta_text(current.status, state.phase, current.done, current.total, current.cached,
                                 time.monotonic() - state.download_started, current.speed)
             if current.settings["format"] == "images":
@@ -444,10 +444,10 @@ class App:
                                    + size_text(current.done, current.total, current.image_bytes, current.result_bytes, current.status) + "\n" + estimate)
             self.progressbar["value"] = percent(current.done, current.total, current.status)
         else:
-            self.speed_text.set("落盘速度  —")
+            self.speed_text.set("保存速度  —")
             latest = next((t for t in reversed(tasks) if t.status == "done"), None)
-            self.progress_text.set(f"{selecting} 本等待选择下载章节" if selecting else "队列已暂停，点击开始继续" if waiting and not self.engine.running else
-                                   (f"JM{latest.album_id} · 下载完成 · 100.0%\n" + size_text(latest.done, latest.total, latest.image_bytes, latest.result_bytes, latest.status) if latest else "当前没有正在运行的任务"))
+            self.progress_text.set(f"{selecting} 本等待选择下载章节" if selecting else "队列已暂停，点击“开始下载”继续" if waiting and not self.engine.running else
+                                   (f"JM{latest.album_id} · 下载完成 · 100.0%\n" + size_text(latest.done, latest.total, latest.image_bytes, latest.result_bytes, latest.status) if latest else "暂无正在下载的任务"))
             self.progressbar["value"] = 100 if latest and not waiting else 0
         self.update_details()
 
@@ -475,7 +475,7 @@ class App:
                 self.library_window.tree.selection_set(key)
                 self.library_window.action("export")
         else:
-            self.library_window.status.set("请选择一本已下载的 PDF、ZIP 或文件夹，然后点击“导出”。")
+            self.library_window.status.set("请在漫画库选择一本漫画，然后点击“导出漫画”。")
 
     def settings_dialog(self):
         dialog = tk.Toplevel(self.root)
@@ -489,15 +489,15 @@ class App:
         ttk.Label(frame, text="连接与自动恢复", font=("Microsoft YaHei UI", 16, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 16))
         variables = {}
         fields = [
-            ("concurrent_tasks", "同时下载任务数", "1–4，默认 2；每个任务单独使用下方图片线程"),
-            ("threads", "每个任务图片线程数", "1–16，默认 8；遇限流可调低"),
-            ("chapter_workers", "每个任务章节读取并行数", "1–8，默认 4；可试 6 或 8，超时或限流时调低"),
-            ("timeout", "单次请求超时 / 秒", "5–120"),
-            ("request_retries", "单次请求重试", "0–5"),
-            ("slow_kbps", "慢速阈值 / KB/s", "0 表示仅检测无进度"),
-            ("slow_seconds", "慢速观察窗口 / 秒", "15–600，首次等待额外 30 秒"),
-            ("stall_seconds", "无进度超时 / 秒", "30–1800，含连接与读取元数据"),
-            ("max_resets", "每本最大自动重置次数", "0–10，达到上限后明确报错"),
+            ("concurrent_tasks", "同时下载任务数", "1–4，默认 2；各任务独立使用图片线程"),
+            ("threads", "每任务图片线程数", "1–16，默认 8；遇限流可调低"),
+            ("chapter_workers", "每任务章节并行数", "1–8，默认 4；超时或限流时可调低"),
+            ("timeout", "请求超时（秒）", "5–120"),
+            ("request_retries", "请求重试次数", "0–5"),
+            ("slow_kbps", "慢速阈值（KB/s）", "0 表示仅检测无进度"),
+            ("slow_seconds", "慢速检测时长（秒）", "15–600，首次等待额外 30 秒"),
+            ("stall_seconds", "无进度超时（秒）", "30–1800，含连接与读取元数据"),
+            ("max_resets", "每任务自动重连上限", "0–10，达到上限后停止任务并提示"),
         ]
         for row, (key, label, hint) in enumerate(fields, 1):
             variables[key] = tk.StringVar(value=str(getattr(self.engine.settings, key)))
@@ -506,12 +506,12 @@ class App:
             ttk.Label(frame, text=hint, foreground=MUTED).grid(row=row, column=2, sticky="w")
         auto = tk.BooleanVar(value=self.engine.settings.auto_reset)
         all_chapters = tk.BooleanVar(value=self.engine.settings.download_all_chapters)
-        ttk.Checkbutton(frame, text="默认下载全章节（跳过章节选择，仅用于尚未选择章节的任务）", variable=all_chapters).grid(row=11, column=0, columnspan=3, sticky="w")
-        ttk.Checkbutton(frame, text="启用慢速 / 无进度自动重置", variable=auto).grid(row=10, column=0, columnspan=3, sticky="w", pady=(14, 5))
+        ttk.Checkbutton(frame, text="默认下载全部章节（仅对未选择章节的任务生效）", variable=all_chapters).grid(row=11, column=0, columnspan=3, sticky="w")
+        ttk.Checkbutton(frame, text="下载缓慢或无进度时自动重连", variable=auto).grid(row=10, column=0, columnspan=3, sticky="w", pady=(14, 5))
         ttk.Label(frame, text="Cookie（可选，仅本次会话有效，不写入配置或日志）").grid(row=13, column=0, columnspan=3, sticky="w", pady=(15, 6))
         cookie = tk.StringVar(value=self.engine.cookie)
         ttk.Entry(frame, textvariable=cookie, show="●", width=65).grid(row=14, column=0, columnspan=3, sticky="ew")
-        ttk.Label(frame, text="章节并行数独立于图片线程；越高不一定越快，多任务会叠加请求。\n速度按已完成图片的文件大小估算，大图下载期间可能暂时显示 0。\n重置会终止旧进程并重建连接；导出阶段不重置。\n任务数保存后生效；调低时等待当前任务结束，不中断下载。\n其他设置用于新任务及手动重试；运行中任务保留原设置。", foreground=MUTED, justify="left").grid(row=15, column=0, columnspan=3, sticky="w", pady=15)
+        ttk.Label(frame, text="并行数越高，请求越多；遇到超时或限流时可适当调低。\n保存速度按已完成图片统计，大图下载期间可能暂时显示为 0。\n自动重连会重新建立下载连接，导出期间不执行。\n任务数保存后生效；调低时等待当前任务完成。\n其他设置用于新任务和手动重试，运行中任务保留原设置。", foreground=MUTED, justify="left").grid(row=15, column=0, columnspan=3, sticky="w", pady=15)
 
         def save():
             try:
@@ -520,7 +520,7 @@ class App:
                     try:
                         values[key] = int(variable.get())
                     except ValueError:
-                        raise ValueError("数值设置必须填写整数。")
+                        raise ValueError("请输入有效的整数，并确认数值在允许范围内。")
                 values.update(auto_reset=auto.get(), download_all_chapters=all_chapters.get())
                 from worker import parse_cookies
                 parse_cookies(cookie.get().strip())

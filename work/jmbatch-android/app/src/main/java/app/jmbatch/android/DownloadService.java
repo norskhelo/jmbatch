@@ -172,7 +172,7 @@ public final class DownloadService extends Service {
                         }
                         String reason=attempt.stop;
                         if(reason.startsWith("RESET:")){
-                            if(task.resets>=task.settings.maxResets){task.status="failed";task.error=reason.substring(6)+"；已达到自动重置上限 "+task.settings.maxResets+" 次";task.phase="速度恢复失败";break;}
+                            if(task.resets>=task.settings.maxResets){task.status="failed";task.error=reason.substring(6)+"；已达到自动重连上限 "+task.settings.maxResets+" 次";task.phase="自动重连失败";break;}
                             task.resets++;task.status="resetting";task.phase=reason.substring(6)+"；重连 "+task.resets+"/"+task.settings.maxResets;saveQuietly();
                             long wait=SystemClock.elapsedRealtime()+Math.min(30000,3000L<<(task.resets-1));
                             while(stop.isEmpty()&&SystemClock.elapsedRealtime()<wait)Thread.sleep(200);

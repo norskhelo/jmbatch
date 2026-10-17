@@ -175,7 +175,7 @@ def export_entries(data, entries, destination, fmt, numeric, flat, split_pdf, pr
                 progress(dict(type="export_progress", message="保存导出文件"))
                 if os.name == "nt" or source.is_dir():
                     if target.exists():
-                        raise FileExistsError("同名导出成品已存在，未覆盖")
+                        raise FileExistsError("同名导出文件已存在，未覆盖")
                     os.rename(source, target)
                 else:
                     os.link(source, target)

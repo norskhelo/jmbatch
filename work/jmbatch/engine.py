@@ -357,7 +357,7 @@ class Engine:
                     reason = None
                 if reason:
                     if task.resets >= task.settings["max_resets"]:
-                        self._fail(state, f"{reason}；已达到自动重置上限 {task.settings['max_resets']} 次。请检查网络或调低慢速阈值后重试。")
+                        self._fail(state, f"{reason}；已达到自动重连上限 {task.settings['max_resets']} 次。请检查网络或调低慢速阈值后重试。")
                     else:
                         self._stop_process(state)
                         task.resets += 1
@@ -365,7 +365,7 @@ class Engine:
                         task.speed = 0
                         delay = min(30, 3 * 2 ** (task.resets - 1))
                         task.phase = f"{reason}；{delay} 秒后重建连接（{task.resets}/{task.settings['max_resets']}）"
-                        self.notify(f"JM{task.album_id} 自动重置：{task.phase}")
+                        self.notify(f"JM{task.album_id} 自动重连：{task.phase}")
                         state.next_start = now + delay
                         self.save()
             else:

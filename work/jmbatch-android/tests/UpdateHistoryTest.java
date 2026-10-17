@@ -28,7 +28,7 @@ public class UpdateHistoryTest {
         check(text.indexOf("nine")<text.indexOf("ten")&&text.indexOf("ten")<text.indexOf(longNotes),"rendered order");
         check(!text.contains("current")&&!text.contains("old"),"no installed release body");
         check(!render(selected,"0.3.9").contains("nine")&&render(selected,"0.3.9").contains("ten"),"rebase offline cache after upgrade");
-        check(render(selected,"0.3.11").equals("版本 0.3.11 更新公告\n\n"+longNotes),"same version full bulletin");
+        check(render(selected,"0.3.11").equals("版本 0.3.11 更新日志\n\n"+longNotes),"same version full bulletin");
         check(render(selected,"0.3.12").equals("local"),"newer local fallback");
         check(render(selected,"0.3.7").equals("local"),"cache does not cover older install");
         check(UpdateHistory.announcement(REPO,"other/app","0.3.8","0.3.11","0.3.8",selected.history,"local").equals("local"),"repository isolation");

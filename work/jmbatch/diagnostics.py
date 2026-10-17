@@ -179,7 +179,7 @@ def check_update_history_ui(root, directory):
     assert all(row["body"] in after.notes_area.get("1.0", "end") for row in rows)
     after.checker = SimpleNamespace(poll=lambda: ("skipped", None))
     after.poll()
-    assert "未能取得完整" in after.notes_status_var.get()
+    assert "无法获取完整更新日志" in after.notes_status_var.get()
     assert all(row["body"] in after.notes_area.get("1.0", "end") for row in rows)
     after.notes_window.destroy()
     after.poll()  # Closing a popup while a check completes must remain safe.
@@ -230,7 +230,7 @@ def check_manual_update_ui(application, directory):
             root.update()
             assert str(ui.check_button["state"]) == "disabled"
             assert ui.check_button["text"] == "检查中…"
-            assert "正在后台检查" in ui.status_var.get()
+            assert "正在检查更新" in ui.status_var.get()
             assert str(ui.download_button["state"]) == "disabled"
             gate.set()
             wait_done()
@@ -251,7 +251,7 @@ def check_manual_update_ui(application, directory):
         with patch("updates.fetch_bulletin", side_effect=OSError("offline")):
             ui.notes_check_button.invoke()
             wait_done()
-            assert "保留离线公告" in ui.status and "重试" in ui.status
+            assert "保留本地日志" in ui.status and "重试" in ui.status
             assert "manual check full announcement" in ui.notes_area.get("1.0", "end")
             assert str(ui.check_button["state"]) == "normal"
             assert str(ui.download_button["state"]) == "disabled"
@@ -268,7 +268,7 @@ def check_manual_update_ui(application, directory):
             wait_done()
             assert "重试" in ui.status and str(ui.check_button["state"]) == "normal"
             ui.check_button.invoke()
-            assert "仍在结束中" in ui.status and not ui.checking
+            assert "尚未结束" in ui.status and not ui.checking
             gate.set()
             ui.checker.thread.join(1)
             assert not ui.checker.thread.is_alive()

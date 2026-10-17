@@ -21,12 +21,12 @@ public final class CleanupScreen {
         final List<Store.Task> tasks;
         synchronized(store){
             if(store.running||store.libraryBusy||!store.activeKeys.isEmpty()){
-                new AlertDialog.Builder(activity).setTitle("清理下载缓存").setMessage("请先暂停全部下载，等待请求及文件操作结束。").setPositiveButton("知道了",null).show();return;
+                new AlertDialog.Builder(activity).setTitle("清理下载缓存").setMessage("请先暂停全部下载，等待请求及文件操作结束。").setPositiveButton("确定",null).show();return;
             }
             store.libraryBusy=true;tasks=selected==null?store.snapshot():Collections.singletonList(selected);
         }
         AlertDialog dialog=new AlertDialog.Builder(activity).setTitle("清理下载缓存")
-            .setMessage("正在清理…\n保留成品、完成标记、未完成任务的完整图片和章节缓存。")
+            .setMessage("正在清理…\n保留已保存文件和继续下载所需的数据。")
             .setCancelable(false).setPositiveButton("关闭",null).create();
         dialog.show();dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
         new Thread(()->{
@@ -37,7 +37,7 @@ public final class CleanupScreen {
                     if(!task.key.matches("[0-9a-f-]{36}")){total.errors++;continue;}
                     CacheCleanup.Result one=CacheCleanup.clean(new File(owner,task.key),owner,resultExists(activity,task),task.settings.keepImages,r->{
                         CacheCleanup.Result current=new CacheCleanup.Result();current.add(total);current.add(r);
-                        String text=current.message(false);activity.runOnUiThread(()->{if(!activity.isDestroyed())dialog.setMessage(text+"\n保留成品和续传所需缓存。");});
+                        String text=current.message(false);activity.runOnUiThread(()->{if(!activity.isDestroyed())dialog.setMessage(text+"\n保留已保存文件和续传所需缓存。");});
                     });
                     total.add(one);
                 }
@@ -48,7 +48,7 @@ public final class CleanupScreen {
             finally{store.libraryBusy=false;}
             String text=message;activity.runOnUiThread(()->{
                 if(activity.isFinishing()||activity.isDestroyed())return;
-                dialog.setMessage(text+"\n成品、完成标记及续传所需完整图片和章节缓存已保留。");
+                dialog.setMessage(text+"\n已保留所有已保存文件和继续下载所需的数据。");
                 dialog.setCancelable(true);dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(true);
             });
         },"jm-cache-cleanup").start();

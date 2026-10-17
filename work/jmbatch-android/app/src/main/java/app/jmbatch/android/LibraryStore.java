@@ -46,7 +46,7 @@ public final class LibraryStore {
             JSONArray array=root.getJSONArray("entries");
             for(int i=0;i<array.length();i++){Entry entry=new Entry(array.getJSONObject(i));entries.put(entry.uri,entry);}
         } catch(Exception error) {
-            entries.clear();loadError="已下载漫画列表无法读取，原文件已保留；本次禁止修改列表："+error.getMessage();
+            entries.clear();loadError="无法读取漫画库，原记录已保留。为保护数据，本次无法修改记录："+error.getMessage();
         }
     }
     private void writable()throws IOException {if(!loadError.isEmpty())throw new IOException(loadError);}
@@ -139,7 +139,7 @@ public final class LibraryStore {
             synchronized(store){
                 for(Store.Task task:store.tasks)if(task.resultUri.equals(item.uri)){
                     task.resultUri="";
-                    if(delete){task.status="cancelled";task.phase="成品已删除，可重试下载";}
+                    if(delete){task.status="cancelled";task.phase="文件已删除，可重新下载";}
                 }
                 store.save();
             }

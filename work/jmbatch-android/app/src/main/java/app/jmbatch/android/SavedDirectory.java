@@ -50,28 +50,28 @@ public final class SavedDirectory {
     private void openExternal(Uri document) {
         int result=SystemDirectory.openFileManager(activity,document);
         if(result==SystemDirectory.UNAVAILABLE)
-            externalFallback("未找到可用的系统文件管理器。请选择备用打开方式。",document);
+            externalFallback("未找到可用的系统文件管理器。请选择其他打开方式。",document);
         else if(result==SystemDirectory.HOME){
             Toast.makeText(activity,"已打开系统文件管理器；若未定位，请手动进入保存目录。",Toast.LENGTH_LONG).show();
             new AlertDialog.Builder(activity).setTitle("保存目录位置")
-                .setMessage("已打开系统文件管理器。此设备未提供可用的直接目录跳转，请在文件管理器中手动定位：\n\n"+location()+
-                    "\n\n若应用目录不可见，可使用文档管理或软件内查看；也可在首页选择可见的公共文件夹供以后下载使用。")
-                .setPositiveButton("知道了",null)
+                .setMessage("已打开系统文件管理器。此设备不支持直接定位到该目录，请手动打开以下位置：\n\n"+location()+
+                    "\n\n若应用目录不可见，可使用文档管理或应用内查看；也可在首页选择可见的公共文件夹用于后续下载。")
+                .setPositiveButton("确定",null)
                 .setNeutralButton("复制位置",(d,w)->((ClipboardManager)activity.getSystemService(Activity.CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("保存目录",location())))
-                .setNegativeButton("备用打开方式",(d,w)->externalFallback("请选择备用打开方式",document)).show();
+                .setNegativeButton("其他打开方式",(d,w)->externalFallback("请选择其他打开方式",document)).show();
         }
     }
 
     private void externalFallback(String message,Uri document){
         if(document==null){new AlertDialog.Builder(activity).setTitle("打开保存目录").setMessage(message).setPositiveButton("关闭",null).show();return;}
         new AlertDialog.Builder(activity).setTitle(message)
-            .setItems(new String[]{"文档管理（备用）","选择其他应用打开","软件内查看当前目录"},(d,index)->{
+            .setItems(new String[]{"系统文档管理","选择其他应用","应用内查看当前目录"},(d,index)->{
                 if(index==0){
                     if(!SystemDirectory.open(activity,SystemDirectory.directory(document),true)&&
                         !SystemDirectory.open(activity,SystemDirectory.picker(document),false))
                         externalFallback("文档管理不可用，请选择其他方式。",document);
                 } else if(index==1){
-                    if(!SystemDirectory.choose(activity,document))externalFallback("没有可打开此目录的应用，请使用软件内查看。",document);
+                    if(!SystemDirectory.choose(activity,document))externalFallback("没有可打开此目录的应用，请使用应用内查看。",document);
                 } else if(dialog==null||!dialog.isShowing())show();
             }).setNegativeButton("关闭",null).show();
     }
@@ -84,7 +84,7 @@ public final class SavedDirectory {
         up.setOnClickListener(v->{if(!parents.isEmpty()){parents.remove(parents.size()-1);load();}});
         Button refresh=new ActionButton(activity); refresh.setText("刷新"); refresh.setOnClickListener(v->load());
         form.addView(new ActionRow(activity,up,refresh));
-        Button external=new ActionButton(activity);external.setText("用系统文件管理器打开此目录");external.setOnClickListener(v->{
+        Button external=new ActionButton(activity);external.setText("在文件管理器中打开");external.setOnClickListener(v->{
             if(parents.isEmpty())openExternal();
             else try{
                 Uri current=parents.get(parents.size()-1).uri;
@@ -146,7 +146,7 @@ public final class SavedDirectory {
                     }
                 }
                 found.sort((a,b)->a.directory!=b.directory?(a.directory?-1:1):a.name.compareToIgnoreCase(b.name));
-            } catch(SecurityException denied){error="目录授权已失效，请关闭后重新“选择目录”授权。";}
+            } catch(SecurityException denied){error="目录访问权限已失效，请返回首页重新选择保存目录。";}
               catch(Exception failure){error="无法读取保存目录："+failure.getClass().getSimpleName()+"。请确认目录仍存在、存储设备可用，并重新选择目录。";}
             final String message=error;
             main.post(()->{

@@ -15,12 +15,12 @@ public final class SinglePageRecovery {
     public static <T> void recover(List<Failure<T>> failed,Attempt<T> attempt,Check check,Notice notice,Retryable retryable)throws Exception{
         if(failed.isEmpty())return;
         Failure<T> first=failed.get(0);
-        if(failed.size()!=1)throw new IOException(failed.size()+" 页下载失败，首个为"+first.label+"："+first.error.getMessage()+"；已保留成功图片，未生成成品",first.error);
+        if(failed.size()!=1)throw new IOException(failed.size()+" 页下载失败，首个为"+first.label+"："+first.error.getMessage()+"；已保留成功图片，未生成完整文件",first.error);
         Exception error=first.error;
         for(int round=1;round<=2&&retryable.test(error);round++){
             check.run();notice.show("仅"+first.label+"失败，单独重试 "+round+"/2（其他图片保留）");
             try{attempt.run(first.page,round);return;}catch(Exception e){check.run();error=e;}
         }
-        throw new IOException(first.label+"下载失败（单页重试结束）："+error.getMessage()+"；已保留其他图片，未生成成品",error);
+        throw new IOException(first.label+"下载失败（单页重试结束）："+error.getMessage()+"；已保留其他图片，未生成完整文件",error);
     }
 }

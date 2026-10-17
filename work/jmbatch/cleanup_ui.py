@@ -10,7 +10,7 @@ from cache_cleanup import clean_tasks
 def show_cleanup(app):
     engine = app.engine
     if engine.running or engine.active or engine.cancelling or engine.cancel_workers or engine.cleaning:
-        messagebox.showinfo('清理下载缓存', '请先暂停全部下载，等待请求结束；清理过程中不能开始下载。', parent=app.root)
+        messagebox.showinfo('清理下载缓存', '请先暂停全部下载，待任务停止后再清理缓存。', parent=app.root)
         return
     engine.cleaning = True
     tasks = list(engine.tasks)
@@ -21,7 +21,7 @@ def show_cleanup(app):
     window.protocol('WM_DELETE_WINDOW', lambda: None)
     label = ttk.Label(window, text='正在清理…', padding=20, wraplength=500)
     label.pack(fill='x')
-    ttk.Label(window, text='保留成品、完成标记、未完成任务的完整图片和章节缓存。\n仅清理已完成任务的可删除缓存及任务内临时文件。', padding=20).pack()
+    ttk.Label(window, text='清理已完成任务的下载缓存及临时文件。\n保留已保存文件和继续下载所需的数据。', padding=20).pack()
     events = queue.Queue()
 
     def work():

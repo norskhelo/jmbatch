@@ -33,7 +33,7 @@ class ParseTests(unittest.TestCase):
         slow = SpeedWatch(settings, 0)
         for n in range(1, 51):
             _, reason = slow.sample(n, n * 100)
-        self.assertIn("平均落盘速度", reason)
+        self.assertIn("平均保存速度", reason)
         normal = SpeedWatch(settings, 0)
         for n in range(1, 81):
             _, reason = normal.sample(n, n * 100 * 1024)

@@ -37,7 +37,7 @@ public final class Downloader {
             try {
                 JSONObject finished = new JSONObject(readText(marker)); Uri uri = Uri.parse(finished.getString("uri"));
                 if(task.settings.format.equals("images")) {
-                    if(!finished.optString("format").equals("images")||finished.optInt("albumLayoutVersion")!=AlbumRules.LAYOUT_VERSION)throw new IOException("旧版成品需重新保存图片");
+                    if(!finished.optString("format").equals("images")||finished.optInt("albumLayoutVersion")!=AlbumRules.LAYOUT_VERSION)throw new IOException("旧版文件需要重新保存为图片");
                     AlbumStorage.Album album=AlbumStorage.load(context,uri,control::check,this::saveProgress);task.total=task.done=album.images.size();task.resultBytes=0;
                     for(AlbumStorage.Image image:album.images)task.resultBytes+=image.size;
                     cleanImageCache();
@@ -141,7 +141,7 @@ public final class Downloader {
             message->{task.stage=control.stage="page_retry";control.lastData=SystemClock.elapsedRealtime();task.phase=message;},
             error->!(error instanceof NetworkRoutes.HttpFailure && ((NetworkRoutes.HttpFailure)error).code<500)
                 && !String.valueOf(error.getMessage()).contains("存储空间不足") && !String.valueOf(error.getMessage()).contains("解码内存"));
-        if (task.done != task.total) throw new IOException("图片不完整：" + task.done + "/" + task.total + "，未生成成品");
+        if (task.done != task.total) throw new IOException("图片不完整：" + task.done + "/" + task.total + "，未生成完整文件");
         task.stage = control.stage = "verify"; task.phase = "校验图片 0/"+jobs.size();
         List<Core.Page> pages = new ArrayList<>(); long totalSize = 0;
         for (ImageJob job : jobs) {
@@ -346,7 +346,7 @@ public final class Downloader {
         } finally { if (!committed) try { if(DocumentsContract.deleteDocument(context.getContentResolver(),partial))rememberOutput(null); } catch (Exception ignored) {} }
     }
     private void rememberOutput(Uri uri)throws IOException {task.cleanupUri=uri==null?"":uri.toString();store.save();}
-    private IOException duplicate(String name) { return new IOException("同名成品已存在：" + name + "，未覆盖。请移动已有文件、更换目录或关闭纯编号命名后重试。"); }
+    private IOException duplicate(String name) { return new IOException("同名文件已存在：" + name + "，未覆盖。请移动已有文件、更换目录或关闭纯编号命名后重试。"); }
     private void ensureAbsent(Uri tree, String name) throws IOException {
         Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
         try (Cursor cursor = context.getContentResolver().query(children, new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null)) {

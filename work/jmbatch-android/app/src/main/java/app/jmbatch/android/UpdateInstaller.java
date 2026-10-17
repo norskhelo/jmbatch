@@ -22,7 +22,7 @@ public final class UpdateInstaller {
         final File file;final String version,sha;final long size;
         boolean certificateMatched;
         Ready(File f,String v,String h,long s){file=f;version=v;sha=h;size=s;}
-        String verificationMessage(){return certificateMatched?"清单签名、SHA-256 和 APK 证书校验通过，可以安装":
+        String verificationMessage(){return certificateMatched?"更新包和应用签名校验通过，可以安装。":
             "清单签名与 SHA-256 校验通过。此系统未提供完整 APK 证书信息，安装时由安卓系统核验；可以继续安装。";}
     }
     public static boolean allowed(URL url){return UpdateDownload.allowed(url,null);}
@@ -95,7 +95,7 @@ public final class UpdateInstaller {
         for(Store.Task task:store.snapshot())if(task.status.equals("running")||task.status.equals("resetting"))throw new IllegalStateException("下载请求正在结束，请等待任务变为已暂停再安装");
         UpdateCrypto.verifyFile(ready.file,ready.size,ready.sha);verifyApk(activity,ready);
         if(!activity.getPackageManager().canRequestPackageInstalls()){
-            new AlertDialog.Builder(activity).setTitle("允许安装更新").setMessage("请允许 JM Batch 安装应用。返回后再次点击“安装新版”，由系统确认安装。")
+            new AlertDialog.Builder(activity).setTitle("允许安装更新").setMessage("请允许 JM Batch 安装应用。返回后再次点击“安装更新”，由系统确认安装。")
                 .setNegativeButton("取消",null).setPositiveButton("前往设置",(d,w)->{
                     try{activity.startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+activity.getPackageName())));}
                     catch(ActivityNotFoundException error){android.widget.Toast.makeText(activity,"请在系统设置中允许 JM Batch 安装未知应用",1).show();}

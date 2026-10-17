@@ -59,14 +59,14 @@ public final class ReaderActivity extends Activity {
         LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setPadding(dp(6),dp(4),dp(6),dp(4));
         LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);
         TextView title=new TextView(this);title.setText(entry.title);title.setTextSize(18);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);controls.addView(title);
-        chapterButton=button("章节",this::chooseChapter);favoriteButton=button("☆ 收藏",this::favorite);modeButton=button("模式：滚动",this::toggleMode);
+        chapterButton=button("章节",this::chooseChapter);favoriteButton=button("☆ 收藏",this::favorite);modeButton=button("滚动阅读",this::toggleMode);
         row(controls,button("返回",this::finish),chapterButton,favoriteButton,modeButton);
         markButton=button("添加书签",this::toggleMark);row(controls,button("上一章",()->chapterStep(-1)),button("下一章",()->chapterStep(1)),markButton,button("书签列表",this::bookmarks));
         body.addView(new ControlScroll(this,controls));
         viewport=new FrameLayout(this);viewport.setBackgroundColor(Color.rgb(32,37,44));body.addView(viewport,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout navigation=new LinearLayout(this);navigation.setOrientation(LinearLayout.VERTICAL);
-        status=new TextView(this);status.setText("正在读取漫画…\n外部 ZIP 首次打开需准备缓存，可返回取消。");status.setTextSize(12);status.setLines(3);status.setEllipsize(android.text.TextUtils.TruncateAt.END);status.setGravity(Gravity.CENTER);navigation.addView(status);
-        row(navigation,button("‹ 上一页",()->step(-1)),button("页码 / 跳页",this::jumpPage),button("下一页 ›",()->step(1)));
+        status=new TextView(this);status.setText("正在读取漫画…\n首次打开外部 ZIP 可能需要一些时间，点击返回可取消。");status.setTextSize(12);status.setLines(3);status.setEllipsize(android.text.TextUtils.TruncateAt.END);status.setGravity(Gravity.CENTER);navigation.addView(status);
+        row(navigation,button("‹ 上一页",()->step(-1)),button("跳转页码",this::jumpPage),button("下一页 ›",()->step(1)));
         body.addView(new ControlScroll(this,navigation));
         setContentView(body);
         viewport.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{
@@ -110,7 +110,7 @@ public final class ReaderActivity extends Activity {
     }
     private void scheduleSave(){main.removeCallbacks(savePosition);main.postDelayed(savePosition,700);}
     private void update(){
-        favoriteButton.setText(entry.favorite?"★ 已收藏":"☆ 收藏");modeButton.setText(scroll?"模式：滚动":"模式：左右");markButton.setText(marks.contains(page)?"移除书签":"添加书签");
+        favoriteButton.setText(entry.favorite?"★ 已收藏":"☆ 收藏");modeButton.setText(scroll?"滚动阅读":"左右翻页");markButton.setText(marks.contains(page)?"移除本页书签":"添加书签");
         if(!ready)return;
         int chapter=ReaderRules.chapter(starts,page);
         chapterButton.setText("第 "+chapters[page]+" 章");
@@ -118,7 +118,7 @@ public final class ReaderActivity extends Activity {
     }
     private String statusText(){
         int chapter=ReaderRules.chapter(starts,page),end=chapter+1<starts.size()?starts.get(chapter+1):chapters.length;
-        return "本章 "+(page-starts.get(chapter)+1)+"/"+(end-starts.get(chapter))+" 页 · 总页码 "+(page+1)+"/"+chapters.length+(entry.format.equals("pdf")?" · PDF 单章节":"");
+        return "本章 "+(page-starts.get(chapter)+1)+"/"+(end-starts.get(chapter))+" 页 · 总页码 "+(page+1)+"/"+chapters.length+(entry.format.equals("pdf")?" · PDF 按一个章节显示":"");
     }
     private void buildPages(){
         if(!ready||closed)return;
@@ -210,13 +210,13 @@ public final class ReaderActivity extends Activity {
     private void chooseChapter(){
         if(!ready)return;
         String[] labels=new String[starts.size()];for(int i=0;i<labels.length;i++)labels[i]="第 "+chapters[starts.get(i)]+" 章 · "+((i+1<starts.size()?starts.get(i+1):chapters.length)-starts.get(i))+" 页";
-        new AlertDialog.Builder(this).setTitle("章节切换").setSingleChoiceItems(labels,ReaderRules.chapter(starts,page),(dialog,index)->{dialog.dismiss();go(starts.get(index));}).setNegativeButton("关闭",null).show();
+        new AlertDialog.Builder(this).setTitle("选择章节").setSingleChoiceItems(labels,ReaderRules.chapter(starts,page),(dialog,index)->{dialog.dismiss();go(starts.get(index));}).setNegativeButton("关闭",null).show();
     }
     private void toggleMode(){if(ready){scroll=!scroll;buildPages();update();save();}}
     private void jumpPage(){
         if(!ready)return;
         EditText input=new EditText(this);input.setInputType(InputType.TYPE_CLASS_NUMBER);input.setText(String.valueOf(page+1));input.selectAll();
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("跳到总页码（1–"+chapters.length+"）").setView(input).setPositiveButton("跳转",null).setNegativeButton("取消",null).create();
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("跳转页码（1–"+chapters.length+"）").setView(input).setPositiveButton("跳转",null).setNegativeButton("取消",null).create();
         dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{int target=Integer.parseInt(input.getText().toString());if(target<1||target>chapters.length)throw new NumberFormatException();go(target-1);dialog.dismiss();}catch(NumberFormatException error){input.setError("请输入有效页码");}}));dialog.show();
     }
     private void favorite(){

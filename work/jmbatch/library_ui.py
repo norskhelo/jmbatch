@@ -20,7 +20,7 @@ class LibraryWindow:
         self.cover_pending = set()
         self.cover_images = OrderedDict()
         self.window = tk.Toplevel(app.root)
-        self.window.title("已下载漫画")
+        self.window.title("漫画库")
         self.window.geometry("1000x640")
         self.window.minsize(850, 520)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
@@ -28,21 +28,21 @@ class LibraryWindow:
         body.pack(fill="both", expand=True)
         body.columnconfigure(0, weight=1)
         body.rowconfigure(3, weight=1)
-        ttk.Label(body, text="图片目录 / PDF / ZIP · 默认以第一页为封面 · Ctrl / Shift 多选").grid(row=0, column=0, sticky="w")
+        ttk.Label(body, text="管理已下载的漫画；以第一页为封面。按住 Ctrl 或 Shift 可多选。").grid(row=0, column=0, sticky="w")
         bar = ttk.Frame(body)
         bar.grid(row=1, column=0, sticky="ew", pady=8)
         bar.columnconfigure(1, weight=1)
         self.query = tk.StringVar()
         self.only_favorites = tk.BooleanVar()
-        ttk.Label(bar, text="编号 / 标题").grid(row=0, column=0)
+        ttk.Label(bar, text="搜索编号或标题").grid(row=0, column=0)
         ttk.Entry(bar, textvariable=self.query, width=18).grid(row=0, column=1, sticky="ew", padx=8)
-        ttk.Checkbutton(bar, text="只看收藏", variable=self.only_favorites, command=self.render).grid(row=0, column=2)
+        ttk.Checkbutton(bar, text="仅显示收藏", variable=self.only_favorites, command=self.render).grid(row=0, column=2)
         ttk.Button(bar, text="扫描保存目录", command=self.scan).grid(row=0, column=3, padx=6)
         ttk.Button(bar, text="刷新", command=self.refresh).grid(row=0, column=4)
         self.query.trace_add("write", lambda *_: self.render())
         select_bar = ttk.Frame(body)
         select_bar.grid(row=2, column=0, sticky="ew", pady=(0, 6))
-        for label, mode in (("全选当前结果", "all"), ("反选", "invert"), ("取消选择", "none")):
+        for label, mode in (("全选", "all"), ("反选", "invert"), ("取消选择", "none")):
             ttk.Button(select_bar, text=label, command=lambda m=mode: self.select(m)).pack(side="left", padx=(0, 6))
         self.stop_button = ttk.Button(select_bar, text="停止操作", command=self.cancelled.set, state="disabled")
         self.stop_button.pack(side="right")
@@ -80,7 +80,7 @@ class LibraryWindow:
         self.status = tk.StringVar()
         ttk.Label(footer, textvariable=self.status, width=1).grid(row=2, column=0, sticky="ew", pady=(3, 5))
         self.action_buttons = {}
-        for row, pairs in enumerate(((("软件内阅读", "open"), ("导出", "export"), ("打开保存目录", "folder")),
+        for row, pairs in enumerate(((("开始阅读", "open"), ("导出漫画", "export"), ("打开保存目录", "folder")),
                       (("批量收藏", "favorite_on"), ("取消收藏", "favorite_off"), ("批量删除文件", "delete"), ("仅移除记录", "forget"))), start=3):
             actions = ttk.Frame(footer)
             actions.grid(row=row, column=0, sticky="ew", pady=3)
@@ -141,7 +141,7 @@ class LibraryWindow:
     def close(self):
         if self.busy:
             self.cancelled.set()
-            self.status.set("正在停止；当前文件操作结束后即可关闭。")
+            self.status.set("正在停止操作，请稍候。当前文件处理完成后即可关闭。")
         else:
             self.window.destroy()
 
@@ -226,7 +226,7 @@ class LibraryWindow:
         if self.busy:
             return
         folder = self.app.output_var.get().strip()
-        if not self.messagebox.askyesno("扫描保存目录", "导入此目录中的 JM Batch 图片目录及 PDF / ZIP。图片目录按清单验证；重复项保留收藏和标题。\n\n" + folder, parent=self.window):
+        if not self.messagebox.askyesno("扫描保存目录", "将此目录中可识别的图片文件夹、PDF 和 ZIP 添加到漫画库。已存在的漫画保留原有标题和收藏。\n\n" + folder, parent=self.window):
             return
         def finish(result):
             found, skipped = result
@@ -246,7 +246,7 @@ class LibraryWindow:
         try:
             if action == "export":
                 if len(selected) != 1:
-                    raise ValueError("请选择一本 PDF、ZIP 或文件夹导出")
+                    raise ValueError("请选择一本漫画，再选择导出格式。")
                 from export_ui import show_export
                 show_export(self, selected[0])
             elif action in ("favorite", "favorite_on", "favorite_off"):
@@ -270,7 +270,7 @@ class LibraryWindow:
                 if len(selected) > 8:
                     preview += f"\n……另 {len(selected)-8} 项"
                 prompt = "永久删除所选图片目录及全部图片，或所选 PDF / ZIP，不进入回收站。" if delete else "只移除选中的记录与收藏，文件保留；以后可重新扫描导入。"
-                if not self.messagebox.askyesno(f"确认处理 {len(selected)} 项", prompt + "\n\n" + preview, parent=self.window):
+                if not self.messagebox.askyesno("确认删除文件" if delete else "确认移除记录", prompt + "\n\n" + preview, parent=self.window):
                     return
                 def finished(result):
                     done, errors, unprocessed = result

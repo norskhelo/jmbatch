@@ -189,10 +189,10 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
                                 except Exception:
                                     pass
                 if self.failed_pages:
-                    raise IOError(f"第 {chapter} 章第 {image.index} 页下载失败（单页重试结束）：{error}；已保留其他图片，未生成成品") from error
+                    raise IOError(f"第 {chapter} 章第 {image.index} 页下载失败（单页重试结束）：{error}；已保留其他图片，未生成完整文件") from error
             elif self.failed_pages:
                 positions = "、".join(f"第 {self.chapter_numbers[str(im.from_photo.id)]} 章第 {im.index} 页" for im, _ in self.failed_pages[:5])
-                raise IOError(f"{len(self.failed_pages)} 页下载失败：{positions}；{self.failed_pages[0][1]}；已保留成功图片，未生成成品")
+                raise IOError(f"{len(self.failed_pages)} 页下载失败：{positions}；{self.failed_pages[0][1]}；已保留成功图片，未生成完整文件")
             self.after_album(album)
 
         def restore_cache(self, photos):
@@ -290,10 +290,10 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
     album, downloader = jmcomic.download_album(task["album_id"], option, downloader=ObservedDownloader, check_exception=True)
     entries = sorted(downloader.entries, key=lambda x: (x["chapter"], x["page"]))
     if len(entries) != downloader.expected:
-        raise ValueError(f"图片不完整：预期 {downloader.expected} 张，实际 {len(entries)} 张。未生成成品。")
+        raise ValueError(f"图片不完整：预期 {downloader.expected} 张，实际 {len(entries)} 张。未生成完整文件。")
     for chapter, count in downloader.expected_chapters.items():
         if [e["page"] for e in entries if e["chapter"] == chapter] != list(range(1, count + 1)):
-            raise ValueError(f"第 {chapter} 章存在缺页或重复页，未生成成品。")
+            raise ValueError(f"第 {chapter} 章存在缺页或重复页，未生成完整文件。")
     if settings.format == "images":
         from albums import save_album
         final, result_size = save_album(task, album.name, entries, emit)
