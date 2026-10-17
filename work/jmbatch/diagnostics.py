@@ -608,6 +608,8 @@ def run_self_test(directory: Path):
             assert reader.current == 3 and 3 in reader.marks and not reader.is_scroll()
             reader.mode.set("滚动阅读")
             reader.relayout()
+            from reader_checks import check_scroll
+            report.setdefault('reader_scroll_seams', {})[fmt] = check_scroll(reader, root, reader_wait)
             reader.go(4)
             reader_wait(lambda: 4 in reader.images)
             reader_wait(lambda: reader.current == 4)
@@ -617,6 +619,7 @@ def run_self_test(directory: Path):
         report["checks"].append("Reader scroll/paged switching, last-page navigation, single-window reuse and controls at minimum size")
         report["checks"].append("Reader adjacent predecode, persistent two-layer animation and real Tk drag preserve displayed page until commit")
         report["checks"].append("Reader 100 transitions, gated slow decode and unreadable page retain pixels and bound cache without new canvas items")
+        report["checks"].append("Reader scroll images touch with zero gap across folder/ZIP/PDF pages, chapter boundaries and window sizes")
         image_library.window.destroy()
         report["checks"].append("Default ordered-image download, library recognition and explicit PDF export dialog preserve originals")
         report["checks"].append("Library UI: scan orphan export, select all/invert, batch favorite/unfavorite, search and persistence")

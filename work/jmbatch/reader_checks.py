@@ -4,6 +4,31 @@ import time
 from unittest.mock import patch
 
 
+def check_scroll(reader, root, wait):
+    """Check actual Tk image edges across sizes and the fixture's chapter boundary."""
+    seams = []
+    for geometry in ('1000x820', '740x520'):
+        reader.window.geometry(geometry)
+        root.update()
+        wait(lambda: reader.resize_timer is None)
+        for first in (0, 2, 3):
+            reader.go(first)
+            wait(lambda: first in reader.images and first + 1 in reader.images)
+            reader.draw()
+            items = {reader.canvas.itemcget(item, 'image'): item
+                     for item in reader.canvas.find_withtag('scroll')
+                     if reader.canvas.type(item) == 'image'}
+            above = reader.canvas.bbox(items[str(reader.images[first])])
+            below = reader.canvas.bbox(items[str(reader.images[first + 1])])
+            assert above[3] == below[1], (geometry, first, above, below)
+            assert reader.heights[first] == reader.images[first].height()
+            assert not any(reader.canvas.itemcget(item, 'text').startswith('第 ')
+                           for item in reader.canvas.find_withtag('scroll')
+                           if reader.canvas.type(item) == 'text')
+            seams.append(dict(geometry=geometry, page=first + 1, gap=below[1] - above[3]))
+    return seams
+
+
 def check_paging(reader, root, wait):
     from reader import ReaderSource
     # Exercise 100 complete transitions without rebuilding the canvas items.

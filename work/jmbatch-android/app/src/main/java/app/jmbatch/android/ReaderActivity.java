@@ -121,7 +121,7 @@ public final class ReaderActivity extends Activity {
         main.removeCallbacks(loadingNotice);noticeTarget=-1;generation++;requests.clear();errors.clear();cache.evictAll();
         if(pager!=null){pager.dispose();pager=null;}viewport.removeAllViews();
         if(scroll){
-            list=new ListView(this);list.setDividerHeight(dp(8));list.setBackgroundColor(Color.rgb(32,37,44));
+            list=new ListView(this);list.setDivider(null);list.setDividerHeight(0);list.setBackgroundColor(Color.rgb(32,37,44));
             adapter=new BaseAdapter(){
                 public int getCount(){return chapters.length;}public Object getItem(int position){return position;}public long getItemId(int position){return position;}
                 public View getView(int position,View convert,ViewGroup parent){PageRow row=convert instanceof PageRow?(PageRow)convert:new PageRow();bind(row,position);return row;}
@@ -140,21 +140,22 @@ public final class ReaderActivity extends Activity {
             viewport.addView(pager,new FrameLayout.LayoutParams(-1,-1));pager.post(()->{if(!closed&&pager!=null)pager.go(page);});
         }
     }
-    private final class PageRow extends LinearLayout {
+    private final class PageRow extends FrameLayout {
         final ImageView image;final TextView label;
-        PageRow(){super(ReaderActivity.this);setOrientation(VERTICAL);setGravity(Gravity.CENTER);image=new ImageView(ReaderActivity.this);image.setScaleType(ImageView.ScaleType.FIT_CENTER);label=new TextView(ReaderActivity.this);label.setTextColor(Color.LTGRAY);label.setGravity(Gravity.CENTER);label.setTextSize(12);addView(label,new LinearLayout.LayoutParams(-1,dp(25)));addView(image,new LinearLayout.LayoutParams(-1,dp(300)));}
+        PageRow(){super(ReaderActivity.this);image=new ImageView(ReaderActivity.this);image.setScaleType(ImageView.ScaleType.FIT_XY);label=new TextView(ReaderActivity.this);label.setTextColor(Color.LTGRAY);label.setGravity(Gravity.CENTER);label.setTextSize(12);addView(image,new FrameLayout.LayoutParams(-1,dp(300)));addView(label,new FrameLayout.LayoutParams(-1,-1));}
     }
     private void bind(PageRow row,int index){
         ReaderRequests.Job job=job(index);int width=job.width;
         String key=job.key;if(!key.equals(row.getTag())){row.setTag(key);row.image.setImageDrawable(null);}
-        Bitmap bitmap=cache.get(key);row.label.setText(errors.containsKey(index)?"本页读取失败，可继续翻页："+errors.get(index):"第 "+(index+1)+" 页"+(bitmap==null?" · 正在加载…":""));
-        LinearLayout.LayoutParams params=(LinearLayout.LayoutParams)row.image.getLayoutParams();int height=bitmap==null?(int)(width*1.4):Math.max(1,(int)((long)bitmap.getHeight()*width/bitmap.getWidth()));
+        Bitmap bitmap=cache.get(key);row.label.setText(errors.containsKey(index)?"本页读取失败，可继续翻页："+errors.get(index):"第 "+(index+1)+" 页 · 正在加载…");row.label.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
+        // The row is exactly the fitted image height; notices overlay its placeholder.
+        FrameLayout.LayoutParams params=(FrameLayout.LayoutParams)row.image.getLayoutParams();int height=bitmap==null?(int)(width*1.4):Math.max(1,(int)((long)bitmap.getHeight()*width/bitmap.getWidth()));
         if(params.height!=height){params.height=height;row.image.setLayoutParams(params);}
         if(bitmap!=null){row.image.setImageBitmap(bitmap);return;}
         if(errors.containsKey(index)||closed)return;
         requests.offer(job);pump();
     }
-    private ReaderRequests.Job job(int index){return new ReaderRequests.Job(generation,index,Math.max(100,viewport.getWidth()-dp(8)),scroll?0:Math.max(100,viewport.getHeight()-dp(8)));}
+    private ReaderRequests.Job job(int index){return new ReaderRequests.Job(generation,index,Math.max(100,viewport.getWidth()-(scroll?0:dp(8))),scroll?0:Math.max(100,viewport.getHeight()-dp(8)));}
     private void planPages(){
         if(closed||scroll||pager==null)return;
         pager.ready();int target=pager.target();List<ReaderRequests.Job> jobs=new ArrayList<>();

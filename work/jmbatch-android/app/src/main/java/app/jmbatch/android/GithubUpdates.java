@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.11 / Android 0.5.5 — 左右翻页流畅度修复\n\n阅读体验\n\n• 左右翻页加载新页时保留当前图片，新图就绪后再切换，避免先清空页面造成闪屏；加载失败明确显示目标页并允许继续翻页。\n• 按阅读方向预加载相邻页，使用有上限的图片缓存；合并重复加载请求，快速正反向翻页时不再重复解码同一运行任务。\n• Android 支持跟手横向拖动、松手翻页和短拖回弹；Windows 支持鼠标拖动及按钮/键盘翻页过渡。相邻页未准备好时保留当前页，首尾越界回弹，快速反向操作可取消旧动画。\n• 页码、书签和阅读记录跟随实际显示页，动画未完成或目标加载失败时不提前记录为已经阅读；继续兼容滚动模式、章节跳转、图片目录、ZIP 和 PDF。\n• Windows 加载期间缩短结果轮询等待并复用图片图层；Android 减少重复布局，阅读记录由有序后台线程保存，遵循系统动画开关。\n\n版本与验证\n\n• Windows 0.3.10 → 0.3.11；Android 0.5.4 → 0.5.5（versionCode 505）。沿用 Android 包名、APK 原签名证书和应用更新公钥。\n• 验证慢加载保留旧页、邻页预加载、快速往返去重、拖动/回弹、动画中反向、损坏页、边界、模式及尺寸变化、收藏书签和重开位置；使用隔离生成素材。\n• Windows 执行回归与源码/冻结成品的实际 Tk 界面自检；Android 执行宿主手势/调度检查、完整编译和原签名核验。未连接 Android 真机，宿主验证不代表手机实测帧率。\n• 提供双端安装包、同版日志、SHA-256、更新清单及原密钥签名，并发布对应源码与使用说明。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.12 / Android 0.5.6 — 上下滚动无缝阅读\n\n阅读体验\n\n• 上下滚动阅读时，相邻图片直接相接，移除软件添加的页间空白、分隔线和逐页页码栏，跨章节连续阅读同样无间隔。\n• 本章页码、总页码及章节信息继续显示在阅读状态栏；加载中和读取失败的提示保留在对应页面区域。\n• Android 按阅读区域宽度计算图片高度，消除图片容器与实际图片尺寸不一致造成的边缘空隙。\n• 保留图片自身内容，不裁掉原图已有白边；继续支持图片文件夹、ZIP、PDF、章节跳转、书签和阅读位置恢复。\n\n版本与验证\n\n• Windows 0.3.11 → 0.3.12；Android 0.5.5 → 0.5.6（versionCode 506）。沿用 Android 包名、APK 原签名证书和应用更新公钥。\n• Windows 执行回归、源码及冻结成品自检，并检查三种格式、两种窗口尺寸和章节边界的实际图片接缝；Android 执行宿主检查、完整编译和原签名核验。\n• 未连接 Android 真机，宿主检查和编译不代表手机界面实测。\n• 提供双端安装包、同版日志、SHA-256、更新清单及原密钥签名，并发布对应源码与使用说明。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

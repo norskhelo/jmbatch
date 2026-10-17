@@ -112,7 +112,7 @@ class ReaderWindow:
         self.images.clear()
         self.errors.clear()
         self.pending.clear()
-        self.heights = [max(200, min(1600, self.canvas.winfo_width() - 32)) * 1.4 + 30] * len(self.pages)
+        self.heights = [max(200, min(1600, self.canvas.winfo_width() - 32)) * 1.4] * len(self.pages)
         if self.is_scroll():
             self.pager.hide()
             self.scrollbar.pack(side="right", fill="y", before=self.canvas)
@@ -208,7 +208,7 @@ class ReaderWindow:
         else:
             visible = [self.current]
         for index in visible:
-            y = self.offsets[index] + 24 if self.is_scroll() else 0
+            y = self.offsets[index] if self.is_scroll() else 0
             photo = self.images.get(index)
             if photo:
                 self.images.move_to_end(index)
@@ -217,8 +217,6 @@ class ReaderWindow:
                 self.canvas.create_image(width / 2, y, image=photo, anchor="n", tags='scroll')
             else:
                 self.canvas.create_text(width / 2, y + (50 if self.is_scroll() else height / 2), text=self.errors.get(index, "正在加载…"), fill="white", width=max(100, width - 80), tags='scroll')
-            if self.is_scroll():
-                self.canvas.create_text(width / 2, self.offsets[index] + 12, text=f"第 {index + 1} 页", fill="#aab7c4", tags='scroll')
         # Replace obsolete work. Already decoded results are accepted only for this layout.
         needed = [i for i in visible if i not in self.images and i not in self.errors]
         self.pending = set(needed)
@@ -298,7 +296,7 @@ class ReaderWindow:
                         if self.is_scroll():
                             anchor = self.current
                             offset = self.canvas.canvasy(0) - self.offsets[anchor]
-                            self.heights[index] = value.height + 34
+                            self.heights[index] = value.height
                             self.layout()
                             self.canvas.yview_moveto((self.offsets[anchor] + offset) / self.extent)
                         value.close()

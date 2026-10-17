@@ -2,20 +2,20 @@
 
 支持 Windows 和 Android 的批量漫画下载工具。下载可选择 PDF、ZIP 或图片文件夹，三种成品可离线互相导出。
 
-当前源码及正式版本：**Windows 0.3.11 / Android 0.5.5（versionCode 505）**。本版修复左右翻页闪屏，加入邻页预加载、跟手拖动与翻页回弹动画。安装包、更新日志与镜像入口见下方。
+当前源码及正式版本：**Windows 0.3.12 / Android 0.5.6（versionCode 506）**。本版上下滚动阅读的相邻图片无间隔直接相接，页码保留在状态栏。安装包、更新日志与镜像入口见下方。
 
 ## 下载安装包（含国内镜像）
 
 GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
 
-当前正式版为 **Windows 0.3.11 / Android 0.5.5**（[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.11-0.5.5)，[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.11-0.5.5)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+当前正式版为 **Windows 0.3.12 / Android 0.5.6**（[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.12-0.5.6)，[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.12-0.5.6)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
 
 | 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
 | --- | --- | --- | --- |
-| Windows 0.3.11 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/JMBatch-0.3.11-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/JMBatch-0.3.11-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/JMBatch-0.3.11-Windows-x64.zip) |
-| Android 0.5.5 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/JMBatch-0.5.5-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/JMBatch-0.5.5-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/JMBatch-0.5.5-Android.apk) |
-| Windows 0.3.11 的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/SHA256-release-0.3.11-0.5.5.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/SHA256-release-0.3.11-0.5.5.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/SHA256-release-0.3.11-0.5.5.txt) |
-| Android 0.5.5 的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/SHA256-release-0.3.11-0.5.5.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/SHA256-release-0.3.11-0.5.5.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.11-0.5.5/SHA256-release-0.3.11-0.5.5.txt) |
+| Windows 0.3.12 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/JMBatch-0.3.12-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/JMBatch-0.3.12-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/JMBatch-0.3.12-Windows-x64.zip) |
+| Android 0.5.6 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/JMBatch-0.5.6-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/JMBatch-0.5.6-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/JMBatch-0.5.6-Android.apk) |
+| Windows 0.3.12 的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/SHA256-release-0.3.12-0.5.6.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/SHA256-release-0.3.12-0.5.6.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/SHA256-release-0.3.12-0.5.6.txt) |
+| Android 0.5.6 的 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/SHA256-release-0.3.12-0.5.6.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/SHA256-release-0.3.12-0.5.6.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.12-0.5.6/SHA256-release-0.3.12-0.5.6.txt) |
 
 镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像用于手动下载，应用内更新仓库仍填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
 
@@ -43,7 +43,7 @@ GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或�
 
 ## 内置阅读器
 
-从任务或漫画库打开后直接在软件内阅读。支持章节切换、本章/总页码、跳页、快捷收藏、书签列表及跳转；再次打开恢复上次页码和模式。滚动阅读与左右翻页可随时切换，Windows 使用滚轮、方向键或页面两侧，Android 使用上下滚动、左右滑动或页面两侧。PDF 按一个章节显示。阅读记录绑定原文件路径/地址；移动文件或清除应用数据后不自动迁移。Android 外部 ZIP 首次打开需准备临时缓存，返回可取消，关闭后清理。
+从任务或漫画库打开后直接在软件内阅读。支持章节切换、本章/总页码、跳页、快捷收藏、书签列表及跳转；再次打开恢复上次页码和模式。上下滚动时相邻图片无间隔直接相接，页码显示在状态栏；原图自身的白边保留。滚动阅读与左右翻页可随时切换，Windows 使用滚轮、方向键或页面两侧，Android 使用上下滚动、左右滑动或页面两侧。PDF 按一个章节显示。阅读记录绑定原文件路径/地址；移动文件或清除应用数据后不自动迁移。Android 外部 ZIP 首次打开需准备临时缓存，返回可取消，关闭后清理。
 
 ## 更新公告
 
