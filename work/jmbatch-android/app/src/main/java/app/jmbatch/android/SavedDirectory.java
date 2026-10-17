@@ -71,8 +71,7 @@ public final class SavedDirectory {
                         !SystemDirectory.open(activity,SystemDirectory.picker(document),false))
                         externalFallback("文档管理不可用，请选择其他方式。",document);
                 } else if(index==1){
-                    try{activity.startActivity(Intent.createChooser(SystemDirectory.directory(document),"选择文件管理器"));}
-                    catch(Exception failure){externalFallback("没有可打开此目录的应用，请使用软件内查看。",document);}
+                    if(!SystemDirectory.choose(activity,document))externalFallback("没有可打开此目录的应用，请使用软件内查看。",document);
                 } else if(dialog==null||!dialog.isShowing())show();
             }).setNegativeButton("关闭",null).show();
     }
@@ -88,7 +87,10 @@ public final class SavedDirectory {
         actions.addView(up,new LinearLayout.LayoutParams(0,-2,1)); actions.addView(refresh,new LinearLayout.LayoutParams(0,-2,1)); form.addView(actions);
         Button external=new Button(activity);external.setText("用系统文件管理器打开此目录");external.setOnClickListener(v->{
             if(parents.isEmpty())openExternal();
-            else openExternal(parents.get(parents.size()-1).uri);
+            else try{
+                Uri current=parents.get(parents.size()-1).uri;
+                openExternal(tree==null?ExportDocumentsProvider.folder(activity,AlbumStorage.local(activity,current)):current);
+            }catch(Exception failure){externalFallback("保存目录地址无效，请重新选择目录。",null);}
         });form.addView(external);
         ListView list=new ListView(activity); adapter=new ArrayAdapter<>(activity,android.R.layout.simple_list_item_1,labels); list.setAdapter(adapter);
         form.addView(list,new LinearLayout.LayoutParams(-1,(int)(320*activity.getResources().getDisplayMetrics().density)));

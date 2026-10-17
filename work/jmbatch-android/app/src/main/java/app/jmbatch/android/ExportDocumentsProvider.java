@@ -12,7 +12,19 @@ import java.util.*;
 public final class ExportDocumentsProvider extends DocumentsProvider {
     private static final String ROOT="exports";
     private static final String[] DOCS={"document_id","display_name","mime_type","flags","size","last_modified"};
-    public static Uri folder(android.content.Context context){return DocumentsContract.buildDocumentUri(context.getPackageName()+".documents",ROOT);}
+    public static Uri folder(android.content.Context context){return folderUri(context,ROOT);}
+    public static Uri folder(android.content.Context context,File directory)throws IOException {
+        if(directory==null||!directory.isDirectory())throw new IOException("目录不存在");
+        // Reuse the exports provider's containment and symlink checks before granting a subtree.
+        File checked=AlbumStorage.local(context,ExportProvider.uri(context,directory));
+        if(checked==null)throw new IOException("目录不可访问");
+        String relative=AlbumStorage.root(context).toPath().toAbsolutePath().relativize(checked.toPath().toAbsolutePath()).toString().replace(File.separatorChar,'/');
+        return folderUri(context,"file:"+relative);
+    }
+    private static Uri folderUri(android.content.Context context,String id){
+        Uri tree=DocumentsContract.buildTreeDocumentUri(context.getPackageName()+".documents",id);
+        return DocumentsContract.buildDocumentUriUsingTree(tree,id);
+    }
     public boolean onCreate(){return true;}
     private File file(String id)throws FileNotFoundException {
         try{

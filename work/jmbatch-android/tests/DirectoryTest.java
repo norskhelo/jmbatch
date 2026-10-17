@@ -54,7 +54,16 @@ public class DirectoryTest {
         check(DirectoryTargets.documentsUi("com.google.android.documentsui","FilesActivity"));
         check(DirectoryTargets.documentsUi("vendor.files","com.android.documentsui.FilesActivity"));
         check(!DirectoryTargets.documentsUi("com.huawei.hidisk","FileManager"));
-        check(DirectoryTargets.LEGACY_MANAGERS.contains("com.huawei.hidisk"));
+        check(DirectoryTargets.excluded("com.huawei.hidisk/Files"));
+        Target cloud=new Target("com.huawei.hidisk/Files",true,true,true,true,false);
+        attempts.clear();
+        check(!DirectoryTargets.open(Arrays.asList(cloud),attempts::add));
+        check(!DirectoryTargets.openManagers(Arrays.asList(cloud),attempts::add));
+        check(!DirectoryTargets.openNative(Arrays.asList(cloud),cloud.component,attempts::add));
+        check(DirectoryTargets.ordered(Arrays.asList(cloud,thirdParty),false,false,null).size()==1);
+        check(attempts.isEmpty());
+        check(DirectoryTargets.openNative(Arrays.asList(vendor,documents),documents.component,attempts::add));
+        check(attempts.equals(Arrays.asList(documents.component)));
         System.out.println("System directory selection and fallback: "+checks+" checks passed");
     }
 }

@@ -1,4 +1,4 @@
-JM Batch 0.5.1 — Android 使用说明
+JM Batch 0.5.2 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每个任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.5.1 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-17）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.1/JMBatch-0.5.1-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.1/JMBatch-0.5.1-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.1/JMBatch-0.5.1-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.1/SHA256-release-android-0.5.1.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/JMBatch-0.5.2-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/JMBatch-0.5.2-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/JMBatch-0.5.2-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.2/SHA256-release-android-0.5.2.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,19 +28,19 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Android 0.5.1 — 2026-10-17
+Android 0.5.2 — 2026-10-17
 
-默认使用系统文件管理器
+原生文件管理与保存目录跳转
 
-• “打开保存目录”改用安卓原生 Intent，默认优先启动手机自带的文件管理应用；不再自动优先打开左侧菜单显示“JM Batch”的文档管理界面。
-• 支持目录查看的系统文件管理器会收到保存目录地址；仅提供应用入口时，直接打开文件管理器主界面，并提示手动定位。返回 JM Batch 后可查看、复制保存位置或选择备用打开方式。
-• 使用 Android 原生文件应用类别发现组件，并兼容旧款华为／荣耀文件管理器入口；仅自动启动可用的系统组件。组件受限或启动失败时继续尝试其他入口。
-• 文档管理改为手动备用选项，保留选择其他应用和软件内查看。首页、任务详情、漫画库和软件内子目录的系统打开入口使用同一逻辑。
-• 不移动已有文件，不更改保存目录或目录授权。部分文件管理器不能浏览应用目录，或会忽略指定位置；此时可用备用入口，或在首页为以后下载选择可见的公共文件夹。
+• 修复荣耀 Play5 / Android 10 上“打开保存目录”误入云空间的问题：删除旧华为／荣耀包名兼容入口，并在自动打开、文档管理备用和其他应用选择中排除已确认的华为云空间包。
+• 改用 Android 原生文件应用选择机制，启动系统实际声明的文件管理活动，不再打开猜测包名对应的应用首页。原生“文件”与文件选择器分别判断，保留可用系统默认项及启动失败回退。
+• 文件管理器明确支持目录查看时，以目录地址请求直接打开保存目录；同时支持默认保存目录、自选目录及软件内当前子目录。默认目录使用只读文档目录树地址，供接收方读取子目录和图片。
+• 不支持目录跳转时打开原生文件应用首页，并显示可复制的保存位置；不会把打开首页显示为已定位。仍可手动使用文档管理或软件内查看。
+• 不移动文件、不更改保存设置、不新增存储权限。目录跳转取决于手机文件应用支持；系统应用可能忽略地址，原生界面也由设备决定。
 
 版本与验证
 
-• Android 0.5.0 → 0.5.1，versionCode 501；Windows 保持 0.3.9。保留原包名、APK 签名证书与更新公钥，支持覆盖安装。
-• 回归默认文件管理器选择、文档管理仅手动回退、原生 Intent 参数、启动失败备用入口、禁用/非导出组件及第三方组件过滤；执行 Android 宿主回归、编译与签名核验。
-• 用户设备为荣耀 Play5 / Android 10。未连接该手机；宿主模拟检查不能证明厂商界面实际跳转，未承诺所有系统都能直达保存目录。
-• 同步源码、应用内说明、同版更新日志、APK、SHA-256 校验文件及原密钥签名更新清单，正式发布 Android 0.5.1。
+• Android 0.5.1 → 0.5.2，versionCode 502；Windows 保持 0.3.9。保留原包名、APK 签名证书与更新公钥，支持覆盖安装。
+• 检查云空间过滤、真实原生组件选择、目录地址与只读授权、首页回退、禁用或受限组件及备用选择；执行 Android 宿主回归、编译与签名核验。
+• 未连接荣耀 Play5 / Android 10 真机；模拟框架检查验证调用参数和选择策略，不代表已验证手机实际界面和目录定位。
+• 同步源码、应用内说明、同版更新日志、APK、SHA-256 校验文件及原密钥签名更新清单，正式发布 Android 0.5.2。
