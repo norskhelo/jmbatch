@@ -466,7 +466,7 @@ def run_self_test(directory: Path):
             library_event("<ButtonPress-1>")
             library_event("<ButtonRelease-1>")
             assert len(library_ui.tree.selection()) == 2
-            assert str(library_ui.action_buttons["export"]["state"]) == "disabled"
+            assert str(library_ui.action_buttons["export"]["state"]) == "normal"
             library_ui.exit_batch()
             root.update()
             assert not library_ui.tree.selection() and not library_ui.batch_rows[0].winfo_ismapped()
@@ -575,6 +575,30 @@ def run_self_test(directory: Path):
             other_format = "pdf" if source.suffix == ".zip" else "zip"
             assert export_album(source, directory / ("converted-to-" + other_format), other_format)[0].is_file()
         report["checks"].append("All six folder/ZIP/PDF conversion directions succeed offline and retain sources")
+        # The real multi-selection export dialog and worker also run in the frozen app.
+        from tkinter import ttk
+        image_library.library.import_found(image_library.library.discover(zipped.parent)[0])
+        batch_keys = [key, image_library.library.key(zipped), image_library.library.key(exports[0])]
+        image_library.render()
+        from unittest.mock import patch
+        with patch('export_ui.messagebox.showinfo') as notice:
+            export_dialog = show_export(image_library, batch_keys)
+            root.update()
+            controls = export_dialog.winfo_children()[0].winfo_children()
+            assert any('已选择 3 本' in w.cget('text') for w in controls if 'text' in w.keys())
+            destination_entry = next(w for w in controls if isinstance(w, ttk.Entry))
+            destination_entry.delete(0, 'end')
+            destination_entry.insert(0, str(directory/'batch-export'))
+            next(w for w in controls if 'text' in w.keys() and w.cget('text') == '开始导出').invoke()
+            deadline = time.monotonic()+20
+            while image_library.busy and time.monotonic()<deadline:
+                root.update();time.sleep(.02)
+            assert not image_library.busy
+            assert notice.call_count == 1 and '成功 3 本' in notice.call_args.args[1]
+        batch_files = list((directory/'batch-export').glob('*.pdf'))
+        assert len(batch_files) == 3 and all(len(PdfReader(p).pages) == 5 for p in batch_files)
+        assert all(image_library.library.key(p) in image_library.library.entries for p in batch_files)
+        report['checks'].append('Batch export dialog and worker: three mixed-format comics, independent PDFs, progress, summary and library refresh')
         # Exercise the shipped reader on real folder, ZIP and PDF fixtures.
         from reader import ReaderState
         def reader_wait(predicate):

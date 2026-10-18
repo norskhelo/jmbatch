@@ -321,7 +321,7 @@ class LibraryWindow:
         self.detail.set(f"当前显示 {len(self.tree.get_children())} 项" + (f"，已选 {len(selected)} 项" if self.batch_mode else ""))
         self.path_text.set(path)
         for action, button in self.action_buttons.items():
-            enabled = self.batch_mode and (len(selected) == 1 if action in ("open", "export", "folder") else bool(selected))
+            enabled = self.batch_mode and (len(selected) == 1 if action in ("open", "folder") else bool(selected))
             button.configure(state="normal" if enabled else "disabled")
 
     def run(self, operation, finished, pause_required=False):
@@ -387,10 +387,8 @@ class LibraryWindow:
             return
         try:
             if action == "export":
-                if len(selected) != 1:
-                    raise ValueError("请选择一本漫画，再选择导出格式。")
                 from export_ui import show_export
-                show_export(self, selected[0])
+                show_export(self, selected)
             elif action in ("favorite", "favorite_on", "favorite_off"):
                 if action == "favorite":
                     self.library.favorite(selected[0])

@@ -5,7 +5,7 @@ import tkinter as tk
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from library import Library
 from library_ui import LibraryWindow
 
@@ -59,7 +59,11 @@ class LibraryInteractionTest(unittest.TestCase):
         self.assertTrue(self.ui.batch_rows[0].winfo_ismapped())
         self.click(1)
         self.assertEqual(set(self.ui.tree.selection()), set(self.keys[:2]))
-        self.assertEqual(str(self.ui.action_buttons['export']['state']), 'disabled')
+        self.assertEqual(str(self.ui.action_buttons['export']['state']), 'normal')
+        self.assertEqual(str(self.ui.action_buttons['open']['state']), 'disabled')
+        with patch('export_ui.show_export') as show:
+            self.ui.action_buttons['export'].invoke()
+            show.assert_called_once_with(self.ui, list(self.ui.tree.selection()))
 
     def test_motion_cancels_both_click_and_hold(self):
         self.event('<ButtonPress-1>')

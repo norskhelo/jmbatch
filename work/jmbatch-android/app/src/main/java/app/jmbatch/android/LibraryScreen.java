@@ -72,10 +72,10 @@ public final class LibraryScreen {
         batchActions=new LinearLayout(activity);batchActions.setOrientation(LinearLayout.VERTICAL);
         Button favoriteOn=button("批量收藏",()->favorite(true)),favoriteOff=button("取消收藏",()->favorite(false));
         Button read=button("开始阅读",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)read(items.get(0));});
-        Button export=button("导出漫画",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)new ExportScreen(activity,store,items.get(0)).show();});
+        Button export=button("导出漫画",()->{List<LibraryStore.Entry> items=selection();if(!items.isEmpty())new ExportScreen(activity,store,items,this::load).show();});
         Button more=button("更多操作",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)details(items.get(0));});
         Button delete=button("删除文件",()->confirmRemove(true)),forget=button("仅移除记录",()->confirmRemove(false));
-        singleButtons.addAll(Arrays.asList(read,export,more));batchButtons.addAll(Arrays.asList(favoriteOn,favoriteOff,delete,forget));
+        singleButtons.addAll(Arrays.asList(read,more));batchButtons.addAll(Arrays.asList(export,favoriteOn,favoriteOff,delete,forget));
         row(batchActions,read,export,more);row(batchActions,favoriteOn,favoriteOff);row(batchActions,delete,forget);actions.addView(batchActions);
         stop=new ActionButton(activity);stop.setText("停止操作");stop.setTextSize(12);stop.setEnabled(false);stop.setOnClickListener(v->cancel());
         row(actions,stop,button("关闭",()->dialog.dismiss()));root.addView(new ControlScroll(activity,actions));
@@ -192,7 +192,7 @@ public final class LibraryScreen {
         new AlertDialog.Builder(activity).setTitle(title(entry)).setItems(new String[]{"开始阅读","分享文件",entry.favorite?"取消收藏":"加入收藏","打开保存目录","应用内查看目录","导出漫画"},(d,index)->{
             if(index==0){read(entry);return;}
             if(index==1&&entry.format.equals("images")){message("图片文件夹请先导出为 ZIP 或 PDF 后分享。");return;}
-            if(index==5){new ExportScreen(activity,store,entry).show();return;}
+            if(index==5){new ExportScreen(activity,store,Collections.singletonList(entry),this::load).show();return;}
             if(index==0||index==1)perform(()->{library.check(entry);return "";},()->open(entry,index==1));
             else if(index==2)perform(()->{library.favorite(entry);return "已更新收藏";},null);
             else if(index==3)new SavedDirectory(activity,entry.tree,entry.label).openExternal();
