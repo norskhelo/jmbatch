@@ -82,11 +82,13 @@ public class LibraryScreenRuntimeTest {
         controller.setup();screen=new LibraryScreen(activity,Store.get(activity));screen.show();settle();
         assertTrue(screen.isOpen());assertTrue("test must exercise touch mode",grid().isInTouchMode());
         assertEquals(count,grid().getCount());assertTrue("usable library viewport",grid().getHeight()>0);
+        assertEquals(tiles?4:1,grid().getNumColumns());
         if(count>0)assertTrue("comics visible",grid().getChildCount()>0);
     }
     private void display(boolean tiles) throws Exception {
         RadioGroup selector=(RadioGroup)field(screen,"displaySelector");
         selector.check(selector.getChildAt(tiles?1:0).getId());frames();
+        assertEquals(tiles?4:1,grid().getNumColumns());
         assertTrue(grid().getChildCount()>0);
     }
     private void scroll() throws Exception {
@@ -97,10 +99,31 @@ public class LibraryScreenRuntimeTest {
     @Test public void emptyTiles() throws Exception {open(true,0);}
     @Test public void populatedList() throws Exception {open(false,80);}
     @Test public void populatedTiles() throws Exception {open(true,80);}
+    @Test @Config(qualifiers="w320dp-h800dp-mdpi")
+    public void narrowTiles() throws Exception {
+        android.content.res.Resources resources=RuntimeEnvironment.getApplication().getResources();
+        android.content.res.Configuration config=new android.content.res.Configuration(resources.getConfiguration());
+        config.fontScale=1.8f;resources.updateConfiguration(config,resources.getDisplayMetrics());
+        open(true,80);assertFourAcross();
+    }
+    @Test @Config(qualifiers="w800dp-h360dp-mdpi")
+    public void wideTiles() throws Exception {open(true,80);assertFourAcross();}
+    private void assertFourAcross() throws Exception {
+        for(int i=0;i<4;i++){
+            android.view.View child=grid().getChildAt(i);
+            assertEquals(grid().getChildAt(0).getTop(),child.getTop());
+            assertTrue(child.getLeft()>=0&&child.getRight()<=grid().getWidth());
+        }
+        if(grid().getChildCount()>4)assertTrue(grid().getChildAt(4).getTop()>grid().getChildAt(0).getTop());
+        else assertEquals("one complete row fits the landscape viewport",4,grid().getChildCount());
+    }
     @Test public void mainActivityEntry() throws Exception {
         fixtures(24);controller=Robolectric.buildActivity(MainActivity.class);activity=controller.get();
+        activity.getSharedPreferences("display",0).edit().putBoolean("downloads",true).commit();
         activity.setTheme(android.R.style.Theme_Material_Light_NoActionBar);
         activity.getApplicationInfo().targetSdkVersion=34;controller.setup();
+        assertEquals(android.widget.LinearLayout.class,field(activity,"queue").getClass());
+        assertEquals(android.widget.LinearLayout.VERTICAL,((android.widget.LinearLayout)field(activity,"queue")).getOrientation());
         ((android.os.Handler)field(activity,"handler")).removeCallbacksAndMessages(null);
         Method open=MainActivity.class.getDeclaredMethod("showLibrary");open.setAccessible(true);open.invoke(activity);
         screen=(LibraryScreen)field(activity,"libraryScreen");settle();

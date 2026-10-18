@@ -23,5 +23,10 @@ while scrolled and in batch mode, and viewport restoration after refresh and
 reopening. Framework resources are used for the theme; this is not an OEM
 firmware, actual APK/Dex, visual or real-device test.
 
+Tile mode is checked for exactly four columns on normal, narrow/large-font
+and landscape screens, including cases where only one row fits onscreen.
+The main activity also ignores the obsolete download tile preference and uses
+the vertical download list.
+
 For a before/after proof, pass `--library-source <path-to-old-LibraryScreen.java>`
 and a separate run ID. The production tree is never replaced by that option.

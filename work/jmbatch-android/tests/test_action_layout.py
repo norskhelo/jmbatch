@@ -56,11 +56,6 @@ public class ScrollView extends ViewGroup {public ScrollView(Context c){super(c)
 protected LayoutParams generateDefaultLayoutParams(){return new LayoutParams(-2,-2);}
 protected void onMeasure(int w,int h){View child=getChildAt(0);child.measure(w,MeasureSpec.makeMeasureSpec(0,MeasureSpec.UNSPECIFIED));setMeasuredDimension(resolveSize(child.getMeasuredWidth(),w),resolveSize(child.getMeasuredHeight(),h));}}''',
 }
-# Compile the real column policy without Android preference widgets.
-mode_source=(source/'DisplayMode.java').read_text(encoding='utf-8')
-start=mode_source.index('    public static int columns(')
-end=mode_source.index('\n    }',start)+6
-stubs['app/jmbatch/android/DisplayMode.java']='package app.jmbatch.android;public class DisplayMode {\n'+mode_source[start:end]+'\n}'
 for name, text in stubs.items():
     file = out/name; file.parent.mkdir(parents=True, exist_ok=True); file.write_text(text, encoding='utf-8')
 harness = out/'ActionLayoutTest.java'
@@ -106,23 +101,6 @@ public final class ActionLayoutTest {
   check(exactScroll.getMeasuredHeight()==120,"explicit parent height ignored");
   ActionButton legacy=new ActionButton(c);legacy.chars=5;legacy.fontHeight=1.7f;c.resources.metrics.scaledDensity=2;
   legacy.measure(exact(80),exact(46));check(legacy.requiredHeight(80)>46,"old fixed-height regression not reproduced");
-  for(int width:new int[]{240,360,760})for(float scale:new float[]{1f,1.8f}){
-   c.resources.config.fontScale=scale;ComicLayout comics=new ComicLayout(c);
-   for(int i=0;i<7;i++){ActionButton item=new ActionButton(c);item.chars=10+i*5;comics.addView(item);}
-   View retained=comics.getChildAt(3);
-   for(boolean tiles:new boolean[]{false,true,false}){
-    comics.setTiles(tiles);measure(comics,width);
-    int columns=DisplayMode.columns(width,Math.round(168*scale),10,tiles);
-    check(comics.getChildAt(3)==retained,"mode switch must retain cards and click targets");
-    for(int i=0;i<comics.getChildCount();i++){
-     View item=comics.getChildAt(i);check(item.getLeft()>=0&&item.getRight()<=width,"comic fits width");
-     check(item.getBottom()<=comics.getMeasuredHeight(),"comic fits scroll extent");
-     if(i>=columns)check(item.getTop()>=comics.getChildAt(i-columns).getBottom(),"rows cannot overlap");
-     if(i%columns>0)check(item.getLeft()>=comics.getChildAt(i-1).getRight(),"columns cannot overlap");
-     if(!tiles)check(item.getLeft()==0&&item.getRight()==width,"list uses full width");
-    }
-   }
-  }
   System.out.println("Action layout: "+scenarios+" synthetic font/scale/width scenarios, "+checks+" checks passed (not Android rendering)");
  }
 }''', encoding='utf-8')
@@ -130,5 +108,5 @@ jdk = Path(sys.argv[1])/'bin'
 classes=out/'classes'; classes.mkdir(exist_ok=True)
 subprocess.run([str(jdk/'javac.exe'), '-encoding', 'UTF-8', '-d', str(classes),
                 *[str(out/name) for name in stubs],
-                *[str(source/name) for name in ('ActionButton.java','ActionRow.java','ControlScroll.java','ComicLayout.java')], str(harness)], check=True)
+                *[str(source/name) for name in ('ActionButton.java','ActionRow.java','ControlScroll.java')], str(harness)], check=True)
 subprocess.run([str(jdk/'java.exe'), '-cp', str(classes), 'ActionLayoutTest'], check=True)

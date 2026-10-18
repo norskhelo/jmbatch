@@ -26,7 +26,4 @@ public final class DisplayMode {
         });
         return group;
     }
-    public static int columns(int width,int minimum,int gap,boolean tiles){
-        return tiles?Math.max(1,(Math.max(0,width)+gap)/(Math.max(1,minimum)+gap)):1;
-    }
 }

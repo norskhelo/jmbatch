@@ -23,9 +23,7 @@ public final class MainActivity extends Activity {
     private GithubUpdates updates;
     private DownloadCovers downloadCovers;
     private LinearLayout layout;
-    private ComicLayout queue;
-    private ScrollView mainScroll;
-    private boolean tiles;
+    private LinearLayout queue;
     private InputFocusLayout inputFocus;
     private LibraryScreen libraryScreen;
     private EditText ids,rangeFirst,rangeLast;
@@ -42,7 +40,7 @@ public final class MainActivity extends Activity {
         super.onCreate(state);store=Store.get(this);downloadCovers=new DownloadCovers(this);
         for(Store.Task task:store.snapshot())if(task.discardRequested&&task.status.equals("cancelling"))send(DownloadService.CANCEL,task.key);
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        ScrollView scroll=new ScrollView(this);mainScroll=scroll;tiles=DisplayMode.tiles(this,"downloads");scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
         layout=column();layout.setPadding(dp(18),dp(20),dp(18),dp(28));scroll.addView(layout);
         inputFocus=new InputFocusLayout(this);inputFocus.addView(scroll);setContentView(inputFocus);inputFocus.requestFocus();
         LinearLayout header=horizontal();TextView brand=text("JM Batch",27,INK);brand.setTypeface(null,Typeface.BOLD);header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));header.addView(button("下载设置",v->settings()));layout.addView(header);
@@ -73,8 +71,7 @@ public final class MainActivity extends Activity {
 
         start=buttonAccent("开始下载",v->startQueue());pause=button("暂停全部",v->send(DownloadService.PAUSE,null));add(new ActionRow(this,start,pause),0,8);
         summary=text("",13,MUTED);add(summary,0,4);global=text("",12,ACCENT);add(global,0,10);
-        add(DisplayMode.selector(this,"downloads",this::changeDisplay),0,6);
-        queue=new ComicLayout(this);queue.setTiles(tiles);layout.addView(queue);more=button("显示更多任务",v->{limit+=50;render();});layout.addView(more);
+        queue=column();layout.addView(queue);more=button("显示更多任务",v->{limit+=50;render();});layout.addView(more);
         layout.addView(button("清除已结束任务记录",v->new AlertDialog.Builder(this).setTitle("清除已结束任务记录").setMessage("仅移除已完成和已取消的任务记录，保留已保存文件及缓存。移除后无法通过这些记录继续下载。").setNegativeButton("取消",null).setPositiveButton("移除",(d,w)->{clearHistory();}).show()));
         layout.addView(text("可在通知栏查看下载进度或暂停任务。应用被系统关闭后，重新打开即可继续下载。",11,MUTED));
         if(!store.note.isEmpty())toast(store.note);
@@ -175,17 +172,6 @@ public final class MainActivity extends Activity {
         if(task.status.equals("selecting")){task.status="paused";task.phase="已暂停，点击“开始下载”继续选择章节";save();}
     }
 
-    private void changeDisplay(boolean value){
-        int y=mainScroll.getScrollY(),relative=y-queue.getTop(),offset=0;Row anchor=null;
-        if(relative>=0)for(Row row:rows.values())if(row.card.getBottom()>relative){anchor=row;offset=relative-row.card.getTop();break;}
-        tiles=value;for(Row row:rows.values())row.setTiles();queue.setTiles(value);
-        final Row retained=anchor;final int delta=offset;
-        queue.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener(){public void onGlobalLayout(){
-            queue.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-            mainScroll.scrollTo(0,retained==null?y:queue.getTop()+retained.card.getTop()+delta);
-        }});
-    }
-
     private final class Row{
         LinearLayout card,heading,description;FrameLayout frame;TextView title,state,phase;ProgressBar progress;Button open;DownloadCovers.Target cover;
         Row(Store.Task task){
@@ -199,15 +185,7 @@ public final class MainActivity extends Activity {
             title=text("",15,INK);title.setTypeface(null,Typeface.BOLD);title.setMaxLines(2);description.addView(title);state=text("",12,MUTED);state.setPadding(0,dp(7),0,dp(6));description.addView(state);
             progress=new ProgressBar(MainActivity.this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(1000);card.addView(progress,new LinearLayout.LayoutParams(-1,dp(8)));
             phase=text("",12,MUTED);phase.setPadding(0,dp(7),0,0);card.addView(phase);
-            open=button("阅读",v->open(task,false));card.addView(new ActionRow(MainActivity.this,button("详情",v->details(task)),button("重试",v->retry(task)),open));setTiles();
-        }
-        void setTiles(){
-            heading.setOrientation(tiles?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
-            LinearLayout.LayoutParams coverParams=new LinearLayout.LayoutParams(tiles?-1:dp(66),dp(tiles?136:88));
-            coverParams.rightMargin=tiles?0:dp(12);frame.setLayoutParams(coverParams);
-            description.setLayoutParams(tiles?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
-            title.setMinLines(tiles?2:0);state.setMaxLines(tiles?4:Integer.MAX_VALUE);phase.setMaxLines(tiles?3:Integer.MAX_VALUE);
-            state.setEllipsize(android.text.TextUtils.TruncateAt.END);phase.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            open=button("阅读",v->open(task,false));card.addView(new ActionRow(MainActivity.this,button("详情",v->details(task)),button("重试",v->retry(task)),open));
         }
     }
 

@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Android 0.5.18 — 漫画库闪退修复\n\n修复内容\n\n• 修复 Android 0.5.17 在手机触摸模式下，点开有漫画的漫画库立即闪退的问题。\n• 修正漫画库列表/平铺控件的滚动位置恢复方式，避免进入页面或刷新时访问无效条目。\n• 保留列表和平铺切换、批量选择，以及刷新和重新打开漫画库后的浏览位置；忽略重复的显示方式回调，避免切换时回到顶部。\n\n版本与验证\n\n• Android 0.5.17 → 0.5.18，versionCode 518；Windows 保持 0.3.20。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。\n• Android 10 框架触摸模式回归覆盖空库、有漫画、主界面入口、显示切换、批量选择及刷新重开定位。同一组 7 项测试中，原代码 4 项越界异常，修复后全部通过；执行完整 Android 宿主回归、编译与原证书签名校验。\n• 当前 ADB 尚未识别手机，未完成真机验收；框架回归不等同于荣耀设备实际验证。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.21 / Android 0.5.19 — 下载列表与漫画库四列平铺\n\n显示调整\n\n• 下载页移除平铺显示及显示方式切换，统一使用列表。升级前保存的下载平铺设置不再生效，原任务、下载进度及操作保留。\n• 漫画库继续支持“列表 / 平铺”切换；平铺固定每行 4 本，卡片宽度随窗口或屏幕调整，末行不足 4 本时按实际数量显示。\n• 漫画库保留搜索、收藏筛选、批量选择和浏览位置，以及 Android 触摸模式下进入漫画库的闪退修复。\n\n版本与验证\n\n• Windows 0.3.20 → 0.3.21；Android 0.5.18 → 0.5.19（versionCode 519）。沿用原 Android 包名、APK 签名证书及更新公钥。\n• 验证下载列表、漫画库四列布局、显示切换与选择保留；执行 Windows 回归及源码/成品自检、Android 宿主回归、Android 10 触摸模式框架回归及原签名构建。\n• Android 框架回归覆盖窄屏、大字号及横屏布局；未连接 Android 真机，手机视觉和手势效果仍需设备验证。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

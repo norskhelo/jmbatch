@@ -16,11 +16,12 @@ class TileLibraryInteractionTest(interaction.LibraryInteractionTest):
         self.root.update()
 
     def test_column_resize_remains_available(self):
-        # Tile columns reflow with the viewport; list header resize is tested by the base class.
-        self.assertGreater(self.ui.tree.columns, 1)
-        self.ui.window.geometry('1400x640')
-        self.root.update()
-        self.assertGreaterEqual(self.ui.tree.columns, 5)
+        for width in (680, 980, 1400):
+            self.ui.window.geometry(f'{width}x640')
+            self.root.update()
+            self.assertEqual(self.ui.tree.columns, 4)
+            boxes = [self.ui.tree.bbox(key) for key in self.keys]
+            self.assertEqual(len({box[1] for box in boxes}), 1)
         self.assertEqual(self.ui.tree.get_children(), self.keys)
 
     def test_toggle_preserves_filters_choices_and_read_target(self):
@@ -44,10 +45,10 @@ class DisplayViewTest(unittest.TestCase):
     def setUp(self):
         self.root = tk.Tk()
         self.root.geometry('900x550')
-        self.view = DisplayView(self.root, kind='downloads', columns=tuple('abcdefg'), selectmode='extended')
+        self.view = DisplayView(self.root, kind='library', columns=tuple('abcd'), selectmode='extended')
         self.view.pack(fill='both', expand=True)
         for n in range(100):
-            self.view.insert('', 'end', iid=str(n), values=(f'JM{n}', '长标题'*60, '下载中', '25% · 1/4', '12 MiB', 'ZIP', '0'))
+            self.view.insert('', 'end', iid=str(n), values=('', str(n), '长标题'*60, 'ZIP'))
         self.root.update()
 
     def tearDown(self):
@@ -62,10 +63,10 @@ class DisplayViewTest(unittest.TestCase):
         self.assertIn('40', self.view.visible_keys())
         self.assertEqual(self.view.selection(), ('40', '43'))
         self.assertLess(len(self.view.canvas.find_all()), 120)
-        self.view.item('40', values=('JM40', 'Updated', '下载完成', '100%', '48 MiB', 'ZIP', '0'))
+        self.view.item('40', values=('★', '40', 'Updated', 'ZIP'))
         self.root.update()
         painted=[self.view.canvas.itemcget(item, 'text') for item in self.view.canvas.find_all() if self.view.canvas.type(item)=='text']
-        self.assertTrue(any('Updated' in text and '100%' in text for text in painted))
+        self.assertTrue(any('Updated' in text and 'JM40' in text for text in painted))
         self.view.set_mode('list')
         self.root.update()
         self.assertEqual(self.view.focus(), '43')
@@ -75,6 +76,9 @@ class DisplayViewTest(unittest.TestCase):
     def test_second_column_hit_ctrl_select_and_delete(self):
         self.view.set_mode('tiles')
         self.root.update()
+        self.assertEqual(self.view.columns, 4)
+        self.assertEqual(self.view.bbox('0')[1], self.view.bbox('3')[1])
+        self.assertGreater(self.view.bbox('4')[1], self.view.bbox('0')[1])
         for key, state in (('0', 0), ('1', 4)):
             x,y,w,h=self.view.bbox(key)
             self.view.event_generate('<ButtonPress-1>', x=x+20, y=y+20, state=state)
@@ -92,7 +96,7 @@ class DisplayViewTest(unittest.TestCase):
         self.view.set_mode('tiles')
         self.view.yview_moveto(.4)
         self.root.update()
-        self.view.insert('', 'end', iid='new', values=('JMnew','New','等待','0%','—','ZIP','0'))
+        self.view.insert('', 'end', iid='new', values=('','new','New','ZIP'))
         self.root.update()
         self.assertEqual(positions[-1],self.view.canvas.yview())
         self.view._list_scrolled('0','0.01')

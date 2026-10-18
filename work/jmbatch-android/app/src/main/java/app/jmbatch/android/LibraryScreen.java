@@ -96,8 +96,7 @@ public final class LibraryScreen {
         row(selectionControls,button("全选",()->select(0)),button("反选",()->select(1)),button("取消选择",()->select(2)));body.addView(selectionControls);
         status=new TextView(activity);status.setTextSize(12);body.addView(status);
         list=new LibraryGridView(activity);list.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);list.setHorizontalSpacing(dp(8));list.setVerticalSpacing(dp(4));
-        list.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol)updateColumns(r-l);});
-        list.setNumColumns(1);list.setChoiceMode(ListView.CHOICE_MODE_NONE);adapter=new CoverAdapter();list.setAdapter(adapter);
+        list.setNumColumns(tiles?4:1);list.setChoiceMode(ListView.CHOICE_MODE_NONE);adapter=new CoverAdapter();list.setAdapter(adapter);
         list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScroll(AbsListView v,int first,int count,int total){}public void onScrollStateChanged(AbsListView v,int state){if(state==SCROLL_STATE_IDLE)adapter.notifyDataSetChanged();}});
         root.addView(new ControlScroll(activity,body));root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout actions=new LinearLayout(activity);actions.setOrientation(LinearLayout.VERTICAL);
@@ -126,14 +125,9 @@ public final class LibraryScreen {
         query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int before,int count){load();}public void afterTextChanged(Editable e){}});
         favorites.setOnCheckedChangeListener((b,c)->load());load();
     }
-    private void updateColumns(int width){
-        int minimum=Math.round(dp(148)*Math.max(1f,activity.getResources().getConfiguration().fontScale));
-        int columns=DisplayMode.columns(width,minimum,dp(8),tiles);
-        if(columns!=list.getNumColumns()){Bundle state=viewportState();list.setNumColumns(columns);list.post(()->restoreViewport(state));}
-    }
     private void changeDisplay(boolean value){
         if(busy||loading||tiles==value)return;
-        Bundle state=viewportState();tiles=value;updateColumns(list.getWidth());adapter.notifyDataSetChanged();
+        Bundle state=viewportState();tiles=value;list.setNumColumns(tiles?4:1);adapter.notifyDataSetChanged();
         list.post(()->restoreViewport(state));
     }
     private void read(LibraryStore.Entry entry){

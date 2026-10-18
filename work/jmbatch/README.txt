@@ -1,4 +1,4 @@
-JM Batch 0.3.20 — Windows 使用说明
+JM Batch 0.3.21 — Windows 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.3.20 — Windows 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-18）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.20-0.5.17/JMBatch-0.3.20-Windows-x64.zip
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.20-0.5.17/JMBatch-0.3.20-Windows-x64.zip
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.20-0.5.17/JMBatch-0.3.20-Windows-x64.zip
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.20-0.5.17/SHA256-release-0.3.20-0.5.17.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.3.21-Windows-x64.zip
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.3.21-Windows-x64.zip
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.3.21-Windows-x64.zip
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/SHA256-release-0.3.21-0.5.19.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,18 +28,16 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.20-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.20 / Android 0.5.17 — 列表与平铺显示
+Windows 0.3.21 / Android 0.5.19 — 下载列表与漫画库四列平铺
 
-漫画库与下载列表
+显示调整
 
-• 新增“列表 / 平铺”显示切换。默认保留原列表，漫画库和下载列表分别记住选择，关闭重开和重启后继续使用。
-• 平铺以封面卡片排列漫画，按窗口或屏幕可用宽度自动调整列数。Android 大字号下减少列数，操作按钮继续自动换行。
-• 切换显示时保留搜索、收藏筛选、批量模式与已选漫画，并尽量保持当前可见漫画的位置。漫画库继续支持点击阅读、长按批量处理、收藏、导出及删除。
-• 下载卡片继续显示任务状态、进度与大小，下载任务和暂停续传不受显示切换影响。Android 卡片长文字可在“详情”中查看完整内容。
-• 两种显示共用现有封面缓存，切换无需重新解析漫画；Windows 仅绘制可见卡片，避免为全部漫画创建界面控件。
+• 下载页移除平铺显示及显示方式切换，统一使用列表。升级前保存的下载平铺设置不再生效，原任务、下载进度及操作保留。
+• 漫画库继续支持“列表 / 平铺”切换；平铺固定每行 4 本，卡片宽度随窗口或屏幕调整，末行不足 4 本时按实际数量显示。
+• 漫画库保留搜索、收藏筛选、批量选择和浏览位置，以及 Android 触摸模式下进入漫画库的闪退修复。
 
 版本与验证
 
-• Windows 0.3.19 → 0.3.20；Android 0.5.16 → 0.5.17（versionCode 517）。沿用原 Android 包名、APK 签名证书和更新公钥。
-• 验证覆盖列表和平铺的点击、长按、滚动取消、跨列选择、显示切换、浏览位置、进度刷新与独立设置保存；执行 Windows 完整回归及源码/打包自检、Android 宿主回归、字体/宽度布局检查和原签名构建。
-• 未连接 Android 真机；手机上的手势和视觉效果仍需设备验证，宿主测试不代替真机验收。
+• Windows 0.3.20 → 0.3.21；Android 0.5.18 → 0.5.19（versionCode 519）。沿用原 Android 包名、APK 签名证书及更新公钥。
+• 验证下载列表、漫画库四列布局、显示切换与选择保留；执行 Windows 回归及源码/成品自检、Android 宿主回归、Android 10 触摸模式框架回归及原签名构建。
+• Android 框架回归覆盖窄屏、大字号及横屏布局；未连接 Android 真机，手机视觉和手势效果仍需设备验证。

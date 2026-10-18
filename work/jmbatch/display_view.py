@@ -109,7 +109,7 @@ class DisplayView(ttk.Treeview):
     def _resize(self, event=None):
         position = self.item_position()
         width = max(1, self.canvas.winfo_width())
-        self.columns = max(1, width // 210)
+        self.columns = 4
         self.cell_width = width / self.columns
         self._extent()
         self.move_to_index(position)

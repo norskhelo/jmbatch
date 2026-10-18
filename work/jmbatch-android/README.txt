@@ -1,4 +1,4 @@
-JM Batch 0.5.18 — Android 使用说明
+JM Batch 0.5.19 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.5.18 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-18）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.18/JMBatch-0.5.18-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.18/JMBatch-0.5.18-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.18/JMBatch-0.5.18-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.18/SHA256-release-android-0.5.18.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.5.19-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.5.19-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.5.19-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/SHA256-release-0.3.21-0.5.19.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,16 +28,16 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Android 0.5.18 — 漫画库闪退修复
+Windows 0.3.21 / Android 0.5.19 — 下载列表与漫画库四列平铺
 
-修复内容
+显示调整
 
-• 修复 Android 0.5.17 在手机触摸模式下，点开有漫画的漫画库立即闪退的问题。
-• 修正漫画库列表/平铺控件的滚动位置恢复方式，避免进入页面或刷新时访问无效条目。
-• 保留列表和平铺切换、批量选择，以及刷新和重新打开漫画库后的浏览位置；忽略重复的显示方式回调，避免切换时回到顶部。
+• 下载页移除平铺显示及显示方式切换，统一使用列表。升级前保存的下载平铺设置不再生效，原任务、下载进度及操作保留。
+• 漫画库继续支持“列表 / 平铺”切换；平铺固定每行 4 本，卡片宽度随窗口或屏幕调整，末行不足 4 本时按实际数量显示。
+• 漫画库保留搜索、收藏筛选、批量选择和浏览位置，以及 Android 触摸模式下进入漫画库的闪退修复。
 
 版本与验证
 
-• Android 0.5.17 → 0.5.18，versionCode 518；Windows 保持 0.3.20。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。
-• Android 10 框架触摸模式回归覆盖空库、有漫画、主界面入口、显示切换、批量选择及刷新重开定位。同一组 7 项测试中，原代码 4 项越界异常，修复后全部通过；执行完整 Android 宿主回归、编译与原证书签名校验。
-• 当前 ADB 尚未识别手机，未完成真机验收；框架回归不等同于荣耀设备实际验证。
+• Windows 0.3.20 → 0.3.21；Android 0.5.18 → 0.5.19（versionCode 519）。沿用原 Android 包名、APK 签名证书及更新公钥。
+• 验证下载列表、漫画库四列布局、显示切换与选择保留；执行 Windows 回归及源码/成品自检、Android 宿主回归、Android 10 触摸模式框架回归及原签名构建。
+• Android 框架回归覆盖窄屏、大字号及横屏布局；未连接 Android 真机，手机视觉和手势效果仍需设备验证。
