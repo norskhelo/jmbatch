@@ -1,0 +1,29 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>app.jmbatch</groupId><artifactId>android-runtime-tests</artifactId><version>1</version>
+  <properties><maven.compiler.source>8</maven.compiler.source><maven.compiler.target>8</maven.compiler.target><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
+  <repositories>
+    <repository><id>central</id><url>https://repo.maven.apache.org/maven2</url></repository>
+    <repository><id>google</id><url>https://dl.google.com/dl/android/maven2/</url></repository>
+  </repositories>
+  <dependencies>
+    <dependency><groupId>android</groupId><artifactId>sdk</artifactId><version>35</version><scope>system</scope><systemPath>${sdk.jar}</systemPath></dependency>
+    <dependency><groupId>junit</groupId><artifactId>junit</artifactId><version>4.13.2</version><scope>test</scope></dependency>
+    <dependency><groupId>org.robolectric</groupId><artifactId>robolectric</artifactId><version>4.14.1</version><scope>test</scope></dependency>
+  </dependencies>
+  <build>
+    <directory>${run.dir}/target</directory>
+    <sourceDirectory>${run.dir}/src/main/java</sourceDirectory>
+    <testSourceDirectory>${project.basedir}/src/test/java</testSourceDirectory>
+    <plugins>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version></plugin>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.2</version>
+        <configuration>
+          <forkedProcessTimeoutInSeconds>120</forkedProcessTimeoutInSeconds>
+          <additionalClasspathElements><additionalClasspathElement>${run.dir}/aar-classes</additionalClasspathElement></additionalClasspathElements>
+          <systemPropertyVariables><robolectric.dependency.repo.url>https://repo.maven.apache.org/maven2</robolectric.dependency.repo.url></systemPropertyVariables>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

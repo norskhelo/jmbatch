@@ -1,0 +1,131 @@
+package app.jmbatch.android;
+
+import android.app.Activity;
+import android.app.Instrumentation;
+import android.os.Bundle;
+import android.os.Looper;
+import android.widget.GridView;
+import android.widget.RadioGroup;
+import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import org.junit.Before;
+import org.junit.After;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.Robolectric;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.RuntimeEnvironment;
+import org.robolectric.annotation.Config;
+import org.robolectric.annotation.LooperMode;
+import org.robolectric.android.controller.ActivityController;
+import static org.junit.Assert.*;
+import static org.robolectric.Shadows.shadowOf;
+
+/** Full production dialog and Android 10 widgets, including phone touch mode. */
+@RunWith(RobolectricTestRunner.class)
+@Config(manifest=Config.NONE, sdk={29}, qualifiers="w360dp-h800dp-mdpi")
+@LooperMode(LooperMode.Mode.PAUSED)
+public class LibraryScreenRuntimeTest {
+    private ActivityController<? extends Activity> controller;
+    private Activity activity;
+    private LibraryScreen screen;
+
+    @Before public void resetIsolatedApp() throws Exception {
+        new Instrumentation().setInTouchMode(true);
+        for(Class<?> type:new Class<?>[]{Store.class,LibraryStore.class}) {
+            Field field=type.getDeclaredField("instance");field.setAccessible(true);field.set(null,null);
+        }
+        for(String name:new String[]{"queue.json","library.json"}) {
+            File file=new File(RuntimeEnvironment.getApplication().getFilesDir(),name);
+            if(file.exists())assertTrue(file.delete());
+        }
+        RuntimeEnvironment.getApplication().getSharedPreferences("display",0).edit().clear().commit();
+    }
+    @After public void close() throws Exception {
+        if(screen!=null)screen.close();
+        if(controller!=null)controller.pause().stop().destroy();
+        frames(); // Dialog dispatches its dismiss listener through the main looper.
+        if(screen!=null) {
+            ((ExecutorService)field(screen,"worker")).awaitTermination(10,TimeUnit.SECONDS);
+            ((ExecutorService)field(screen,"coverWorker")).awaitTermination(10,TimeUnit.SECONDS);
+        }
+    }
+    private static Object field(Object value,String name) throws Exception {
+        Field field=value.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(value);
+    }
+    private void call(String name,Class<?>[] types,Object... args) throws Exception {
+        Method method=LibraryScreen.class.getDeclaredMethod(name,types);method.setAccessible(true);method.invoke(screen,args);
+    }
+    private static void frames(){shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));}
+    private void settle() throws Exception {
+        ((ExecutorService)field(screen,"worker")).submit(()->{}).get(10,TimeUnit.SECONDS);
+        frames();
+    }
+    private GridView grid() throws Exception {return (GridView)field(screen,"list");}
+    private void fixtures(int count) throws Exception {
+        ArrayList<LibraryStore.Entry> entries=new ArrayList<>();
+        for(int i=0;i<count;i++)entries.add(new LibraryStore.Entry(""+i,"Comic "+i,
+            "content://app.jmbatch.android.exports/book"+i,"","test","images",i%2==0));
+        LibraryStore.get(RuntimeEnvironment.getApplication()).importFound(entries);
+    }
+    private void open(boolean tiles,int count) throws Exception {
+        fixtures(count);
+        controller=Robolectric.buildActivity(Activity.class);
+        activity=controller.get();activity.setTheme(android.R.style.Theme_Material_Light_NoActionBar);
+        activity.getApplicationInfo().targetSdkVersion=34;
+        activity.getSharedPreferences("display",0).edit().putBoolean("library",tiles).commit();
+        controller.setup();screen=new LibraryScreen(activity,Store.get(activity));screen.show();settle();
+        assertTrue(screen.isOpen());assertTrue("test must exercise touch mode",grid().isInTouchMode());
+        assertEquals(count,grid().getCount());assertTrue("usable library viewport",grid().getHeight()>0);
+        if(count>0)assertTrue("comics visible",grid().getChildCount()>0);
+    }
+    private void display(boolean tiles) throws Exception {
+        RadioGroup selector=(RadioGroup)field(screen,"displaySelector");
+        selector.check(selector.getChildAt(tiles?1:0).getId());frames();
+        assertTrue(grid().getChildCount()>0);
+    }
+    private void scroll() throws Exception {
+        grid().smoothScrollToPositionFromTop(40,-13,0);frames();
+        assertTrue("scrolled away from beginning",grid().getFirstVisiblePosition()>0);
+    }
+    @Test public void emptyList() throws Exception {open(false,0);}
+    @Test public void emptyTiles() throws Exception {open(true,0);}
+    @Test public void populatedList() throws Exception {open(false,80);}
+    @Test public void populatedTiles() throws Exception {open(true,80);}
+    @Test public void mainActivityEntry() throws Exception {
+        fixtures(24);controller=Robolectric.buildActivity(MainActivity.class);activity=controller.get();
+        activity.setTheme(android.R.style.Theme_Material_Light_NoActionBar);
+        activity.getApplicationInfo().targetSdkVersion=34;controller.setup();
+        ((android.os.Handler)field(activity,"handler")).removeCallbacksAndMessages(null);
+        Method open=MainActivity.class.getDeclaredMethod("showLibrary");open.setAccessible(true);open.invoke(activity);
+        screen=(LibraryScreen)field(activity,"libraryScreen");settle();
+        assertTrue(screen.isOpen());assertEquals(24,grid().getCount());assertTrue(grid().getChildCount()>0);
+        // Stop the activity's updater timer before advancing simulated time further.
+        controller.pause().stop().destroy();controller=null;
+    }
+    @Test public void switchModesPreservesBatchAndVisibleComic() throws Exception {
+        open(false,80);scroll();
+        int position=grid().getFirstVisiblePosition();
+        call("itemLongClick",new Class<?>[]{int.class},position);
+        Bundle before=screen.saveState();
+        for(boolean tiles:new boolean[]{true,false,true,false}) {
+            display(tiles);
+            assertTrue(screen.saveState().getBoolean("batch"));
+            assertEquals(before.getStringArrayList("selected"),screen.saveState().getStringArrayList("selected"));
+            assertTrue("original comic "+position+" stays visible in tiles="+tiles+" (visible "+grid().getFirstVisiblePosition()+".."+grid().getLastVisiblePosition()+")",grid().getFirstVisiblePosition()<=position&&grid().getLastVisiblePosition()>=position);
+        }
+    }
+    @Test public void refreshAndReopenRestoreViewport() throws Exception {
+        open(false,80);scroll();Bundle before=screen.saveState();
+        call("load",new Class<?>[0]);settle();
+        assertEquals(before.getBundle("viewport").getString("anchor"),screen.saveState().getBundle("viewport").getString("anchor"));
+        assertEquals(before.getBundle("viewport").getInt("top"),screen.saveState().getBundle("viewport").getInt("top"));
+        screen.close();frames();screen=new LibraryScreen(activity,Store.get(activity));screen.show(before);settle();
+        assertEquals(before.getBundle("viewport").getString("anchor"),screen.saveState().getBundle("viewport").getString("anchor"));
+    }
+}

@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.20 / Android 0.5.17 — 列表与平铺显示\n\n漫画库与下载列表\n\n• 新增“列表 / 平铺”显示切换。默认保留原列表，漫画库和下载列表分别记住选择，关闭重开和重启后继续使用。\n• 平铺以封面卡片排列漫画，按窗口或屏幕可用宽度自动调整列数。Android 大字号下减少列数，操作按钮继续自动换行。\n• 切换显示时保留搜索、收藏筛选、批量模式与已选漫画，并尽量保持当前可见漫画的位置。漫画库继续支持点击阅读、长按批量处理、收藏、导出及删除。\n• 下载卡片继续显示任务状态、进度与大小，下载任务和暂停续传不受显示切换影响。Android 卡片长文字可在“详情”中查看完整内容。\n• 两种显示共用现有封面缓存，切换无需重新解析漫画；Windows 仅绘制可见卡片，避免为全部漫画创建界面控件。\n\n版本与验证\n\n• Windows 0.3.19 → 0.3.20；Android 0.5.16 → 0.5.17（versionCode 517）。沿用原 Android 包名、APK 签名证书和更新公钥。\n• 验证覆盖列表和平铺的点击、长按、滚动取消、跨列选择、显示切换、浏览位置、进度刷新与独立设置保存；执行 Windows 完整回归及源码/打包自检、Android 宿主回归、字体/宽度布局检查和原签名构建。\n• 未连接 Android 真机；手机上的手势和视觉效果仍需设备验证，宿主测试不代替真机验收。\n";
+    private static final String CURRENT_NOTES="Android 0.5.18 — 漫画库闪退修复\n\n修复内容\n\n• 修复 Android 0.5.17 在手机触摸模式下，点开有漫画的漫画库立即闪退的问题。\n• 修正漫画库列表/平铺控件的滚动位置恢复方式，避免进入页面或刷新时访问无效条目。\n• 保留列表和平铺切换、批量选择，以及刷新和重新打开漫画库后的浏览位置；忽略重复的显示方式回调，避免切换时回到顶部。\n\n版本与验证\n\n• Android 0.5.17 → 0.5.18，versionCode 518；Windows 保持 0.3.20。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。\n• Android 10 框架触摸模式回归覆盖空库、有漫画、主界面入口、显示切换、批量选择及刷新重开定位。同一组 7 项测试中，原代码 4 项越界异常，修复后全部通过；执行完整 Android 宿主回归、编译与原证书签名校验。\n• 当前 ADB 尚未识别手机，未完成真机验收；框架回归不等同于荣耀设备实际验证。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

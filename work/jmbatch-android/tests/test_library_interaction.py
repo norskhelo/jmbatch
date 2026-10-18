@@ -44,7 +44,7 @@ void putStringArrayList(String k,ArrayList<String> v){put(k,v);}
 void putBundle(String k,Bundle v){put(k,v);}Bundle getBundle(String k){return (Bundle)get(k);}}
 static class ListView extends View {static final int CHOICE_MODE_NONE=0,CHOICE_MODE_MULTIPLE=2;int mode;
 int first;View child=new View();int getFirstVisiblePosition(){return first;}View getChildAt(int i){return child;}
-void setSelectionFromTop(int n,int offset){first=n;child.top=offset;}
+void restorePosition(int n,int offset){first=n;child.top=offset;}
 Set<Integer> checked=new HashSet<>();void setChoiceMode(int n){mode=n;}void clearChoices(){checked.clear();}
 void setItemChecked(int n,boolean v){if(mode==0)return;if(v)checked.add(n);else checked.remove(n);}}
 static class Adapter {int changes;void notifyDataSetChanged(){changes++;}}
@@ -102,7 +102,7 @@ f.tap(1);check(ReaderActivity.opened.equals(Arrays.asList("a")),"tap reads again
 f=new LibraryInteractionTest();f.setBatchMode(true);check(f.batchMode&&f.selected.isEmpty(),"accessible batch button starts empty");
 f.acceptEntries(new ArrayList<>());f.select(0);f.itemLongClick(0);check(f.selected.isEmpty(),"empty library safe");
 f=new LibraryInteractionTest();f.query.text="search";f.favorites.checked=true;f.report="scan complete";
-f.itemLongClick(1);f.list.setSelectionFromTop(1,-23);f.read(f.entries.get(1));
+f.itemLongClick(1);f.list.restorePosition(1,-23);f.read(f.entries.get(1));
 check(!f.dialog.dismissed&&f.returningFromReader,"reading retains exact dialog");
 check(f.batchMode&&f.selected.contains("b")&&f.query.text.equals("search")&&f.favorites.checked,"read preserves filters and batch selection");
 check(f.list.first==1&&f.list.child.top==-23,"read preserves pixel offset");
