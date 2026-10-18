@@ -85,6 +85,27 @@ public class LibraryScreenRuntimeTest {
         assertEquals(tiles?4:1,grid().getNumColumns());
         if(count>0)assertTrue("comics visible",grid().getChildCount()>0);
     }
+
+    @Test public void chapterDeleteButtonChoosesConfirmsAndRefreshes() throws Exception {
+        open(false,0);
+        File book=new File(AlbumStorage.root(activity),"JM123-delete-12345678");assertTrue(book.mkdirs());
+        for(int c=1;c<=3;c++)for(int p=1;p<=2;p++){
+            File image=new File(book,String.format("%04d/%05d.jpg",c,p));image.getParentFile().mkdirs();java.nio.file.Files.write(image.toPath(),new byte[]{(byte)c,(byte)p,1});
+        }
+        LibraryStore.Entry entry=new LibraryStore.Entry("123","Delete fixture",ExportProvider.uri(activity,book).toString(),"","test","images",false);
+        LibraryStore.get(activity).importFound(java.util.Collections.singletonList(entry));call("load",new Class<?>[]{});settle();
+        call("setBatchMode",new Class<?>[]{boolean.class},true);call("itemClick",new Class<?>[]{int.class},0);frames();
+        @SuppressWarnings("unchecked") java.util.List<android.widget.Button> buttons=(java.util.List<android.widget.Button>)field(screen,"singleButtons");
+        android.widget.Button button=buttons.stream().filter(b->b.getText().toString().equals("删除章节")).findFirst().get();assertTrue(button.isEnabled());button.performClick();settle();settle();
+        android.app.AlertDialog picker=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();assertTrue(picker.isShowing());assertEquals(3,picker.getListView().getCount());
+        picker.getListView().performItemClick(picker.getListView().getChildAt(1),1,1);
+        picker.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();
+        android.app.AlertDialog confirmation=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();assertNotSame(picker,confirmation);
+        confirmation.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();settle();settle();
+        assertFalse(book.exists());assertEquals(1,grid().getCount());
+        assertTrue(((android.widget.TextView)field(screen,"status")).getText().toString().contains("删除 1 章"));
+        assertEquals(4,AlbumStorage.load(activity,android.net.Uri.parse(LibraryStore.get(activity).list("",false).get(0).uri)).images.size());
+    }
     private void display(boolean tiles) throws Exception {
         RadioGroup selector=(RadioGroup)field(screen,"displaySelector");
         selector.check(selector.getChildAt(tiles?1:0).getId());frames();

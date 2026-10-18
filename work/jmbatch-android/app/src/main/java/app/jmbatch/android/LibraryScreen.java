@@ -108,8 +108,9 @@ public final class LibraryScreen {
         Button export=button("导出漫画",()->{List<LibraryStore.Entry> items=selection();if(!items.isEmpty())new ExportScreen(activity,store,items,this::load).show();});
         Button more=button("更多操作",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)details(items.get(0));});
         Button delete=button("删除文件",()->confirmRemove(true)),forget=button("仅移除记录",()->confirmRemove(false));
-        singleButtons.addAll(Arrays.asList(read,more));batchButtons.addAll(Arrays.asList(export,favoriteOn,favoriteOff,delete,forget));
-        row(batchActions,read,export,more);row(batchActions,favoriteOn,favoriteOff);row(batchActions,delete,forget);actions.addView(batchActions);
+        Button chapters=button("删除章节",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)deleteChapters(items.get(0));});
+        singleButtons.addAll(Arrays.asList(read,more,chapters));batchButtons.addAll(Arrays.asList(export,favoriteOn,favoriteOff,delete,forget));
+        row(batchActions,read,export,more);row(batchActions,favoriteOn,favoriteOff);row(batchActions,chapters,delete,forget);actions.addView(batchActions);
         stop=new ActionButton(activity);stop.setText("停止操作");stop.setTextSize(12);stop.setEnabled(false);stop.setOnClickListener(v->cancel());
         row(actions,stop,button("关闭",()->dialog.dismiss()));root.addView(new ControlScroll(activity,actions));
         dialog=new Dialog(activity);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);dialog.setContentView(root);
@@ -250,7 +251,8 @@ public final class LibraryScreen {
         },null)).show();
     }
     private void details(LibraryStore.Entry entry){
-        new AlertDialog.Builder(activity).setTitle(title(entry)).setItems(new String[]{"开始阅读","分享文件",entry.favorite?"取消收藏":"加入收藏","打开保存目录","应用内查看目录","导出漫画"},(d,index)->{
+        new AlertDialog.Builder(activity).setTitle(title(entry)).setItems(new String[]{"开始阅读","分享文件",entry.favorite?"取消收藏":"加入收藏","打开保存目录","应用内查看目录","导出漫画","删除章节"},(d,index)->{
+            if(index==6){deleteChapters(entry);return;}
             if(index==0){read(entry);return;}
             if(index==1&&entry.format.equals("images")){message("图片文件夹请先导出为 ZIP 或 PDF 后分享。");return;}
             if(index==5){new ExportScreen(activity,store,Collections.singletonList(entry),this::load).show();return;}
@@ -259,6 +261,28 @@ public final class LibraryScreen {
             else if(index==3)new SavedDirectory(activity,entry.tree,entry.label).openExternal();
             else new SavedDirectory(activity,entry.tree,entry.label).show();
         }).setNegativeButton("关闭",null).show();
+    }
+    private void deleteChapters(LibraryStore.Entry entry){
+        final ChapterDeletion.Plan[] result=new ChapterDeletion.Plan[1];
+        perform(()->{result[0]=ChapterDeletion.inspect(activity,entry,cancelled::get);return "请选择要删除的章节";},()->{
+            ChapterDeletion.Plan plan=result[0];if(plan==null)return;
+            if(plan.counts.size()<=1){message("本书仅识别到一个章节。PDF 或平铺 ZIP 没有可分辨的分章信息；删除整本请使用“删除文件”。");return;}
+            List<Integer> chapters=new ArrayList<>(plan.counts.keySet());String[] labels=new String[chapters.size()];Set<Integer> removed=new HashSet<>();
+            for(int i=0;i<labels.length;i++)labels[i]="第 "+chapters.get(i)+" 章 · "+plan.counts.get(chapters.get(i))+" 页";
+            AlertDialog picker=new AlertDialog.Builder(activity).setTitle("删除章节（至少保留一章）")
+                .setMultiChoiceItems(labels,new boolean[labels.length],(d,index,checked)->{if(checked)removed.add(chapters.get(index));else removed.remove(chapters.get(index));})
+                .setNegativeButton("取消",null).setPositiveButton("删除所选章节",null).create();
+            picker.setOnShowListener(d->picker.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                if(removed.isEmpty()||removed.size()==chapters.size()){message("请选择要删除的章节，并至少保留一章。");return;}
+                int pages=0;StringBuilder names=new StringBuilder();for(int c:chapters)if(removed.contains(c)){pages+=plan.counts.get(c);names.append("第 ").append(c).append(" 章、");}
+                new AlertDialog.Builder(activity).setTitle("确认删除章节").setMessage("将永久删除 "+removed.size()+" 章，共 "+pages+" 页。\n"+names+"\n\n删除页的书签会移除。先校验保留章节再替换漫画，文件名会更新，需要临时可用空间；不进入回收站。")
+                    .setNegativeButton("取消",null).setPositiveButton("删除章节",(confirm,which)->{
+                        if(busy||loading){message("漫画库正在刷新，请稍后再次确认。");return;}
+                        picker.dismiss();Set<Integer> selection=new HashSet<>(removed);
+                        perform(()->ChapterDeletion.delete(activity,store,entry,plan,selection,cancelled::get,text->main.post(()->{if(visible())status.setText(text);})),()->{if(report.contains("清理未完成"))message(report);});
+                    }).show();
+            }));picker.show();
+        });
     }
     private void open(LibraryStore.Entry entry,boolean share){
         if(!share){read(entry);return;}

@@ -155,6 +155,24 @@ public final class LibraryStore {
         }
         if(!changed.isEmpty())persist(next);return changed.size();
     }
+    static final class RecoveryFailure extends IOException {RecoveryFailure(String message,Throwable cause){super(message,cause);}}
+    void replaceChapters(Store store,Entry original,Entry replacement)throws IOException {
+        synchronized(store){synchronized(this){
+            writable();Entry current=entries.get(original.uri);if(current==null)throw new IOException("漫画记录已变化，请刷新");
+            LinkedHashMap<String,Entry> previous=new LinkedHashMap<>(entries),next=new LinkedHashMap<>();
+            Entry updated=new Entry(current.id,current.title,replacement.uri,current.tree,current.label,current.format,current.favorite);
+            for(Entry entry:entries.values())next.put(entry.uri.equals(original.uri)?updated.uri:entry.uri,entry.uri.equals(original.uri)?updated:entry);
+            List<Store.Task> affected=new ArrayList<>();for(Store.Task task:store.tasks)if(task.resultUri.equals(original.uri))affected.add(task);
+            try{
+                persist(next);for(Store.Task task:affected)task.resultUri=updated.uri;store.save();
+            }catch(IOException failure){
+                for(Store.Task task:affected)task.resultUri=original.uri;
+                try{persist(previous);store.save();}
+                catch(IOException rollback){throw new RecoveryFailure("记录保存及恢复失败，原漫画和新副本均已保留，请检查写入权限："+replacement.uri,rollback);}
+                throw failure;
+            }
+        }}
+    }
     private static String identity(Entry entry){
         Uri uri=Uri.parse(entry.uri);
         if(!entry.tree.isEmpty())return uri.getAuthority()+"|"+DocumentsContract.getDocumentId(uri);

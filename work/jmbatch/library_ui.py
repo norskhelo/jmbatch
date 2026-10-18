@@ -105,7 +105,7 @@ class LibraryWindow:
         ttk.Label(footer, textvariable=self.status, width=1).grid(row=2, column=0, sticky="ew", pady=(3, 5))
         self.action_buttons = {}
         self.batch_rows = []
-        for row, pairs in enumerate(((("开始阅读", "open"), ("导出漫画", "export"), ("打开保存目录", "folder")),
+        for row, pairs in enumerate(((("开始阅读", "open"), ("导出漫画", "export"), ("打开保存目录", "folder"), ("删除章节", "chapters")),
                       (("批量收藏", "favorite_on"), ("取消收藏", "favorite_off"), ("批量删除文件", "delete"), ("仅移除记录", "forget"))), start=3):
             actions = ttk.Frame(footer)
             actions.grid(row=row, column=0, sticky="ew", pady=3)
@@ -366,7 +366,7 @@ class LibraryWindow:
         self.detail.set(f"当前显示 {len(self.tree.get_children())} 项" + (f"，已选 {len(selected)} 项" if self.batch_mode else ""))
         self.path_text.set(path)
         for action, button in self.action_buttons.items():
-            enabled = self.batch_mode and (len(selected) == 1 if action in ("open", "folder") else bool(selected))
+            enabled = self.batch_mode and (len(selected) == 1 if action in ("open", "folder", "chapters") else bool(selected))
             button.configure(state="normal" if enabled else "disabled")
 
     def run(self, operation, finished, pause_required=False):
@@ -431,7 +431,11 @@ class LibraryWindow:
         if not selected:
             return
         try:
-            if action == "export":
+            if action == "chapters":
+                if len(selected) == 1:
+                    from chapter_delete_ui import show
+                    show(self, selected[0])
+            elif action == "export":
                 from export_ui import show_export
                 show_export(self, selected)
             elif action in ("favorite", "favorite_on", "favorite_off"):
