@@ -144,6 +144,7 @@ public final class LibraryStore {
                 store.save();
             }
             synchronized(this){LinkedHashMap<String,Entry> next=new LinkedHashMap<>(entries);next.remove(item.uri);persist(next);}
+            LibraryCover.forget(context,item);
         }catch(IOException failure){throw new IOException((delete?"文件已删除，但记录保存失败：":"记录保存失败：")+failure.getMessage(),failure);}
     }
     public synchronized int setFavorites(List<Entry> selected,boolean favorite)throws IOException {

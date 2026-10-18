@@ -206,6 +206,8 @@ class Library:
             if delete_file:
                 raise OSError("文件已删除，但漫画列表保存失败；请检查磁盘空间与写入权限")
             raise
+        from cover_cache import CoverCache
+        CoverCache(self.path.parent).forget(item["path"], item["format"])
 
     def remove_many(self, keys, tasks, delete_file=False, cancelled=None, progress=lambda done, total: None):
         keys = list(dict.fromkeys(keys))

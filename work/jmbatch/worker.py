@@ -60,8 +60,14 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
     cache.mkdir(parents=True, exist_ok=True)
     marker = cache / "completed.json"
 
-    def finish(artifact, total, size):
+    def finish(artifact, total, size, pages=None):
         from cache_cleanup import clean_task
+        if pages and task.get("_cover_home"):
+            from cover_cache import CoverCache
+            from albums import image_name
+            first = pages[0]
+            relative = image_name(first["chapter"], first["page"], len({p["chapter"] for p in pages}))
+            CoverCache(task["_cover_home"]).load(artifact, settings.format, first_page=first["path"], relative=relative)
         emit({"type": "phase", "phase": "cleanup", "message": "正在清理下载临时缓存"})
         cleaned = clean_task(task, completed=True, progress=lambda r: emit({
             "type": "export_progress", "message": r.message(True)}))
@@ -300,7 +306,7 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
     else:
         final = export_images(task, album.name, entries, emit)
         result_size = final.stat().st_size
-    finish(final, len(entries), result_size)
+    finish(final, len(entries), result_size, entries)
 
 
 def worker_entry(task: dict, cookie: str, channel):

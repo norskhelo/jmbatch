@@ -1,4 +1,4 @@
-JM Batch 0.5.14 — Android 使用说明
+JM Batch 0.5.15 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.5.14 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-18）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.11/JMBatch-0.5.11-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.11/JMBatch-0.5.11-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.11/JMBatch-0.5.11-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.11/SHA256-release-android-0.5.11.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.19-0.5.15/JMBatch-0.5.15-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.19-0.5.15/JMBatch-0.5.15-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.19-0.5.15/JMBatch-0.5.15-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.19-0.5.15/SHA256-release-0.3.19-0.5.15.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -20,7 +20,7 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 8. 更新日志随后台检查结果刷新；升级后保留本次升级起点和全部中间版本日志，重启或再次检查仍可查看。未来新版另列为“可用更新”。日志未取全时保留本版说明并明确提示，联网检查后补齐。
 
-9. 下载列表会在首章第一页成功下载后自动显示封面，无需等待整本完成；暂停、继续和重启后可从缓存恢复。尚未就绪或无法读取时显示占位，完成后从 PDF、ZIP 或文件夹成品读取。
+9. 下载列表会在首章第一页成功下载后自动显示封面，无需等待整本完成；暂停、继续和重启后可从缓存恢复。尚未就绪或无法读取时显示占位，完成后优先使用已保存的小尺寸封面，缺失时从 PDF、ZIP 或文件夹成品读取并缓存。
 
 10. 点击主界面“软件更新”立即联网检查，更新窗口与完整更新日志也可手动检查。关闭启动自动检查后仍可使用。检查采用已保存仓库；修改后先保存。检查失败保留本地更新日志，可再次点击重试。下载和安装更新需要手动确认。
 
@@ -28,18 +28,18 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.18 / Android 0.5.14 — 阅读保留漫画库
+Windows 0.3.19 / Android 0.5.15 — 漫画库封面缓存
 
-漫画库与阅读
+封面加载
 
-• 从漫画库进入阅读后保留原漫画库页面，返回时继续原来的浏览位置，无需重新打开漫画库。
-• 保留搜索文字、仅显示收藏筛选、列表滚动位置，以及批量处理模式和已选漫画。
-• 阅读中修改收藏后，漫画库同步显示最新结果，并尽量保持当前可见漫画的位置；该漫画不再符合筛选时，显示附近仍符合条件的漫画。
-• Windows 再次打开已有漫画库窗口或刷新列表时保留位置与选择，避免阅读后返回列表顶部。
-• Android 返回阅读前的漫画库时收起搜索键盘，并保存页面状态供系统重建主页面时恢复。主动关闭漫画库仍正常关闭并释放资源。
+• Windows 与 Android 将首次成功读取的封面保存为小尺寸缩略图。关闭重开漫画库、切换页面或重启软件后优先复用，减少反复扫描图片目录、解析 PDF 或复制外部 ZIP。
+• 新下载漫画在完成保存、清理临时图片前直接用首图预生成封面，首次进入漫画库即可调用；已完成漫画的下载列表与漫画库共用封面缓存。
+• 已有漫画首次成功读取后自动建立缓存，无需重新下载漫画。封面处理不增加网站请求，也不会向漫画成品目录添加文件。
+• 按原文件和首图可用的大小、修改时间识别变化；缓存损坏时自动重建。文件缺失或暂时无法读取时保留占位，不影响漫画库管理操作，缓存写入失败不影响下载。
+• 缓存最多保留 128 MiB / 4096 项，超出时淘汰较久未使用的封面；移除漫画记录时清理对应缓存。清理应用数据或缓存被淘汰后，下一次读取会重新生成。
 
 版本与验证
 
-• Windows 0.3.17 → 0.3.18；Android 0.5.13 → 0.5.14（versionCode 514）。沿用原 Android 包名、APK 签名证书和更新公钥。
-• 验证覆盖 Windows 实际漫画库/阅读器窗口、反复进出、收藏筛选与列表变化，以及源码和冻结成品；Android 覆盖生产状态处理器宿主回归、状态保存恢复、完整构建和原签名核验。
-• 未连接 Android 真机，返回界面、系统回收重建及输入法的设备表现仍需真机确认。
+• Windows 0.3.18 → 0.3.19；Android 0.5.14 → 0.5.15（versionCode 515）。沿用原 Android 包名、APK 签名证书和更新公钥。
+• Windows 验证覆盖 220 项回归、源码与打包程序各 41 项自检；Android 覆盖完整宿主回归、新增持久缓存和生产封面加载集成 53 项检查、完整编译及原签名构建。
+• 未连接 Android 真机，手机实际加载速度与外部存储行为仍需设备验证；宿主测试结果不代表手机性能。

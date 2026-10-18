@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.18 / Android 0.5.14 — 阅读保留漫画库\n\n漫画库与阅读\n\n• 从漫画库进入阅读后保留原漫画库页面，返回时继续原来的浏览位置，无需重新打开漫画库。\n• 保留搜索文字、仅显示收藏筛选、列表滚动位置，以及批量处理模式和已选漫画。\n• 阅读中修改收藏后，漫画库同步显示最新结果，并尽量保持当前可见漫画的位置；该漫画不再符合筛选时，显示附近仍符合条件的漫画。\n• Windows 再次打开已有漫画库窗口或刷新列表时保留位置与选择，避免阅读后返回列表顶部。\n• Android 返回阅读前的漫画库时收起搜索键盘，并保存页面状态供系统重建主页面时恢复。主动关闭漫画库仍正常关闭并释放资源。\n\n版本与验证\n\n• Windows 0.3.17 → 0.3.18；Android 0.5.13 → 0.5.14（versionCode 514）。沿用原 Android 包名、APK 签名证书和更新公钥。\n• 验证覆盖 Windows 实际漫画库/阅读器窗口、反复进出、收藏筛选与列表变化，以及源码和冻结成品；Android 覆盖生产状态处理器宿主回归、状态保存恢复、完整构建和原签名核验。\n• 未连接 Android 真机，返回界面、系统回收重建及输入法的设备表现仍需真机确认。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.19 / Android 0.5.15 — 漫画库封面缓存\n\n封面加载\n\n• Windows 与 Android 将首次成功读取的封面保存为小尺寸缩略图。关闭重开漫画库、切换页面或重启软件后优先复用，减少反复扫描图片目录、解析 PDF 或复制外部 ZIP。\n• 新下载漫画在完成保存、清理临时图片前直接用首图预生成封面，首次进入漫画库即可调用；已完成漫画的下载列表与漫画库共用封面缓存。\n• 已有漫画首次成功读取后自动建立缓存，无需重新下载漫画。封面处理不增加网站请求，也不会向漫画成品目录添加文件。\n• 按原文件和首图可用的大小、修改时间识别变化；缓存损坏时自动重建。文件缺失或暂时无法读取时保留占位，不影响漫画库管理操作，缓存写入失败不影响下载。\n• 缓存最多保留 128 MiB / 4096 项，超出时淘汰较久未使用的封面；移除漫画记录时清理对应缓存。清理应用数据或缓存被淘汰后，下一次读取会重新生成。\n\n版本与验证\n\n• Windows 0.3.18 → 0.3.19；Android 0.5.14 → 0.5.15（versionCode 515）。沿用原 Android 包名、APK 签名证书和更新公钥。\n• Windows 验证覆盖 220 项回归、源码与打包程序各 41 项自检；Android 覆盖完整宿主回归、新增持久缓存和生产封面加载集成 53 项检查、完整编译及原签名构建。\n• 未连接 Android 真机，手机实际加载速度与外部存储行为仍需设备验证；宿主测试结果不代表手机性能。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

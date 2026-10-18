@@ -162,9 +162,10 @@ public final class Downloader {
             String uri=AlbumStorage.publishImages(context,sources,task.settings.outputUri,folderName,control::check,this::saveProgress,this::rememberOutput).toString();
             AlbumStorage.remember(context,Uri.parse(uri),new JSONObject().put("version",AlbumRules.LAYOUT_VERSION).put("id",task.id).put("title",task.title).put("entries",entries));
             // Once published, finish the marker even if pause arrived during the last rename.
-            AlbumStorage.load(context,Uri.parse(uri),()->{},this::saveProgress);
+            AlbumStorage.Album saved=AlbumStorage.load(context,Uri.parse(uri),()->{},this::saveProgress);
             task.resultBytes=totalSize;
             writeTextAtomic(marker,new JSONObject().put("uri",uri).put("images",jobs.size()).put("format","images").put("resultBytes",totalSize).put("albumLayoutVersion",AlbumRules.LAYOUT_VERSION).toString());
+            LibraryCover.remember(context,uri,"images",jobs.get(0).target,saved.images.get(0).uri);
             cleanImageCache();
             return uri;
         }
@@ -199,6 +200,7 @@ public final class Downloader {
         String uri = publish(partial);
         task.resultBytes = resultSize;
         writeTextAtomic(marker, new JSONObject().put("uri", uri).put("images", jobs.size()).put("resultBytes", resultSize).put("numericFilename", task.settings.numericFilename).put("flatZip", task.settings.flatZip).put("zipLayoutVersion", Core.ZIP_LAYOUT_VERSION).toString());
+        LibraryCover.remember(context,uri,task.settings.format,jobs.get(0).target,null);
         cleanImageCache();
         return uri;
     }

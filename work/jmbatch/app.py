@@ -179,7 +179,7 @@ class App:
         self.tree.heading("#0", text="封面")
         self.tree.column("#0", width=76, minwidth=76, stretch=False)
         from download_covers import DownloadCovers
-        self.download_covers = DownloadCovers(self.tree)
+        self.download_covers = DownloadCovers(self.tree, self.home)
         for key, label, width in [("id", "编号", 100), ("title", "标题", 220), ("status", "状态", 95), ("progress", "完成进度", 180), ("size", "漫画大小", 125), ("format", "格式", 65), ("resets", "重连", 60)]:
             self.tree.heading(key, text=label)
             self.tree.column(key, width=width, minwidth=60, stretch=key == "title", anchor="w")

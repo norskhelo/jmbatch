@@ -237,7 +237,8 @@ class Engine:
         state.bytes = 0
         state.watch = SpeedWatch(Settings(**task.settings), now)
         state.channel = self.context.Queue()
-        state.process = self.context.Process(target=self.worker_target, args=(task.to_dict(), self.cookie, state.channel), daemon=True)
+        snapshot = dict(task.to_dict(), _cover_home=str(self.home))
+        state.process = self.context.Process(target=self.worker_target, args=(snapshot, self.cookie, state.channel), daemon=True)
         try:
             state.process.start()
         except Exception as exc:

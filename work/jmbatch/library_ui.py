@@ -20,7 +20,8 @@ class LibraryWindow:
         self.cancelled = threading.Event()
         self.events = queue.Queue()
         from covers import CoverWorker
-        self.cover_worker = CoverWorker()
+        from cover_cache import CoverCache
+        self.cover_worker = CoverWorker(CoverCache(self.library.path.parent).load)
         self.cover_generation = 0
         self.cover_pending = set()
         self.cover_images = OrderedDict()

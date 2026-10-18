@@ -22,8 +22,10 @@ def cover_source(task):
 
 
 class DownloadCoverLoader:
-    def __init__(self):
+    def __init__(self, home=None):
         self.cache = OrderedDict()
+        from cover_cache import CoverCache
+        self.disk = CoverCache(home) if home is not None else None
 
     def __call__(self, task, _fmt):
         try:
@@ -36,7 +38,8 @@ class DownloadCoverLoader:
         if previous and previous[0] == source and (previous[1] is not None or now - previous[2] < 3):
             self.cache.move_to_end(key)
             return previous[:2]
-        result = load_cover(*source[:2]) if source else None
+        loader = self.disk.load if self.disk is not None and source and source[1] != "image" else load_cover
+        result = loader(*source[:2]) if source else None
         self.cache[key] = (source, result, now)
         self.cache.move_to_end(key)
         while len(self.cache) > 64:
@@ -45,7 +48,7 @@ class DownloadCoverLoader:
 
 
 class DownloadCovers:
-    def __init__(self, tree):
+    def __init__(self, tree, home=None):
         from PIL import Image, ImageDraw, ImageTk
         self.tree = tree
         placeholder = Image.new("RGB", (54, 72), "#e8edf1")
@@ -54,7 +57,7 @@ class DownloadCovers:
         for y in (28, 36, 44):
             draw.line((20, y, 34, y), fill="#96a6b2", width=2)
         self.placeholder = ImageTk.PhotoImage(placeholder, master=tree)
-        self.worker = CoverWorker(DownloadCoverLoader())
+        self.worker = CoverWorker(DownloadCoverLoader(home))
         self.pending = set()
         self.images = OrderedDict()
         self.next_check = {}

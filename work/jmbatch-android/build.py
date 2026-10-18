@@ -56,6 +56,9 @@ run(sys.executable,ROOT/'tests/test_library_interaction.py',jdk,testroot/'librar
 run(sys.executable,ROOT/'tests/test_batch_export.py',jdk,testroot/'batch-export')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/CoverRules.java',ROOT/'tests/CoverTest.java')
 run(java,'-cp',testout,'CoverTest',testroot/'test-output')
+run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/CoverDiskCache.java',ROOT/'tests/CoverDiskCacheTest.java')
+run(java,'-cp',testout,'CoverDiskCacheTest',testroot/'cover-disk-cache')
+run(sys.executable,ROOT/'tests/test_library_cover_cache.py',jdk,testroot/'library-cover-cache')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/DownloadCoverRules.java',ROOT/'tests/DownloadCoverTest.java')
 run(java,'-cp',testout,'DownloadCoverTest',testroot/'test-output')
 
