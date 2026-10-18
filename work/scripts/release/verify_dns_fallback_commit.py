@@ -2,7 +2,7 @@
 from pathlib import Path
 import json,subprocess,sys
 ROOT=Path(__file__).resolve().parents[3]
-REPORT=ROOT/'outputs/reports/dns-fallback-061-release-complete'
+REPORT=ROOT/'outputs/reports/dns-fallback-061-release'
 audit=json.loads((REPORT/'audit.json').read_text(encoding='utf-8'))
 def run(*args):
     return subprocess.run(args,cwd=ROOT,capture_output=True,check=True).stdout
