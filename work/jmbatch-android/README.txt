@@ -1,4 +1,4 @@
-JM Batch 0.5.22 — Android 使用说明
+JM Batch 0.6.0 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.5.22 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-18）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.22/JMBatch-0.5.22-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.22/JMBatch-0.5.22-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.22/JMBatch-0.5.22-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.22/SHA256-release-android-0.5.22.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.0/JMBatch-0.6.0-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.0/JMBatch-0.6.0-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.0/JMBatch-0.6.0-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.0/SHA256-release-android-0.6.0.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,18 +28,19 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Android 0.5.22 — 大漫画章节删除提速
+Android 0.6.0 — 权限检测与申请
 
 更新内容
 
-• 优化图片文件夹打开“删除章节”列表：每个章节目录只读取一次，同时取得图片大小和修改时间，合并完整性及额外文件检查，不再逐页单独查询或反复扫描整本漫画。
-• 确认删除后，保留图片直接复制到输出临时目录，并逐页读回校验，省去应用缓存中转和第二次整本复制，减少存储读写与临时空间需求。
-• 显示章节检查、保留图片校验及页数进度、记录保存和原文件清理阶段，合并频繁界面刷新；检查和复制期间支持取消。
-• 保留旧版图片目录兼容、源文件变化检查、书签/阅读位置迁移、收藏和任务地址同步、保存失败回滚。新副本及记录确认有效后才清理原漫画；至少保留一章。
+• 首页及失败任务详情加入“权限与联网检测”。查看联网、通知、保存目录、后台下载和安装更新权限；从系统设置返回后自动刷新。
+• Android 13 及以上支持直接申请通知权限；首次开始下载最多提示一次，拒绝后不反复弹窗、不阻止下载，可在权限页主动申请或打开通知设置。识别“下载进度”通知类别被单独关闭的情况。
+• 检查保存目录持久读写授权，支持重新选择授权；从失败任务进入时只重新授权该任务的原目录，防止误改保存位置。应用目录无需额外存储权限，不申请全部文件访问。
+• 提供应用联网、通知、省电、后台流量及安装更新设置入口。Android 的联网权限由系统在安装时授予，不能重新弹窗申请；厂商额外联网限制无法可靠读取，页面会明确说明并引导核对，不虚报为已放行。
+• 内置以 JM Batch 自身身份运行的联网诊断：检查 DNS、小米官网对照与四条漫画线路 HTTPS，可手动选择 IPv4/IPv6 直连对比。保留 TLS 证书及域名校验，不读取漫画、Cookie 或账号，不自动上传报告；支持复制、分享、保存和停止检测。
+• 修正连接异常里手机本地 `from /::` 被误认为服务器地址异常的问题，区分联网权限拒绝、连接拒绝、路由不可达与超时；保持 HTTP 4xx 停止及敏感信息过滤。
 
 版本与验证
 
-• Android 0.5.21 → 0.5.22，versionCode 522；Windows 保持 0.3.22。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。
-• 151 章、7227 页合成外部目录在已有索引时，打开列表的存储查询从 7836 次降为 153 次；缺少索引时为 154 次。保留图片只从源读取一次、向目标写入一次，再完整读回目标校验。
-• Android 10 框架回归覆盖大目录、旧布局、空时间戳、取消、源变化、读回损坏、重命名/清理失败，以及漫画库实际入口和阅读器；执行完整宿主检查、编译和原证书签名核验。
-• 查询与读写次数来自合成测试，不代表手机实测提速倍数。保留页面仍需复制和读回校验，实际耗时取决于剩余图片大小及存储速度；仍需保留内容的临时可用空间。
+• Android 0.5.22 → 0.6.0，versionCode 600；Windows 保持 0.3.22。保留原包名、APK 签名证书和更新公钥，可覆盖安装。
+• 执行网络原因/诊断引擎宿主回归、Android 10 与 Android 15 框架权限流程、目录授权及页面入口测试，以及既有全量回归、布局检查、完整构建与签名核验。
+• 手机暂不可获取，尚未进行 Redmi K70 Pro 真机验收。网络诊断结果用于定位具体原因，不能保证所有网络环境可达；省电和安装更新设置为可选项，不强制授予。

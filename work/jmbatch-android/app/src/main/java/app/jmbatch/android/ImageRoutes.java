@@ -45,7 +45,8 @@ public final class ImageRoutes {
     }
     public synchronized void failure(String host, Exception error) {
         String kind = NetworkRoutes.kind(error);
-        if (kind.equals("other") || error instanceof NetworkRoutes.HttpFailure && ((NetworkRoutes.HttpFailure) error).code < 500) return;
+        NetworkRoutes.HttpFailure http = NetworkRoutes.httpFailure(error);
+        if (kind.equals("other") || http != null && http.code < 500) return;
         Health h = health.get(host); if (h == null) return;
         h.until = clock.now() + Math.min(120000L, 15000L << Math.min(3, h.failures++));
         h.rate = 0; h.samples = 0;

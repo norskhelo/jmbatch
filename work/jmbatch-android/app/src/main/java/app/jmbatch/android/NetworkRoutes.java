@@ -16,6 +16,10 @@ public final class NetworkRoutes {
     public interface Request<T> { T call(String host) throws Exception; }
     public interface Check { void run() throws Exception; }
     public interface Notice { void show(String message); }
+    static HttpFailure httpFailure(Throwable error) {
+        for(int i=0;error!=null&&i<8;i++,error=error.getCause())if(error instanceof HttpFailure)return (HttpFailure)error;
+        return null;
+    }
     public static List<String> merge(List<String> primary,List<String> fallback) {
         LinkedHashSet<String> result=new LinkedHashSet<>();
         // Reserve places for the built-in fallback even if the remote list is long.
@@ -27,13 +31,33 @@ public final class NetworkRoutes {
         return new ArrayList<>(result);
     }
     static String kind(Throwable error) {
+        // Android appends "from /:: (port ...)" to connect errors. That is the
+        // local bind address, not a DNS answer. Inspect destinations only and
+        // prefer the specific OS cause over the outer ConnectException.
+        List<Throwable> chain=new ArrayList<>();
         for(int i=0;error!=null&&i<8;i++,error=error.getCause()) {
+            chain.add(error);
             if(error instanceof HttpFailure)return "http";
-            String text=String.valueOf(error.getMessage());
-            if(text.matches("(?s).*(?:\\[::\\]|/0\\.0\\.0\\.0(?::|\\b)|0:0:0:0:0:0:0:0).*"))return "address";
-            if(error instanceof UnknownHostException)return "dns";
+        }
+        for(Throwable cause:chain)if(cause instanceof SSLException)return "tls";
+        for(Throwable cause:chain) {
+            String text=String.valueOf(cause.getMessage());
+            if(cause instanceof SecurityException||text.matches("(?is).*(?:\\bEACCES\\b|\\bEPERM\\b|permission denied|operation not permitted).*"))return "permission";
+        }
+        for(Throwable cause:chain)if(cause instanceof UnknownHostException)return "dns";
+        for(Throwable cause:chain) {
+            String text=String.valueOf(cause.getMessage());
+            if(java.util.regex.Pattern.compile("(?i)(?:^|\\bconnect to\\s+)(?:[a-z0-9_.-]+)?/(?:\\[(?:::|(?:0:){7}0)\\](?=[:\\s)]|$)|(?:::|(?:0:){7}0)(?=[\\s)]|$)|0\\.0\\.0\\.0(?=[:\\s)]|$))").matcher(text).find())return "address";
+        }
+        for(Throwable cause:chain) {
+            String text=String.valueOf(cause.getMessage());
+            if(cause instanceof SocketTimeoutException||text.matches("(?s).*\\bETIMEDOUT\\b.*"))return "timeout";
+            if(text.matches("(?s).*\\bECONNREFUSED\\b.*"))return "refused";
+            if(text.matches("(?s).*\\b(?:ENETUNREACH|EHOSTUNREACH)\\b.*"))return "unreachable";
+        }
+        for(Throwable cause:chain) {
+            error=cause;
             if(error instanceof SSLException)return "tls";
-            if(error instanceof SocketTimeoutException)return "timeout";
             if(error instanceof ConnectException||error instanceof NoRouteToHostException||error instanceof SocketException)return "connect";
             if(error instanceof BadResponse||error instanceof EOFException)return "response";
         }
@@ -41,12 +65,15 @@ public final class NetworkRoutes {
     }
     static String reason(Exception error) {
         switch(kind(error)) {
+            case "permission":return "系统拒绝联网（EACCES / EPERM），请检查 JM Batch 的 WLAN、移动数据权限及防火墙限制";
+            case "refused":return "连接被拒绝（ECONNREFUSED），可能是目标服务或网络过滤拒绝连接";
+            case "unreachable":return "网络路由不可达，请切换 Wi-Fi/移动数据并检查 VPN 或代理";
             case "address":return "连接目标出现未指定地址（:: / 0.0.0.0），可能与 DNS、代理或过滤设置有关";
             case "dns":return "DNS 解析失败，未取得服务器地址";
             case "connect":return "连接被拒绝、重置或网络不可达";
             case "timeout":return "连接或读取超时";
             case "tls":return "HTTPS 握手或证书校验失败（未关闭校验）";
-            case "http":return error.getMessage();
+            case "http":return new HttpFailure(httpFailure(error).code).getMessage();
             case "response":return "服务器响应为空、不完整或格式异常";
             default:return "请求失败";
         }
@@ -64,12 +91,12 @@ public final class NetworkRoutes {
                 catch(Exception error) {
                     check.run();String kind=kind(error);
                     if(kind.equals("other"))throw error;
-                    if(error instanceof HttpFailure) {
-                        int code=((HttpFailure)error).code;
-                        if(code<500)throw error;
+                    HttpFailure http=httpFailure(error);
+                    if(http!=null) {
+                        if(http.code<500)throw http;
                     }
                     reasons.put(host,reason(error));counts.put(host,counts.getOrDefault(host,0)+1);
-                    if(Arrays.asList("address","dns","tls","connect").contains(kind))skip.add(host);
+                    if(Arrays.asList("address","dns","tls","connect","permission","refused","unreachable").contains(kind))skip.add(host);
                 }
             }
             if(!tried)break;

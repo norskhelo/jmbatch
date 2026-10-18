@@ -48,6 +48,7 @@ public final class MainActivity extends Activity {
         Button updateButton=button("软件更新",v->{});add(updateButton,0,10);updates=new GithubUpdates(this,updateButton);handler.postDelayed(()->updates.startup(),1500);
         add(button("漫画库",v->showLibrary()),0,6);
         add(button("清理下载缓存",v->CleanupScreen.show(this,store,null)),0,6);
+        add(button("权限与联网检测",v->PermissionActivity.open(this)),0,6);
 
         LinearLayout target=card();target.addView(text("保存位置",13,MUTED));
         output=text(store.settings.outputLabel,14,INK);output.setPadding(0,dp(8),0,dp(6));target.addView(output);
@@ -100,8 +101,7 @@ public final class MainActivity extends Activity {
     private void startQueue(){
         boolean ready=false;for(Store.Task t:store.snapshot())if(t.status.equals("queued")||t.status.equals("paused"))ready=true;
         if(!ready){toast("请添加任务，或在失败任务中选择重试");return;}
-        if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},3);
+        PermissionAccess.requestDownloadNotifications(this);
         Intent intent=new Intent(this,DownloadService.class).setAction(DownloadService.START);startForegroundService(intent);
     }
     private void send(String action,String key){Intent intent=new Intent(this,DownloadService.class).setAction(action);if(key!=null)intent.putExtra("key",key);startService(intent);}
@@ -202,6 +202,7 @@ public final class MainActivity extends Activity {
         if(!task.error.isEmpty())message+="\n\n错误原因：\n"+task.error;
         TextView content=text(message,14,INK);content.setPadding(dp(20),dp(10),dp(20),dp(10));content.setTextIsSelectable(true);ScrollView scroll=new ScrollView(this);LinearLayout details=column();details.addView(content);details.addView(button("打开保存目录",v->new SavedDirectory(this,task.settings.outputUri,task.settings.outputLabel).openExternal()));scroll.addView(details);
         AlertDialog.Builder builder=new AlertDialog.Builder(this).setTitle("任务详情").setView(scroll).setNegativeButton("关闭",null);
+        if(task.status.equals("failed"))details.addView(button("权限与联网检测",v->PermissionActivity.open(this,task)));
         if(task.status.equals("done"))builder.setPositiveButton("导出漫画",(d,w)->new ExportScreen(this,store,albumEntry(task)).show());
         else builder.setPositiveButton(task.discardRequested?"重试清理":"取消并删除文件",(d,w)->{send(DownloadService.CANCEL,task.key);});
         if(!task.status.equals("running")&&!task.status.equals("resetting"))builder.setNeutralButton("清理下载缓存",(d,w)->CleanupScreen.show(this,store,task));
@@ -265,7 +266,7 @@ public final class MainActivity extends Activity {
         if(store.running){toast("请先暂停下载，再运行离线诊断。");return;}
         toast("正在运行离线诊断，无需联网…");new Thread(()->{String result;try{result=Diagnostics.run(this);}catch(Throwable error){result="诊断未完成："+Core.error(error,"");}String message=result;runOnUiThread(()->new AlertDialog.Builder(this).setTitle("离线诊断结果").setMessage(message).setPositiveButton("确定",null).show());},"offline-check").start();
     }
-    protected void onResume(){super.onResume();if(inputFocus!=null)inputFocus.prepareForResume();if(libraryScreen!=null)libraryScreen.resume();handler.removeCallbacks(refresh);handler.post(refresh);}
+    protected void onResume(){super.onResume();if(output!=null&&store!=null)output.setText(store.settings.outputLabel);if(inputFocus!=null)inputFocus.prepareForResume();if(libraryScreen!=null)libraryScreen.resume();handler.removeCallbacks(refresh);handler.post(refresh);}
     protected void onPause(){if(inputFocus!=null)inputFocus.finishEditing();handler.removeCallbacks(refresh);if(chapterDialog!=null){chapterDialog.dismiss();chapterDialog=null;}save();super.onPause();}
     protected void onDestroy(){if(libraryScreen!=null)libraryScreen.close();if(downloadCovers!=null)downloadCovers.close();for(Row row:rows.values())row.cover.remove();super.onDestroy();}
     private void save(){try{store.save();}catch(Exception error){store.note=error.getMessage();toast(store.note);}}

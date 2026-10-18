@@ -1,5 +1,13 @@
 # Android framework regression tests
 
+PermissionRuntimeTest checks the permissions/network screen on Android 10 and
+Android 15: no automatic network probe on entry, notification requests and
+denial handling, disabled notification channels, return-from-settings refresh,
+persisted directory grants and wrong-directory protection, original-app settings
+intents and fallback, explicit report export/share, both home and failed-task
+entry points, and a synthetic network probe under the same application identity.
+It does not validate a particular manufacturer's permission UI or real network.
+
 Run from the repository root on Windows:
 
 ```powershell

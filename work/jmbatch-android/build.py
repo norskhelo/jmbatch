@@ -73,6 +73,10 @@ run(sys.executable,ROOT/'tests/test_cancel_service.py',jdk,testroot/'cancel-serv
 
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/NetworkRoutes.java',ROOT/'tests/NetworkTest.java')
 run(java,'-cp',testout,'NetworkTest')
+run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'tests/NetworkCauseTest.java')
+run(java,'-cp',testout,'app.jmbatch.android.NetworkCauseTest')
+run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/NetworkProbe.java',ROOT/'tests/NetworkProbeTest.java')
+run(java,'-cp',testout,'app.jmbatch.android.NetworkProbeTest')
 
 for component in ('ImageMemory', 'ImagePipeline', 'ImageRoutes'):
     run(javac,'-encoding','UTF-8','-cp',testout,'-d',testout,ROOT/'app/src/main/java/app/jmbatch/android'/(component+'.java'),ROOT/'tests'/(component+'Test.java'))
