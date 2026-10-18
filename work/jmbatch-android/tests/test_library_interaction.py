@@ -135,7 +135,7 @@ assert 'KeyEvent.KEYCODE_BACK&&batchMode&&!busy' in source
 assert 'KeyEvent.ACTION_UP)setBatchMode(false)' in source
 assert 'if(!filter.equals(nextFilter)){selected.clear();filter=nextFilter;pendingViewState=new Bundle();}' in source
 assert 'resetCovers();acceptEntries(result);' in source
-assert 'else row.text.setCheckMarkDrawable(null)' in source
+assert 'row.bindChoice(batchMode,selected.contains(entry.uri))' in source
 print('Library interaction listener, back, filter, refresh and recycled-row wiring verified')
 main_source=(root/'app/src/main/java/app/jmbatch/android/MainActivity.java').read_text(encoding='utf-8')
 assert 'libraryScreen.show(state.getBundle("library"))' in main_source

@@ -162,6 +162,15 @@ public final class LibraryScreen {
             text=new CheckedTextView(activity);text.setTextSize(14);text.setMaxLines(4);text.setEllipsize(TextUtils.TruncateAt.END);text.setPadding(dp(12),0,0,0);
             addView(text,new LinearLayout.LayoutParams(0,-2,1));
         }
+        private void bindChoice(boolean show,boolean checked){
+            if(show!=(text.getCheckMarkDrawable()!=null)){
+                if(show){TypedArray attrs=activity.obtainStyledAttributes(new int[]{android.R.attr.listChoiceIndicatorMultiple});text.setCheckMarkDrawable(attrs.getDrawable(0));attrs.recycle();}
+                else text.setCheckMarkDrawable(null);
+            }
+            setChecked(show&&checked);
+            // Binding recycled rows or refreshed covers is not a user selection change.
+            text.jumpDrawablesToCurrentState();
+        }
         public boolean isChecked(){return text.isChecked();}public void setChecked(boolean value){text.setChecked(value);}public void toggle(){setChecked(!isChecked());}
     }
     private final class CoverAdapter extends BaseAdapter {
@@ -169,8 +178,7 @@ public final class LibraryScreen {
         public View getView(int position,View recycled,ViewGroup parent){
             CoverRow row=recycled instanceof CoverRow?(CoverRow)recycled:new CoverRow();LibraryStore.Entry entry=entries.get(position);
             row.text.setText((entry.favorite?"★ ":"")+title(entry)+"\n"+entry.format.toUpperCase(Locale.ROOT)+" · "+entry.label);
-            if(batchMode){TypedArray attrs=activity.obtainStyledAttributes(new int[]{android.R.attr.listChoiceIndicatorMultiple});row.text.setCheckMarkDrawable(attrs.getDrawable(0));attrs.recycle();}else row.text.setCheckMarkDrawable(null);
-            row.setChecked(batchMode&&selected.contains(entry.uri));
+            row.bindChoice(batchMode,selected.contains(entry.uri));
             Cover cover=coverCache.get(entry.uri);Bitmap bitmap=cover==null?null:cover.bitmap;
             row.image.setImageBitmap(bitmap);row.image.setContentDescription(bitmap==null?"暂无封面":"第一页封面");row.placeholder.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
             if(cover==null&&!coverPending.contains(entry.uri)&&!coverWorker.isShutdown()){

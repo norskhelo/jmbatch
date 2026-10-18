@@ -1,4 +1,4 @@
-JM Batch 0.5.15 — Android 使用说明
+JM Batch 0.5.16 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.5.15 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-18）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.19-0.5.15/JMBatch-0.5.15-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.19-0.5.15/JMBatch-0.5.15-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.19-0.5.15/JMBatch-0.5.15-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.19-0.5.15/SHA256-release-0.3.19-0.5.15.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.16/JMBatch-0.5.16-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.16/JMBatch-0.5.16-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.16/JMBatch-0.5.16-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.16/SHA256-release-android-0.5.16.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,18 +28,16 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.19-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.19 / Android 0.5.15 — 漫画库封面缓存
+Android 0.5.16 — 批量选择显示修复
 
-封面加载
+修复内容
 
-• Windows 与 Android 将首次成功读取的封面保存为小尺寸缩略图。关闭重开漫画库、切换页面或重启软件后优先复用，减少反复扫描图片目录、解析 PDF 或复制外部 ZIP。
-• 新下载漫画在完成保存、清理临时图片前直接用首图预生成封面，首次进入漫画库即可调用；已完成漫画的下载列表与漫画库共用封面缓存。
-• 已有漫画首次成功读取后自动建立缓存，无需重新下载漫画。封面处理不增加网站请求，也不会向漫画成品目录添加文件。
-• 按原文件和首图可用的大小、修改时间识别变化；缓存损坏时自动重建。文件缺失或暂时无法读取时保留占位，不影响漫画库管理操作，缓存写入失败不影响下载。
-• 缓存最多保留 128 MiB / 4096 项，超出时淘汰较久未使用的封面；移除漫画记录时清理对应缓存。清理应用数据或缓存被淘汰后，下一次读取会重新生成。
+• 修复漫画库开启批量处理后，滑动列表、停止滑动或封面加载完成时，勾选框反复播放勾选动画的问题。
+• 列表复用勾选图标，刷新时直接显示当前选择状态，避免已选数量不变但勾选框反复闪动。
+• 保留点击勾选和取消、长按选择、全选/反选、筛选及阅读返回后的选择恢复。
 
 版本与验证
 
-• Windows 0.3.18 → 0.3.19；Android 0.5.14 → 0.5.15（versionCode 515）。沿用原 Android 包名、APK 签名证书和更新公钥。
-• Windows 验证覆盖 220 项回归、源码与打包程序各 41 项自检；Android 覆盖完整宿主回归、新增持久缓存和生产封面加载集成 53 项检查、完整编译及原签名构建。
-• 未连接 Android 真机，手机实际加载速度与外部存储行为仍需设备验证；宿主测试结果不代表手机性能。
+• Android 0.5.15 → 0.5.16，versionCode 516；Windows 保持 0.3.19。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。
+• 新增 22 项列表绑定回归，覆盖反复复用、封面完成刷新、批量模式切换及选择状态；包含原有 46 项漫画库交互检查，并执行完整 Android 宿主回归、编译和原证书签名校验。
+• 当前没有连接 Android 真机；宿主动画状态检查不能替代手机实际渲染，显示效果仍需设备验收。

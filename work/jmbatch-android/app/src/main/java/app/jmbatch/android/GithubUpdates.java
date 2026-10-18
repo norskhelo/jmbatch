@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.19 / Android 0.5.15 — 漫画库封面缓存\n\n封面加载\n\n• Windows 与 Android 将首次成功读取的封面保存为小尺寸缩略图。关闭重开漫画库、切换页面或重启软件后优先复用，减少反复扫描图片目录、解析 PDF 或复制外部 ZIP。\n• 新下载漫画在完成保存、清理临时图片前直接用首图预生成封面，首次进入漫画库即可调用；已完成漫画的下载列表与漫画库共用封面缓存。\n• 已有漫画首次成功读取后自动建立缓存，无需重新下载漫画。封面处理不增加网站请求，也不会向漫画成品目录添加文件。\n• 按原文件和首图可用的大小、修改时间识别变化；缓存损坏时自动重建。文件缺失或暂时无法读取时保留占位，不影响漫画库管理操作，缓存写入失败不影响下载。\n• 缓存最多保留 128 MiB / 4096 项，超出时淘汰较久未使用的封面；移除漫画记录时清理对应缓存。清理应用数据或缓存被淘汰后，下一次读取会重新生成。\n\n版本与验证\n\n• Windows 0.3.18 → 0.3.19；Android 0.5.14 → 0.5.15（versionCode 515）。沿用原 Android 包名、APK 签名证书和更新公钥。\n• Windows 验证覆盖 220 项回归、源码与打包程序各 41 项自检；Android 覆盖完整宿主回归、新增持久缓存和生产封面加载集成 53 项检查、完整编译及原签名构建。\n• 未连接 Android 真机，手机实际加载速度与外部存储行为仍需设备验证；宿主测试结果不代表手机性能。\n";
+    private static final String CURRENT_NOTES="Android 0.5.16 — 批量选择显示修复\n\n修复内容\n\n• 修复漫画库开启批量处理后，滑动列表、停止滑动或封面加载完成时，勾选框反复播放勾选动画的问题。\n• 列表复用勾选图标，刷新时直接显示当前选择状态，避免已选数量不变但勾选框反复闪动。\n• 保留点击勾选和取消、长按选择、全选/反选、筛选及阅读返回后的选择恢复。\n\n版本与验证\n\n• Android 0.5.15 → 0.5.16，versionCode 516；Windows 保持 0.3.19。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。\n• 新增 22 项列表绑定回归，覆盖反复复用、封面完成刷新、批量模式切换及选择状态；包含原有 46 项漫画库交互检查，并执行完整 Android 宿主回归、编译和原证书签名校验。\n• 当前没有连接 Android 真机；宿主动画状态检查不能替代手机实际渲染，显示效果仍需设备验收。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;
