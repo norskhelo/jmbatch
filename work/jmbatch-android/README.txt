@@ -1,4 +1,4 @@
-JM Batch 0.5.10 — Android 使用说明
+JM Batch 0.5.11 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -6,11 +6,11 @@ JM Batch 0.5.10 — Android 使用说明
 4. 文件夹和 ZIP 只含图片：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。导出和文件删除前请暂停下载并等待请求退出。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
-安装包下载（2026-10-17）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.15-0.5.10/JMBatch-0.5.10-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.15-0.5.10/JMBatch-0.5.10-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.15-0.5.10/JMBatch-0.5.10-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.15-0.5.10/SHA256-release-0.3.15-0.5.10.txt
+安装包下载（2026-10-18）
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.11/JMBatch-0.5.11-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.11/JMBatch-0.5.11-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.11/JMBatch-0.5.11-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.11/SHA256-release-android-0.5.11.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,18 +28,17 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.15-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.15 / Android 0.5.10 — 沉浸阅读
+Android 0.5.11 — 返回前台时保持键盘收起
 
-阅读体验
+修复内容
 
-• 在软件内阅读时，轻点漫画区域即可隐藏阅读工具栏、页码状态栏和滚动条，只保留漫画；再次轻点恢复。
-• 工具栏以约 220 毫秒的滑动过渡收起或展开，Android 同时淡入淡出；动画中再次点击可平滑反向。Android 遵循系统动画开关，隐藏时同时收起系统状态栏与导航栏。
-• 滚动阅读和左右翻页均支持。轻点页面任何位置统一切换工具栏，左右滑动/拖动继续翻页；Windows 还可使用方向键、PageUp/PageDown 或滚轮，工具栏显示时仍可点击上一页/下一页。
-• 区分轻点、滑动和长按，Android 多指操作不触发工具栏切换。收起与恢复保留当前页，滚动模式的高度变化不重新解码漫画。
-• Windows 按 Esc 可恢复工具栏；Android 隐藏时按返回先恢复工具栏，再次返回退出阅读。
+• 修复主界面从后台返回时，编号输入框保留焦点导致输入法自动弹出的问题。返回后保持键盘收起，点击输入框可继续正常输入。
+• 保留未提交的编号文字；输入框焦点转移到页面外层，不因焦点切换主动滚动编号区域。
+• “加入队列”和“添加连续编号”成功后结束本次输入、收起键盘；添加失败时保留输入内容，便于修改。
+• 仅在页面恢复和本次输入结束时处理键盘，避免重复窗口焦点回调打断后续输入；下载、阅读、收藏和保存目录继续沿用原有行为。
 
-版本与兼容性
+版本与验证
 
-• Windows 0.3.14 → 0.3.15；Android 0.5.9 → 0.5.10（versionCode 510）。保留原应用包名、APK 签名证书及更新公钥。
-• 图片文件夹、ZIP、PDF，以及章节、收藏、书签、阅读进度与下载设置继续兼容。
-• 验证覆盖 Windows 实际阅读窗口和冻结成品、Android 宿主手势/动画/布局检查及原签名构建。未连接 Android 真机，宿主检查不代表手机视觉验收。
+• Android 0.5.10 → 0.5.11，versionCode 511；Windows 保持 0.3.15。沿用原应用包名、APK 签名证书和更新公钥，可覆盖安装。
+• 验证包括焦点生命周期、窗口尚未就绪时的处理、连续切换、再次输入、未提交文字保留及弹窗窗口隔离的宿主回归，并执行既有 Android 检查、完整构建与签名校验。
+• 当前没有连接 Android 真机；宿主测试不能代替具体手机和输入法的实测，实际系统恢复时序及界面效果仍需设备验证。

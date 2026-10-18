@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.15 / Android 0.5.10 — 沉浸阅读\n\n阅读体验\n\n• 在软件内阅读时，轻点漫画区域即可隐藏阅读工具栏、页码状态栏和滚动条，只保留漫画；再次轻点恢复。\n• 工具栏以约 220 毫秒的滑动过渡收起或展开，Android 同时淡入淡出；动画中再次点击可平滑反向。Android 遵循系统动画开关，隐藏时同时收起系统状态栏与导航栏。\n• 滚动阅读和左右翻页均支持。轻点页面任何位置统一切换工具栏，左右滑动/拖动继续翻页；Windows 还可使用方向键、PageUp/PageDown 或滚轮，工具栏显示时仍可点击上一页/下一页。\n• 区分轻点、滑动和长按，Android 多指操作不触发工具栏切换。收起与恢复保留当前页，滚动模式的高度变化不重新解码漫画。\n• Windows 按 Esc 可恢复工具栏；Android 隐藏时按返回先恢复工具栏，再次返回退出阅读。\n\n版本与兼容性\n\n• Windows 0.3.14 → 0.3.15；Android 0.5.9 → 0.5.10（versionCode 510）。保留原应用包名、APK 签名证书及更新公钥。\n• 图片文件夹、ZIP、PDF，以及章节、收藏、书签、阅读进度与下载设置继续兼容。\n• 验证覆盖 Windows 实际阅读窗口和冻结成品、Android 宿主手势/动画/布局检查及原签名构建。未连接 Android 真机，宿主检查不代表手机视觉验收。\n";
+    private static final String CURRENT_NOTES="Android 0.5.11 — 返回前台时保持键盘收起\n\n修复内容\n\n• 修复主界面从后台返回时，编号输入框保留焦点导致输入法自动弹出的问题。返回后保持键盘收起，点击输入框可继续正常输入。\n• 保留未提交的编号文字；输入框焦点转移到页面外层，不因焦点切换主动滚动编号区域。\n• “加入队列”和“添加连续编号”成功后结束本次输入、收起键盘；添加失败时保留输入内容，便于修改。\n• 仅在页面恢复和本次输入结束时处理键盘，避免重复窗口焦点回调打断后续输入；下载、阅读、收藏和保存目录继续沿用原有行为。\n\n版本与验证\n\n• Android 0.5.10 → 0.5.11，versionCode 511；Windows 保持 0.3.15。沿用原应用包名、APK 签名证书和更新公钥，可覆盖安装。\n• 验证包括焦点生命周期、窗口尚未就绪时的处理、连续切换、再次输入、未提交文字保留及弹窗窗口隔离的宿主回归，并执行既有 Android 检查、完整构建与签名校验。\n• 当前没有连接 Android 真机；宿主测试不能代替具体手机和输入法的实测，实际系统恢复时序及界面效果仍需设备验证。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

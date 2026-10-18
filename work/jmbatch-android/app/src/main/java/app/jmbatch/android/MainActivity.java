@@ -23,6 +23,7 @@ public final class MainActivity extends Activity {
     private GithubUpdates updates;
     private DownloadCovers downloadCovers;
     private LinearLayout layout,queue;
+    private InputFocusLayout inputFocus;
     private EditText ids,rangeFirst,rangeLast;
     private TextView output,summary,global;
     private Button start,pause,more;
@@ -38,7 +39,8 @@ public final class MainActivity extends Activity {
         for(Store.Task task:store.snapshot())if(task.discardRequested&&task.status.equals("cancelling"))send(DownloadService.CANCEL,task.key);
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
-        layout=column();layout.setPadding(dp(18),dp(20),dp(18),dp(28));scroll.addView(layout);setContentView(scroll);
+        layout=column();layout.setPadding(dp(18),dp(20),dp(18),dp(28));scroll.addView(layout);
+        inputFocus=new InputFocusLayout(this);inputFocus.addView(scroll);setContentView(inputFocus);inputFocus.requestFocus();
         LinearLayout header=horizontal();TextView brand=text("JM Batch",27,INK);brand.setTypeface(null,Typeface.BOLD);header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));header.addView(button("下载设置",v->settings()));layout.addView(header);
         add(text("Android  ·  "+Core.VERSION,12,MUTED),0,4);
         Button updateButton=button("软件更新",v->{});add(updateButton,0,10);updates=new GithubUpdates(this,updateButton);handler.postDelayed(()->updates.startup(),1500);
@@ -60,9 +62,9 @@ public final class MainActivity extends Activity {
 
         LinearLayout input=card();TextView title=text("添加下载编号",17,INK);title.setTypeface(null,Typeface.BOLD);input.addView(title);
         ids=edit("示例：123456, 123460-123465\n支持空格、换行、逗号及 JM 前缀",false);ids.setMinLines(2);ids.setMaxLines(5);ids.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);input.addView(ids);
-        input.addView(buttonAccent("加入队列",v->{if(addIds(ids.getText().toString()))ids.setText("");}));
+        input.addView(buttonAccent("加入队列",v->{if(addIds(ids.getText().toString())){ids.setText("");inputFocus.finishEditing();}}));
         LinearLayout range=horizontal();rangeFirst=edit("起始编号",true);rangeLast=edit("结束编号",true);range.addView(rangeFirst,new LinearLayout.LayoutParams(0,-2,1));TextView to=text(" 至 ",14,MUTED);to.setGravity(Gravity.CENTER);range.addView(to);range.addView(rangeLast,new LinearLayout.LayoutParams(0,-2,1));input.addView(range);
-        input.addView(button("添加连续编号",v->{if(addIds(rangeFirst.getText().toString().trim()+"-"+rangeLast.getText().toString().trim())){rangeFirst.setText("");rangeLast.setText("");}}));
+        input.addView(button("添加连续编号",v->{if(addIds(rangeFirst.getText().toString().trim()+"-"+rangeLast.getText().toString().trim())){rangeFirst.setText("");rangeLast.setText("");inputFocus.finishEditing();}}));
         input.addView(text("每次最多添加 2000 个编号，自动跳过重复任务。\n新任务使用当前保存位置和格式，下载后可在漫画库转换格式。",11,MUTED));add(input,0,12);
 
         start=buttonAccent("开始下载",v->startQueue());pause=button("暂停全部",v->send(DownloadService.PAUSE,null));add(new ActionRow(this,start,pause),0,8);
@@ -255,8 +257,8 @@ public final class MainActivity extends Activity {
         if(store.running){toast("请先暂停下载，再运行离线诊断。");return;}
         toast("正在运行离线诊断，无需联网…");new Thread(()->{String result;try{result=Diagnostics.run(this);}catch(Throwable error){result="诊断未完成："+Core.error(error,"");}String message=result;runOnUiThread(()->new AlertDialog.Builder(this).setTitle("离线诊断结果").setMessage(message).setPositiveButton("确定",null).show());},"offline-check").start();
     }
-    protected void onResume(){super.onResume();handler.removeCallbacks(refresh);handler.post(refresh);}
-    protected void onPause(){handler.removeCallbacks(refresh);if(chapterDialog!=null){chapterDialog.dismiss();chapterDialog=null;}save();super.onPause();}
+    protected void onResume(){super.onResume();if(inputFocus!=null)inputFocus.prepareForResume();handler.removeCallbacks(refresh);handler.post(refresh);}
+    protected void onPause(){if(inputFocus!=null)inputFocus.finishEditing();handler.removeCallbacks(refresh);if(chapterDialog!=null){chapterDialog.dismiss();chapterDialog=null;}save();super.onPause();}
     protected void onDestroy(){if(downloadCovers!=null)downloadCovers.close();for(Row row:rows.values())row.cover.remove();super.onDestroy();}
     private void save(){try{store.save();}catch(Exception error){store.note=error.getMessage();toast(store.note);}}
     private void showError(String message){new AlertDialog.Builder(this).setTitle("无法完成操作").setMessage(message).setPositiveButton("确定",null).show();}
