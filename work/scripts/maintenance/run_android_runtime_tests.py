@@ -14,6 +14,7 @@ sys.stdout.reconfigure(encoding='utf-8',errors='replace')
 parser=argparse.ArgumentParser()
 parser.add_argument('--run-id', required=True)
 parser.add_argument('--library-source', type=Path, help='Optional pre-fix LibraryScreen.java for regression proof')
+parser.add_argument('--tests', help='Optional Maven test selector for a focused rerun')
 args=parser.parse_args()
 if not args.run_id.replace('-', '').replace('_', '').isalnum():
     parser.error('Use a simple run-id')
@@ -53,4 +54,4 @@ for path in (run/'dependencies').glob('*.aar'):
     with zipfile.ZipFile(path) as z:
         import io
         with zipfile.ZipFile(io.BytesIO(z.read('classes.jar'))) as classes:classes.extractall(aar)
-execute('runtime',['test'])
+execute('runtime',['test']+(['-Dtest='+args.tests] if args.tests else []))

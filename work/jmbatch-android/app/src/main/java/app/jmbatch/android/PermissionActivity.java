@@ -40,7 +40,7 @@ public class PermissionActivity extends Activity {
         body.addView(new ActionRow(this,action("省电设置",()->openSettings(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))),action("后台流量设置",()->openSettings(new Intent(Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS,Uri.parse("package:"+getPackageName()))))));
         installation=section(body,"安装应用更新（可选）");button(body,"安装更新权限",()->openSettings(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+getPackageName()))));
         button(body,"重新检测权限",()->refreshPermissions());
-        addText(body,"联网诊断",20);addText(body,"以 JM Batch 自身身份检测系统 DNS、小米官网与四条漫画线路的 HTTPS。仅测试连接，不读取漫画、Cookie 或账号；报告含机型、系统版本及网络信息，仅保存在本机，可主动分享。通常数十秒，最多约 90 秒。",14);
+        addText(body,"联网诊断",20);addText(body,"以 JM Batch 自身身份检测系统 DNS、小米官网与四条漫画线路的 HTTPS。系统解析为全零地址时，自动尝试阿里/DNSPod 的加密备用 DNS，仅发送域名；下载也使用此策略。配置 HTTP/SOCKS 代理时保留代理解析，不切换。仅测试连接，不读取漫画、Cookie 或账号；报告仅保存在本机，可主动分享。通常数十秒，最多约 150 秒。",14);
         direct=new CheckBox(this);direct.setText("额外比较 IPv4/IPv6 直连（忽略 HTTP 代理，仍使用当前网络/VPN）");body.addView(direct);
         detect=action("检测本应用联网",()->startProbe());stop=action("停止检测",()->{if(probe!=null)probe.cancel();});stop.setEnabled(false);body.addView(new ActionRow(this,detect,stop));
         body.addView(new ActionRow(this,action("复制报告",()->{((ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("JM Batch 联网报告",report.toString()));toast("报告已复制");}),action("分享报告",()->share()),action("保存报告",()->export())));
@@ -106,7 +106,14 @@ public class PermissionActivity extends Activity {
             finally{String ending=network();runOnUiThread(()->{if(destroyed)return;append("\n结束时 "+ending+"\n若中途切换网络，请重新检测。");probe=null;detect.setEnabled(true);stop.setEnabled(false);direct.setEnabled(true);try(FileOutputStream out=openFileOutput("network-report.txt",MODE_PRIVATE)){out.write(report.toString().getBytes(StandardCharsets.UTF_8));}catch(IOException error){append("本地报告保存失败，可复制报告。");}});}
         },"jm-network-check");worker.setDaemon(true);worker.start();
     }
-    NetworkProbe createProbe(){return new NetworkProbe();}
+    NetworkProbe createProbe(){
+        JmApi.Control control=new JmApi.Control();JmApi api=new JmApi(new Store.Settings(),"",control);
+        return new NetworkProbe(new NetworkProbe.NetworkOperations(){
+            @Override public boolean hasFallback(){return true;}
+            @Override public String fallback(String host)throws Exception{return api.probeHttps(host);}
+            @Override public void cancel(){control.cancel("诊断已结束");}
+        },NetworkProbe.HOSTS,7000,150000);
+    }
     private String network(){
         try{ConnectivityManager cm=(ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);Network active=cm.getActiveNetwork();if(active==null)return "当前无活动默认网络";NetworkCapabilities caps=cm.getNetworkCapabilities(active);LinkProperties lp=cm.getLinkProperties(active);StringBuilder s=new StringBuilder("当前网络：");
             if(caps!=null)s.append("Wi-Fi=").append(caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)).append("，移动数据=").append(caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)).append("，VPN=").append(caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)).append("，系统已验证联网=").append(caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED));

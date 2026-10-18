@@ -2,20 +2,20 @@
 
 支持 Windows 和 Android 的批量漫画下载工具。下载可选择 PDF、ZIP 或图片文件夹，三种成品可离线互相导出。
 
-当前源码及正式版本：**Windows 0.3.22 / Android 0.6.0（versionCode 600）**。Android 内置权限检测与申请、目录重新授权和本应用联网诊断，可直接打开对应系统设置并导出报告。安装包、更新日志与镜像入口见下方。
+当前源码及正式版本：**Windows 0.3.22 / Android 0.6.1（versionCode 601）**。Android 新增全零 DNS 自动备用解析，保留 HTTPS 验证和代理策略，并在内置诊断中比较系统与备用路径。安装包、更新日志与镜像入口见下方。
 
 ## 下载安装包（含国内镜像）
 
 GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
 
-当前正式版为 **Windows 0.3.22 / Android 0.6.0**（[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.22-0.5.21)、[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-android-0.6.0)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+当前正式版为 **Windows 0.3.22 / Android 0.6.1**（[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.22-0.5.21)、[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-android-0.6.1)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
 
 | 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
 | --- | --- | --- | --- |
 | Windows 0.3.22 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-0.5.21/JMBatch-0.3.22-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-0.5.21/JMBatch-0.3.22-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-0.5.21/JMBatch-0.3.22-Windows-x64.zip) |
-| Android 0.6.0 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.0/JMBatch-0.6.0-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.0/JMBatch-0.6.0-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.0/JMBatch-0.6.0-Android.apk) |
+| Android 0.6.1 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.1/JMBatch-0.6.1-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.1/JMBatch-0.6.1-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.1/JMBatch-0.6.1-Android.apk) |
 | Windows 0.3.22 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-0.5.21/SHA256-release-0.3.22-0.5.21.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-0.5.21/SHA256-release-0.3.22-0.5.21.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-0.5.21/SHA256-release-0.3.22-0.5.21.txt) |
-| Android 0.6.0 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.0/SHA256-release-android-0.6.0.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.0/SHA256-release-android-0.6.0.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.0/SHA256-release-android-0.6.0.txt) |
+| Android 0.6.1 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.1/SHA256-release-android-0.6.1.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.1/SHA256-release-android-0.6.1.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.1/SHA256-release-android-0.6.1.txt) |
 
 镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像同时用于手动下载及本版应用内更新文件下载的自动回退，版本查询仍使用 GitHub API，应用内更新仓库填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
 

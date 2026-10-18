@@ -8,6 +8,15 @@ intents and fallback, explicit report export/share, both home and failed-task
 entry points, and a synthetic network probe under the same application identity.
 It does not validate a particular manufacturer's permission UI or real network.
 
+FallbackTlsRuntimeTest checks the production OriginTls adapter through Android's
+HttpsURLConnection implementation on Android 10 and 15. A separate local JVM
+TLS fixture verifies original-domain SNI, Host and path; wrong-domain and
+untrusted certificates must fail before HTTP headers or cookies are sent.
+Conscrypt provides the Android test client's sockets and PKIX trust manager;
+the fixture uses an isolated temporary certificate and never a release key.
+This checks TLS identity preservation, not a phone's mobile network or API 36.
+Use --tests FallbackTlsRuntimeTest for a focused run.
+
 Run from the repository root on Windows:
 
 ```powershell

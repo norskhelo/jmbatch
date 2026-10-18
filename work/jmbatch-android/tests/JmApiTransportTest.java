@@ -33,7 +33,7 @@ public class JmApiTransportTest {
             return new ByteArrayInputStream(new byte[mode.equals("truncated")&&url.getHost().equals(JmApi.IMAGE_HOSTS[0])?512:1024]);
         }
     }
-    static JmApi api(String scenario){mode=scenario;calls.clear();disconnects=0;return new JmApi(new Store.Settings(),"",new JmApi.Control());}
+    static JmApi api(String scenario){mode=scenario;calls.clear();disconnects=0;return new JmApi(new Store.Settings(),"",new JmApi.Control(),new FallbackDns(h->new InetAddress[]{InetAddress.getByAddress(new byte[]{93,(byte)184,(byte)216,34})},()->System.nanoTime()/1000000));}
     public static void main(String[] args)throws Exception {
         URL.setURLStreamHandlerFactory(protocol->new URLStreamHandler(){protected URLConnection openConnection(URL url){return new Connection(url);}});
         Path root=Path.of(args[0]);Files.createDirectories(root);

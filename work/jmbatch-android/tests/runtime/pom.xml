@@ -21,7 +21,7 @@
         <configuration>
           <forkedProcessTimeoutInSeconds>120</forkedProcessTimeoutInSeconds>
           <additionalClasspathElements><additionalClasspathElement>${run.dir}/aar-classes</additionalClasspathElement></additionalClasspathElements>
-          <systemPropertyVariables><robolectric.dependency.repo.url>https://repo.maven.apache.org/maven2</robolectric.dependency.repo.url></systemPropertyVariables>
+          <systemPropertyVariables><robolectric.dependency.repo.url>https://repo.maven.apache.org/maven2</robolectric.dependency.repo.url><jm.test.classes>${run.dir}/target/test-classes</jm.test.classes></systemPropertyVariables>
         </configuration>
       </plugin>
     </plugins>

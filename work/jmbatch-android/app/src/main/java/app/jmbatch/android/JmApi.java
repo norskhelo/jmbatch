@@ -23,6 +23,8 @@ public final class JmApi {
     private final CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER);
     private final Store.Settings settings;
     private final String userCookie;
+    private final FallbackDns fallbackDns;
+    private final Set<String> dnsConnected=ConcurrentHashMap.newKeySet();
     private List<String> domains = new ArrayList<>(Arrays.asList(DEFAULT_API));
     private volatile int preferred;
     private final ImageRoutes imageRoutes = new ImageRoutes(Arrays.asList(IMAGE_HOSTS), SystemClock::elapsedRealtime);
@@ -74,7 +76,8 @@ public final class JmApi {
         HttpError(int code) { super(code); }
     }
 
-    public JmApi(Store.Settings settings, String cookie, Control control) { this.settings = settings; userCookie = cookie; this.control = control; }
+    public JmApi(Store.Settings settings, String cookie, Control control) { this(settings,cookie,control,new FallbackDns()); }
+    JmApi(Store.Settings settings,String cookie,Control control,FallbackDns fallbackDns) { this.settings=settings;userCookie=cookie;this.control=control;this.fallbackDns=fallbackDns; }
 
     public void initialize() throws Exception {
         List<String> cachedDomains=rememberedDomains;
@@ -163,17 +166,11 @@ public final class JmApi {
 
     private void transfer(String address, Map<String,String> headers, boolean api, int timeout, OutputStream output, long maxBytes, boolean image) throws Exception {
         URL url = new URL(address); control.check();
-        HttpURLConnection connection = (HttpURLConnection)url.openConnection();
-        connection.setConnectTimeout(Math.min(8,timeout)*1000); connection.setReadTimeout(timeout*1000); connection.setInstanceFollowRedirects(false);
-        connection.setRequestProperty("User-Agent", UA); connection.setRequestProperty("Accept-Encoding", image ? "identity" : "gzip");
-        for (Map.Entry<String,String> header : headers.entrySet()) connection.setRequestProperty(header.getKey(), header.getValue());
-        for (Map.Entry<String,List<String>> header : cookies.get(url.toURI(), Collections.emptyMap()).entrySet())
-            if (header.getKey() != null && !header.getValue().isEmpty()) connection.setRequestProperty(header.getKey(), String.join("; ", header.getValue()));
-        if (api && !userCookie.trim().isEmpty()) connection.setRequestProperty("Cookie", userCookie);
-        Control.Request request = control.register(connection);
+        Response response=openResponse(url,headers,api,timeout,image,"GET");
+        HttpURLConnection connection=response.connection;Control.Request request=response.request;
         boolean success = false;
         try {
-            control.check(); int status = connection.getResponseCode();
+            control.check(); int status = response.status;
             cookies.put(url.toURI(), connection.getHeaderFields());
             if (status != 200) throw new HttpError(status);
             try (InputStream raw = connection.getInputStream(); InputStream input = "gzip".equalsIgnoreCase(connection.getContentEncoding()) ? new GZIPInputStream(raw) : raw) {
@@ -188,10 +185,70 @@ public final class JmApi {
                     throw new EOFException("响应长度不完整");
             }
             success = true;
-        } finally {
-            // Closing the response permits Android's HTTP stack to reuse keep-alive connections.
-            request.finish(success);
+        } finally { request.finish(success); }
+    }
+
+    private final class Response {
+        final HttpURLConnection connection;final Control.Request request;final int status;
+        Response(HttpURLConnection connection,Control.Request request,int status){this.connection=connection;this.request=request;this.status=status;}
+    }
+    String probeHttps(String host)throws Exception {
+        URL url=new URL("https://"+DnsWire.host(host)+"/");Response response=openResponse(url,Collections.emptyMap(),false,4,false,"HEAD");
+        try{return "HTTP "+response.status+"（仅连接测试，未验证漫画接口）";}finally{response.request.finish(false);}
+    }
+    private Response openResponse(URL url,Map<String,String> headers,boolean api,int timeout,boolean image,String method)throws Exception {
+        try{return response(url,(HttpURLConnection)url.openConnection(),headers,api,timeout,image,method);}
+        catch(Exception original){
+            control.check();if(!FallbackDns.permitsDirect(url))throw original;
+            boolean zero;try{zero=fallbackDns.confirmedZero(url.getHost(),original);}catch(IOException lookupFailure){throw original;}
+            control.check();if(!zero)throw original;
+            FallbackDns.Result result=fallbackDns.resolve(url.getHost(),this::dnsQuery,control::check,control.routeMessage::accept);
+            Exception last=original;long deadline=SystemClock.elapsedRealtime()+12000;
+            for(InetAddress ip:result.addresses){
+                control.check();long remaining=deadline-SystemClock.elapsedRealtime();if(remaining<=0)break;
+                int seconds=Math.max(1,Math.min(4,Math.min(timeout,(int)(remaining/3000))));
+                try {
+                    Response response=response(url,OriginTls.open(url,ip,seconds*1000),headers,api,seconds,image,method);
+                    if(dnsConnected.add(url.getHost()))control.routeMessage.accept("备用 DNS 连接已响应："+url.getHost()+"（HTTP "+response.status+"）");return response;
+                }catch(Exception failure){
+                    control.check();last=failure;String kind=NetworkRoutes.kind(failure);
+                    if(!Arrays.asList("connect","refused","unreachable","timeout","address").contains(kind))throw failure;
+                }
+            }
+            control.routeMessage.accept("备用 DNS 已取得地址，但连接仍失败："+url.getHost());throw last;
         }
+    }
+    private Response response(URL url,HttpURLConnection connection,Map<String,String> headers,boolean api,int timeout,boolean image,String method)throws Exception {
+        connection.setRequestMethod(method);
+        connection.setConnectTimeout(Math.min(8,timeout)*1000); connection.setReadTimeout(timeout*1000); connection.setInstanceFollowRedirects(false);
+        connection.setRequestProperty("User-Agent", UA); connection.setRequestProperty("Accept-Encoding", image ? "identity" : "gzip");
+        for (Map.Entry<String,String> header : headers.entrySet()) connection.setRequestProperty(header.getKey(), header.getValue());
+        for (Map.Entry<String,List<String>> header : cookies.get(url.toURI(), Collections.emptyMap()).entrySet())
+            if (header.getKey() != null && !header.getValue().isEmpty()) connection.setRequestProperty(header.getKey(), String.join("; ", header.getValue()));
+        if (api && !userCookie.trim().isEmpty()) connection.setRequestProperty("Cookie", userCookie);
+        Control.Request request = control.register(connection);
+        boolean returned = false;
+        try {
+            control.check();int status=connection.getResponseCode();returned=true;return new Response(connection,request,status);
+        }finally{if(!returned)request.finish(false);}
+    }
+    private byte[] dnsQuery(URL url,long deadline)throws Exception {
+        control.check();long remaining=deadline-fallbackDns.clock.getAsLong();if(remaining<=0)throw new SocketTimeoutException();
+        HttpURLConnection connection=(HttpURLConnection)url.openConnection();
+        int timeout=(int)Math.max(1,Math.min(3000,remaining/2));connection.setConnectTimeout(timeout);connection.setReadTimeout(timeout);
+        connection.setInstanceFollowRedirects(false);connection.setUseCaches(false);
+        connection.setRequestProperty("Accept","application/dns-message");connection.setRequestProperty("Accept-Encoding","identity");
+        // DNS queries deliberately use no session cookies, API tokens or request paths.
+        Control.Request request=control.register(connection);
+        try{
+            control.check();if(connection.getResponseCode()!=200)throw new IOException("备用 DNS 服务未响应成功");
+            String type=connection.getContentType();if(type==null||!type.split(";",2)[0].trim().equalsIgnoreCase("application/dns-message"))throw new IOException("备用 DNS 响应类型错误");
+            try(InputStream input=connection.getInputStream();ByteArrayOutputStream out=new ByteArrayOutputStream()){
+                byte[] buffer=new byte[2048];int count;
+                while((count=input.read(buffer))!=-1){control.check();if(fallbackDns.clock.getAsLong()>=deadline)throw new SocketTimeoutException();if(out.size()+count>65536)throw new IOException("备用 DNS 响应过大");out.write(buffer,0,count);}
+                return out.toByteArray();
+            }
+        }finally{request.finish(false);}
     }
 
     static JSONObject parseJson(String text) throws JSONException {

@@ -14,6 +14,14 @@ public final class NetworkProbeTest {
         public String https(String h)throws Exception{https++;return "HTTP 403";}
         public String direct(String h,InetAddress a)throws Exception{direct++;return "TCP + TLS";}
     }
+    static class Backup extends Fake {
+        volatile int fallback,cancelled;boolean zero=true,fail=true;
+        public InetAddress[] dns(String h)throws Exception{return zero?new InetAddress[]{InetAddress.getByName("0.0.0.0"),InetAddress.getByName("::")}:super.dns(h);}
+        public String https(String h)throws Exception{if(fail)throw new ConnectException("all addresses failed");return super.https(h);}
+        public boolean hasFallback(){return true;}
+        public String fallback(String h)throws Exception{fallback++;return "HTTP 200（仅连接测试）";}
+        public void cancel(){cancelled++;}
+    }
     public static void main(String[] args)throws Exception {
         Fake f=new Fake();List<String> log=new ArrayList<>();
         new NetworkProbe(f,NetworkProbe.HOSTS,100,3000).run(false,log::add);
@@ -32,6 +40,15 @@ public final class NetworkProbeTest {
         NetworkProbe cancel=new NetworkProbe(new Fake(){public InetAddress[] dns(String h)throws Exception{Thread.sleep(5000);return super.dns(h);}},NetworkProbe.HOSTS,5000,90000);
         Thread worker=new Thread(()->cancel.run(false,s->{}));worker.start();Thread.sleep(50);cancel.cancel();worker.join(1000);check(!worker.isAlive());
         String detail=NetworkProbe.error(new IOException("outer",new ConnectException("ECONNREFUSED\nfrom /::")));check(detail.contains("IOException")&&detail.contains("ConnectException")&&!detail.contains("\n"));
+        Backup backup=new Backup();log.clear();new NetworkProbe(backup,new String[]{"test.example"},100,1000).run(false,log::add);
+        check(backup.fallback==1);check(backup.cancelled==1);check(log.toString().contains("备用路径：HTTP 200"));
+        backup=new Backup();backup.zero=false;new NetworkProbe(backup,new String[]{"test.example"},100,1000).run(false,s->{});check(backup.fallback==0);
+        backup=new Backup();backup.fail=false;new NetworkProbe(backup,new String[]{"test.example"},100,1000).run(false,s->{});check(backup.fallback==0);
+        backup=new Backup(){public String fallback(String h)throws Exception{throw new IOException("backup offline");}};log.clear();new NetworkProbe(backup,new String[]{"test.example"},100,1000).run(false,log::add);
+        check(log.toString().contains("备用路径失败：IOException: backup offline"));check(backup.cancelled==1);
+        backup=new Backup(){public String fallback(String h)throws Exception{fallback++;Thread.sleep(5000);return "unexpected";}};
+        Backup slowBackup=backup;NetworkProbe pending=new NetworkProbe(backup,new String[]{"test.example"},100,90000);Thread waiting=new Thread(()->pending.run(false,s->{}));waiting.start();
+        for(int i=0;i<100&&slowBackup.fallback==0;i++)Thread.sleep(10);pending.cancel();waiting.join(1000);check(!waiting.isAlive()&&slowBackup.cancelled>=1);
         System.out.println("Probe engine: "+checks+" checks passed");
     }
 }

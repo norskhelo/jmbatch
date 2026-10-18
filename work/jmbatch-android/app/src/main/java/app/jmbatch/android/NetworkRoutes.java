@@ -5,7 +5,7 @@ import java.net.*;
 import java.util.*;
 import javax.net.ssl.SSLException;
 
-/** Bounded, request-local failover. Never changes DNS, proxies or TLS verification. */
+/** Bounded, request-local route failover. Never changes system network settings. */
 public final class NetworkRoutes {
     public static class HttpFailure extends IOException {
         public final int code;
@@ -64,6 +64,7 @@ public final class NetworkRoutes {
         return "other";
     }
     static String reason(Exception error) {
+        Throwable cause=error;for(int i=0;cause!=null&&i<8;i++,cause=cause.getCause())if(cause instanceof FallbackDns.Failure)return cause.getMessage();
         switch(kind(error)) {
             case "permission":return "系统拒绝联网（EACCES / EPERM），请检查 JM Batch 的 WLAN、移动数据权限及防火墙限制";
             case "refused":return "连接被拒绝（ECONNREFUSED），可能是目标服务或网络过滤拒绝连接";
