@@ -443,6 +443,38 @@ def run_self_test(directory: Path):
         assert len(library_ui.cover_images) == 2
         assert all(photo != library_ui.cover_placeholder for photo in library_ui.cover_images.values())
         report["checks"].append("First-page PDF/ZIP covers load asynchronously in the actual library UI")
+        from unittest.mock import patch
+        def library_event(name, index=0, dx=0):
+            key = library_ui.tree.get_children()[index]
+            x, y, w, h = library_ui.tree.bbox(key)
+            library_ui.tree.event_generate(name, x=x+30+dx, y=y+h//2)
+            root.update()
+        with patch.object(application, "read_comic") as opened:
+            assert not library_ui.batch_mode and not library_ui.batch_rows[0].winfo_ismapped()
+            library_event("<ButtonPress-1>")
+            library_event("<ButtonRelease-1>")
+            opened.assert_called_once_with(library_ui.tree.get_children()[0])
+            opened.reset_mock()
+            library_event("<ButtonPress-1>", 1)
+            deadline = time.monotonic()+.6
+            while time.monotonic()<deadline:
+                root.update()
+                time.sleep(.01)
+            library_event("<ButtonRelease-1>", 1)
+            assert library_ui.batch_mode and len(library_ui.tree.selection()) == 1
+            opened.assert_not_called()
+            library_event("<ButtonPress-1>")
+            library_event("<ButtonRelease-1>")
+            assert len(library_ui.tree.selection()) == 2
+            assert str(library_ui.action_buttons["export"]["state"]) == "disabled"
+            library_ui.exit_batch()
+            root.update()
+            assert not library_ui.tree.selection() and not library_ui.batch_rows[0].winfo_ismapped()
+            library_event("<ButtonPress-1>", 1)
+            library_event("<B1-Motion>", 1, 24)
+            library_event("<ButtonRelease-1>", 1, 24)
+            opened.assert_not_called()
+        report["checks"].append("Library real Tk events: tap reads, hold selects, release never reads, batch toggle/exit and drag cancellation")
         selected = library_ui.tree.get_children()[0]
         library_ui.tree.selection_set(selected)
         library_ui.action("favorite")

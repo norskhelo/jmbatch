@@ -472,6 +472,7 @@ class App:
         if task and task.status == "done" and task.result:
             key = self.engine.library.key(task.result)
             if self.library_window.tree.exists(key):
+                self.library_window.enter_batch(key)
                 self.library_window.tree.selection_set(key)
                 self.library_window.action("export")
         else:

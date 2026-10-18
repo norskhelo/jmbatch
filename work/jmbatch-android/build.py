@@ -52,6 +52,7 @@ run(java,'-cp',testout,'CertificateTest')
 
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/LibraryRules.java',ROOT/'tests/LibraryTest.java')
 run(java,'-cp',testout,'LibraryTest',testroot/'test-output')
+run(sys.executable,ROOT/'tests/test_library_interaction.py',jdk,testroot/'library-interaction')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/CoverRules.java',ROOT/'tests/CoverTest.java')
 run(java,'-cp',testout,'CoverTest',testroot/'test-output')
 run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/DownloadCoverRules.java',ROOT/'tests/DownloadCoverTest.java')

@@ -121,12 +121,18 @@ def check_chrome(reader, root, wait):
         assert reader.chrome.visible and reader.top.winfo_ismapped() and reader.bottom.winfo_ismapped()
         assert reader.canvas.winfo_height() == before[3] and reader.current == before[0]
         # Reverse the animation before completion and verify it ends fully shown.
-        tap(reader.canvas.winfo_width()//2)
-        time.sleep(.06); root.update()
-        assert reader.chrome.animating
-        if not reader.is_scroll():
-            assert reader.canvas.coords(reader.pager.front) == [reader.canvas.winfo_width()/2, reader.canvas.winfo_height()/2]
-        tap(reader.canvas.winfo_width()//2)
+        # Keep the animation clock deterministic while pumping real Tk events.
+        # A busy build host can otherwise finish the 220 ms animation during update().
+        from unittest.mock import patch
+        clock = [time.monotonic()]
+        with patch('reader_chrome.time.monotonic', side_effect=lambda: clock[0]):
+            tap(reader.canvas.winfo_width()//2)
+            clock[0] += .06
+            time.sleep(.02); root.update()
+            assert reader.chrome.animating and 0 < reader.chrome.fraction < 1
+            if not reader.is_scroll():
+                assert reader.canvas.coords(reader.pager.front) == [reader.canvas.winfo_width()/2, reader.canvas.winfo_height()/2]
+            tap(reader.canvas.winfo_width()//2)
         wait(lambda: not reader.chrome.animating and reader.resize_timer is None)
         assert reader.chrome.visible and reader.canvas.winfo_height() == before[3]
         # A vertical drag returning to its start must not toggle controls.
