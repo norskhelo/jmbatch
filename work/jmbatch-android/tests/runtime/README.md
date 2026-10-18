@@ -39,3 +39,14 @@ query counts establish lazy chapter access, not real phone storage timings.
 
 For a before/after proof, pass `--library-source <path-to-old-LibraryScreen.java>`
 and a separate run ID. The production tree is never replaced by that option.
+
+ChapterDeletionRuntimeTest covers the actual chapter-delete backend and synthetic
+SAF publication. A 151-chapter / 7227-page fixture bounds directory listing and
+document query counts both with and without an internal index. Retained pages
+are each opened once at the source, written once, and read back once at the
+target. It also checks absent timestamps, legacy manifests, foreign files,
+mid-operation timestamp changes, corrupted target readback, cancellation,
+record-save failures, rename failure and old-file cleanup failure. The complete
+LibraryScreen test invokes the chapter picker and destructive confirmation.
+The batch-mode switch test advances a frame after showing the batch toolbar
+before simulating the next action, so consecutive actions use the laid-out UI.

@@ -10,6 +10,7 @@ public final class FolderSave {
     public interface Check { void run() throws Exception; }
     public interface Ownership { void record(File file) throws Exception; }
     public interface Progress { void update(String phase,int done,int total,long bytes,long totalBytes) throws Exception; }
+    public interface Input { InputStream open() throws Exception; }
     public interface Target {
         OutputStream write() throws Exception;
         void sync(OutputStream stream) throws Exception;
@@ -17,37 +18,47 @@ public final class FolderSave {
     }
     public static final class Entry {
         public final File source; public final String path; public final long size;
+        private final Input input;
         public Entry(File source,String path,long size) throws IOException {
+            this(source,()->new FileInputStream(source),path,size);
+        }
+        /** URI sources are fully inspected by the caller before and after publication. */
+        public Entry(Input input,String path,long size)throws IOException {this(null,input,path,size);}
+        private Entry(File source,Input input,String path,long size)throws IOException {
             if(path==null||!path.matches("(?:[0-9]{4,}/)?[0-9]{5,}\\.jpg")||size<=0)
                 throw new IOException("图片路径或大小无效");
-            this.source=source;this.path=path;this.size=size;
+            this.source=source;this.input=Objects.requireNonNull(input);this.path=path;this.size=size;
+        }
+        private long checkSource()throws IOException {
+            if(source==null)return 0;
+            if(Files.isSymbolicLink(source.toPath())||!source.isFile()||source.length()!=size)throw new IOException("来源图片已变化："+path);
+            return source.lastModified();
         }
     }
     public static long validate(List<Entry> entries) throws IOException {
         if(entries.isEmpty()||entries.size()>20000)throw new IOException("图片数量无效");
         Set<String> names=new HashSet<>();long bytes=0;
         for(Entry entry:entries){
-            if(!names.add(entry.path)||Files.isSymbolicLink(entry.source.toPath())||!entry.source.isFile()
-                    ||entry.source.length()!=entry.size)throw new IOException("图片重复、缺失或大小变化："+entry.path);
+            if(!names.add(entry.path))throw new IOException("图片重复："+entry.path);
+            entry.checkSource();
             bytes=Math.addExact(bytes,entry.size);
         }
         return bytes;
     }
     public static void transfer(Entry entry,Target target,Check check,Progress progress,
                                 int done,int total,long bytes,long totalBytes) throws Exception {
-        check.run();long modified=entry.source.lastModified();
-        if(Files.isSymbolicLink(entry.source.toPath())||!entry.source.isFile()||entry.source.length()!=entry.size)
-            throw new IOException("来源图片已变化："+entry.path);
+        check.run();long modified=entry.checkSource();
         byte[] buffer=new byte[65536];CRC32 sourceCrc=new CRC32();long copied=0;
         progress.update("save",done,total,bytes,totalBytes);
-        try(InputStream input=new FileInputStream(entry.source);OutputStream output=target.write()){
+        try(InputStream input=entry.input.open();OutputStream output=target.write()){
+            if(input==null)throw new IOException("来源图片不可读");
             if(output==null)throw new IOException("保存目录不可写");int n;
             while((n=input.read(buffer))!=-1){
                 check.run();copied+=n;if(copied>entry.size)throw new IOException("来源图片大小变化");
                 output.write(buffer,0,n);sourceCrc.update(buffer,0,n);
                 progress.update("save",done,total,bytes+copied,totalBytes);
             }
-            if(copied!=entry.size||entry.source.length()!=entry.size||entry.source.lastModified()!=modified)
+            if(copied!=entry.size||entry.checkSource()!=modified)
                 throw new IOException("来源图片在保存时发生变化");
             check.run();output.flush();target.sync(output);
         }

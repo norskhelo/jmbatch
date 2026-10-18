@@ -156,6 +156,7 @@ public class LibraryScreenRuntimeTest {
         open(false,80);scroll();
         int position=grid().getFirstVisiblePosition();
         call("itemLongClick",new Class<?>[]{int.class},position);
+        frames(); // Complete the batch-toolbar layout before the next user action.
         Bundle before=screen.saveState();
         for(boolean tiles:new boolean[]{true,false,true,false}) {
             display(tiles);

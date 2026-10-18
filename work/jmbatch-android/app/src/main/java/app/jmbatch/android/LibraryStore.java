@@ -91,7 +91,11 @@ public final class LibraryStore {
         return LibraryRules.ownedFile(new File(root,"exports"),uri.getLastPathSegment());
     }
     public void check(Entry item)throws IOException {
-        if(item.tree.isEmpty()){appFile(item);if(item.format.equals("images"))try{AlbumStorage.load(context,Uri.parse(item.uri));}catch(Exception e){throw new IOException("图片目录校验失败",e);}return;}
+        checkLocation(item);
+        if(item.format.equals("images"))try{AlbumStorage.load(context,Uri.parse(item.uri));}catch(Exception e){throw new IOException("图片目录校验失败",e);}
+    }
+    void checkLocation(Entry item)throws IOException {
+        if(item.tree.isEmpty()){appFile(item);return;}
         Uri uri=Uri.parse(item.uri), tree=Uri.parse(item.tree);
         if(!"content".equals(uri.getScheme())||!Objects.equals(tree.getAuthority(),uri.getAuthority())||
             !DocumentsContract.isTreeUri(uri)||!DocumentsContract.getTreeDocumentId(tree).equals(DocumentsContract.getTreeDocumentId(uri)))
@@ -102,7 +106,7 @@ public final class LibraryStore {
             String name=cursor.getString(0),mime=cursor.getString(1);
             if(item.format.equals("images")){
                 if(!DocumentsContract.Document.MIME_TYPE_DIR.equals(mime))throw new IOException("图片目录已不存在");
-                try{AlbumStorage.load(context,uri);}catch(Exception e){throw new IOException("图片目录校验失败",e);}return;
+                return;
             }
             if(name==null||!LibraryRules.supported(name)||DocumentsContract.Document.MIME_TYPE_DIR.equals(mime))throw new IOException("只允许操作 PDF / ZIP 文件，不允许删除目录");
         }

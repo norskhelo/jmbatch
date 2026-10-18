@@ -264,7 +264,7 @@ public final class LibraryScreen {
     }
     private void deleteChapters(LibraryStore.Entry entry){
         final ChapterDeletion.Plan[] result=new ChapterDeletion.Plan[1];
-        perform(()->{result[0]=ChapterDeletion.inspect(activity,entry,cancelled::get);return "请选择要删除的章节";},()->{
+        perform(()->{result[0]=ChapterDeletion.inspect(activity,entry,cancelled::get,text->main.post(()->{if(visible())status.setText(text);}));return "请选择要删除的章节";},()->{
             ChapterDeletion.Plan plan=result[0];if(plan==null)return;
             if(plan.counts.size()<=1){message("本书仅识别到一个章节。PDF 或平铺 ZIP 没有可分辨的分章信息；删除整本请使用“删除文件”。");return;}
             List<Integer> chapters=new ArrayList<>(plan.counts.keySet());String[] labels=new String[chapters.size()];Set<Integer> removed=new HashSet<>();

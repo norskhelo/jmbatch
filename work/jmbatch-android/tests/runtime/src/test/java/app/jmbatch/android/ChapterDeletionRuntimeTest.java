@@ -89,7 +89,7 @@ public class ChapterDeletionRuntimeTest {
         LibraryStore.Entry old=fixture(false,false);ChapterDeletion.Plan plan=ChapterDeletion.inspect(context,old,()->false);
         for(Set<Integer> choice:Arrays.asList(Collections.<Integer>emptySet(),new HashSet<>(Arrays.asList(1,2,3)),Collections.singleton(8))){try{ChapterDeletion.delete(context,store,old,plan,choice,()->false,t->{});fail();}catch(IOException expected){}}
         AtomicBoolean cancelled=new AtomicBoolean();
-        try{ChapterDeletion.delete(context,store,old,plan,Collections.singleton(2),cancelled::get,t->{if(t.contains("1"))cancelled.set(true);});fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("取消"));}
+        try{ChapterDeletion.delete(context,store,old,plan,Collections.singleton(2),cancelled::get,t->{if(t.equals("校验保留图片 4/4"))cancelled.set(true);});fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("取消"));}
         assertEquals(6,AlbumStorage.load(context,Uri.parse(old.uri)).images.size());assertEquals(old.uri,library.list("",false).get(0).uri);assertFalse(store.libraryBusy);
     }
     @Test public void failedLibraryCommitPreservesSourceAndRemovesReplacement()throws Exception {
@@ -109,6 +109,61 @@ public class ChapterDeletionRuntimeTest {
         LibraryStore.Entry old=fixture(false,true);provider.failDelete=DocumentsContract.getDocumentId(Uri.parse(old.uri));String message=delete(old,2);
         assertTrue(message.contains("清理未完成"));assertTrue(message.contains(old.uri));assertTrue(root.exists());assertNotEquals(old.uri,library.list("",false).get(0).uri);
     }
+    @Test public void largeFolderReadsOneListingPerChapterWithAndWithoutIndex()throws Exception {
+        LibraryStore.Entry item=fixture(false,true);JSONArray records=new JSONArray();
+        for(int c=1;c<=151;c++)for(int p=1;p<=(c<=130?48:47);p++){
+            String name=String.format(Locale.ROOT,"%04d/%05d.jpg",c,p);File image=new File(root,name);image.getParentFile().mkdirs();Files.write(image.toPath(),new byte[]{1,2,3});
+            records.put(new JSONObject().put("chapter",c).put("page",p).put("file",name).put("size",3));
+        }
+        Uri uri=Uri.parse(item.uri);AlbumStorage.remember(context,uri,new JSONObject().put("version",2).put("id","123").put("title","test").put("entries",records));
+        for(boolean indexed:new boolean[]{true,false}){
+            if(!indexed)AlbumStorage.forget(context,uri);
+            provider.documents=provider.children=0;provider.reads.clear();List<String> progress=new ArrayList<>();
+            ChapterDeletion.Plan plan=ChapterDeletion.inspect(context,item,()->false,progress::add);
+            assertEquals(151,plan.counts.size());assertEquals(7227,plan.chapters.size());
+            assertEquals(152,provider.children);assertEquals(indexed?1:2,provider.documents);assertTrue(provider.reads.isEmpty());
+            assertTrue(progress.get(0).contains("正在检查"));assertTrue(progress.get(progress.size()-1).contains("7227/7227"));
+        }
+    }
+    @Test public void safRetainedPagesAreReadOnceAndWrittenOnceWithoutCacheCopy()throws Exception {
+        LibraryStore.Entry item=fixture(false,true);ChapterDeletion.Plan plan=ChapterDeletion.inspect(context,item,()->false);
+        provider.reads.clear();provider.writes.clear();String oldPrefix=DocumentsContract.getDocumentId(Uri.parse(item.uri))+"/";
+        List<String> progress=new ArrayList<>();ChapterDeletion.delete(context,store,item,plan,Collections.singleton(2),()->false,progress::add);
+        int sourceReads=0,targetReads=0,writes=0;
+        for(Map.Entry<String,Integer> e:provider.reads.entrySet())if(e.getKey().endsWith(".jpg")){assertEquals(1,(int)e.getValue());if(e.getKey().startsWith(oldPrefix))sourceReads++;else targetReads++;}
+        for(int n:provider.writes.values())writes+=n;
+        assertEquals(4,sourceReads);assertEquals(4,targetReads);assertEquals(4,writes);
+        assertFalse(new File(context.getCacheDir(),"chapter-delete").exists());
+        assertTrue(progress.stream().anyMatch(t->t.contains("校验保留图片 4/4")));
+        assertTrue(progress.stream().anyMatch(t->t.contains("清理原漫画")));
+        assertUpdated(item,true);
+    }
+    @Test public void timestampChangeDuringCopyKeepsOriginalAndRemovesNewOutput()throws Exception {
+        LibraryStore.Entry item=fixture(false,true);ChapterDeletion.Plan plan=ChapterDeletion.inspect(context,item,()->false);
+        Set<String> before=new HashSet<>(Arrays.asList(root.getParentFile().list()));File changed=new File(root,"0001/00001.jpg");
+        try{ChapterDeletion.delete(context,store,item,plan,Collections.singleton(2),()->false,t->{if(t.contains("核对原漫画"))assertTrue(changed.setLastModified(changed.lastModified()+10000));});fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("变化"));}
+        assertEquals(before,new HashSet<>(Arrays.asList(root.getParentFile().list())));assertEquals(item.uri,library.list("",false).get(0).uri);assertFalse(store.libraryBusy);
+    }
+    @Test public void targetReadbackCorruptionPreservesOriginal()throws Exception {
+        LibraryStore.Entry item=fixture(false,true);provider.corruptReadback=true;
+        try{delete(item,2);fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("校验失败"));}
+        assertTrue(root.exists());assertEquals(item.uri,library.list("",false).get(0).uri);
+        assertEquals(1,root.getParentFile().list().length);assertFalse(store.libraryBusy);
+    }
+    @Test public void inspectionCancellationAndNullTimestampsAreSupported()throws Exception {
+        LibraryStore.Entry item=fixture(false,true);AtomicBoolean stop=new AtomicBoolean();
+        try{ChapterDeletion.inspect(context,item,stop::get,t->stop.set(true));fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("取消"));}
+        provider.nullTimestamps=true;delete(item,2);assertUpdated(item,true);
+    }
+    @Test public void legacyManifestUsesOneListingAndKeepsExtraFileProtection()throws Exception {
+        LibraryStore.Entry item=fixture(false,true);JSONArray entries=new JSONArray();
+        for(int c=1;c<=3;c++)for(int p=1;p<=2;p++)entries.put(new JSONObject().put("chapter",c).put("page",p).put("file",String.format(Locale.ROOT,"%04d/%05d.jpg",c,p)).put("size",3));
+        Files.write(new File(root,AlbumRules.MANIFEST).toPath(),new JSONObject().put("version",1).put("id","123").put("title","test").put("entries",entries).toString().getBytes("UTF-8"));
+        provider.children=0;assertEquals(6,ChapterDeletion.inspect(context,item,()->false).chapters.size());assertEquals(4,provider.children);
+        Files.write(new File(root,"0002/personal.txt").toPath(),new byte[]{1});
+        try{ChapterDeletion.inspect(context,item,()->false);fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("额外"));}
+        Files.delete(new File(root,"0002/personal.txt").toPath());delete(item,2);assertUpdated(item,true);
+    }
     static byte[] read(InputStream in)throws IOException {try(InputStream input=in;ByteArrayOutputStream output=new ByteArrayOutputStream()){byte[] b=new byte[1024];int n;while((n=input.read(b))!=-1)output.write(b,0,n);return output.toByteArray();}}
     public static class Bridge extends ContentProvider {
         final TreeProvider documents;Bridge(TreeProvider value){documents=value;}
@@ -122,16 +177,20 @@ public class ChapterDeletionRuntimeTest {
         public int delete(Uri uri,String selection,String[] args){throw new UnsupportedOperationException();}
     }
     public static class TreeProvider extends DocumentsProvider {
-        final File base;int creates,renames,deletes;boolean failRename;String failDelete="";
+        final File base;int creates,renames,deletes,documents,children;boolean failRename,corruptReadback,nullTimestamps;String failDelete="";final Map<String,Integer> reads=new HashMap<>(),writes=new HashMap<>();
         TreeProvider(File value){base=value;}
         public boolean onCreate(){return true;}
         File file(String id)throws FileNotFoundException {try{File f=id.equals("root")?base:new File(base,id.substring(5));if(!f.getCanonicalPath().startsWith(base.getCanonicalPath()))throw new IOException();return f;}catch(Exception e){throw new FileNotFoundException();}}
         String id(File file){return "root/"+base.toPath().relativize(file.toPath()).toString().replace('\\','/');}
-        void row(MatrixCursor cursor,String[] projection,File file){Object[] values=new Object[projection.length];for(int i=0;i<projection.length;i++){switch(projection[i]){case "document_id":values[i]=id(file);break;case "_display_name":values[i]=file.getName();break;case "mime_type":values[i]=file.isDirectory()?DocumentsContract.Document.MIME_TYPE_DIR:"application/octet-stream";break;case "_size":values[i]=file.length();break;case "last_modified":values[i]=file.lastModified();break;case "flags":values[i]=0;break;}}cursor.addRow(values);}
+        void row(MatrixCursor cursor,String[] projection,File file){Object[] values=new Object[projection.length];for(int i=0;i<projection.length;i++){switch(projection[i]){case "document_id":values[i]=id(file);break;case "_display_name":values[i]=file.getName();break;case "mime_type":values[i]=file.isDirectory()?DocumentsContract.Document.MIME_TYPE_DIR:"application/octet-stream";break;case "_size":values[i]=file.length();break;case "last_modified":values[i]=nullTimestamps?null:file.lastModified();break;case "flags":values[i]=0;break;}}cursor.addRow(values);}
         public Cursor queryRoots(String[] projection){return new MatrixCursor(projection);}
-        public Cursor queryDocument(String id,String[] projection)throws FileNotFoundException {MatrixCursor cursor=new MatrixCursor(projection);File f=file(id);if(f.exists())row(cursor,projection,f);return cursor;}
-        public Cursor queryChildDocuments(String id,String[] projection,String sort)throws FileNotFoundException {MatrixCursor cursor=new MatrixCursor(projection);File[] children=file(id).listFiles();if(children==null)throw new FileNotFoundException();for(File f:children)row(cursor,projection,f);return cursor;}
-        public ParcelFileDescriptor openDocument(String id,String mode,CancellationSignal signal)throws FileNotFoundException {return ParcelFileDescriptor.open(file(id),ParcelFileDescriptor.parseMode(mode));}
+        public Cursor queryDocument(String id,String[] projection)throws FileNotFoundException {documents++;MatrixCursor cursor=new MatrixCursor(projection);File f=file(id);if(f.exists())row(cursor,projection,f);return cursor;}
+        public Cursor queryChildDocuments(String id,String[] projection,String sort)throws FileNotFoundException {children++;MatrixCursor cursor=new MatrixCursor(projection);File[] listed=file(id).listFiles();if(listed==null)throw new FileNotFoundException();for(File f:listed)row(cursor,projection,f);return cursor;}
+        public ParcelFileDescriptor openDocument(String id,String mode,CancellationSignal signal)throws FileNotFoundException {
+            Map<String,Integer> counts=mode.contains("w")?writes:reads;counts.put(id,counts.getOrDefault(id,0)+1);
+            if(corruptReadback&&!mode.contains("w")&&id.contains(".partial/")&&id.endsWith(".jpg"))try{Files.write(file(id).toPath(),new byte[]{0,0,0});}catch(IOException error){throw new FileNotFoundException();}
+            return ParcelFileDescriptor.open(file(id),ParcelFileDescriptor.parseMode(mode));
+        }
         public String createDocument(String parent,String mime,String name)throws FileNotFoundException {creates++;File f=new File(file(parent),name);try{if(mime.equals(DocumentsContract.Document.MIME_TYPE_DIR)){if(!f.mkdir())throw new IOException();}else if(!f.createNewFile())throw new IOException();return id(f);}catch(IOException e){throw new FileNotFoundException();}}
         public String renameDocument(String id,String name)throws FileNotFoundException {renames++;if(failRename)throw new FileNotFoundException("重命名失败");File from=file(id),to=new File(from.getParentFile(),name);if(!from.renameTo(to))throw new FileNotFoundException();return id(to);}
         public void deleteDocument(String id)throws FileNotFoundException {deletes++;if(failDelete.equals(id))throw new FileNotFoundException("delete denied");try{Downloader.deleteOwned(file(id),base);}catch(Exception e){throw new FileNotFoundException(e.getMessage());}}
