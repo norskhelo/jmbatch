@@ -175,7 +175,10 @@ class App:
         table.grid(row=5, column=0, sticky="nsew")
         columns = ("id", "title", "status", "progress", "size", "format", "resets")
         ttk.Style(self.root).configure("Download.Treeview", rowheight=82)
-        self.tree = ttk.Treeview(table, columns=columns, show="tree headings", selectmode="extended", height=2, style="Download.Treeview")
+        from display_view import DisplayView, load_mode, mode_buttons
+        self.download_mode = tk.StringVar(value=load_mode(self.home, "downloads"))
+        mode_buttons(stats, self.download_mode, self.change_display).pack(side="right", padx=12)
+        self.tree = DisplayView(table, kind="downloads", columns=columns, show="tree headings", selectmode="extended", height=2, style="Download.Treeview")
         self.tree.heading("#0", text="封面")
         self.tree.column("#0", width=76, minwidth=76, stretch=False)
         from download_covers import DownloadCovers
@@ -191,6 +194,8 @@ class App:
         scroll.pack(side="right", fill="y")
         self.tree.bind("<<TreeviewSelect>>", lambda _: self.update_details())
         self.tree.bind("<Double-1>", lambda _: self.open_selected())
+        self.tree.bind("<Return>", lambda _: self.open_selected())
+        self.tree.set_mode(self.download_mode.get())
 
         progress = ttk.Frame(outer)
         progress.grid(row=6, column=0, sticky="ew", pady=(8, 6))
@@ -210,6 +215,14 @@ class App:
         self.details = self._text_panel(details_frame, 4)
         self.logs = self._text_panel(logs_frame, 4)
         self._set_text(self.details, "选择任务可查看进度、保存位置和失败原因。\n自动重连会保留完整图片，导出期间不执行。")
+
+    def change_display(self):
+        from display_view import save_mode
+        self.tree.set_mode(self.download_mode.get())
+        try:
+            save_mode(self.home, "downloads", self.download_mode.get())
+        except OSError as exc:
+            self.log(f"显示方式未能保存：{exc}")
 
     def _text_panel(self, parent, height):
         text = tk.Text(parent, height=height, wrap="word", relief="flat", bg="white", fg=INK, padx=12, pady=10, state="disabled", font=("Microsoft YaHei UI", 9))

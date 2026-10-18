@@ -30,6 +30,7 @@ public class LibraryRowsTest {
 static class View {static final int VISIBLE=0,GONE=8;int visibility;void setVisibility(int v){visibility=v;}}
 static class ViewGroup extends View {}
 static class LinearLayout extends ViewGroup {
+    static final int VERTICAL=1,HORIZONTAL=0;void setOrientation(int n){}
     LinearLayout(Activity a){}void setGravity(int v){}void setPadding(int a,int b,int c,int d){}
     void addView(View v,Object params){}static class LayoutParams {LayoutParams(int a,int b){}LayoutParams(int a,int b,int c){}}
 }
@@ -45,7 +46,7 @@ static class ImageView extends View {
 }
 static class TextView extends View {
     String value="";TextView(Activity a){}void setText(String s){value=s;}void setTextSize(int n){}
-    void setGravity(int n){}void setTextColor(int n){}void setMaxLines(int n){}
+    void setGravity(int n){}void setTextColor(int n){}void setMaxLines(int n){}void setMinLines(int n){}
     void setEllipsize(int n){}void setPadding(int a,int b,int c,int d){}
 }
 static class Drawable {
@@ -83,7 +84,7 @@ static class Worker {
     void execute(Runnable r){queue.add(r);}void complete(){queue.remove(0).run();}
 }
 static class Handler {void post(Runnable r){r.run();}}
-final Activity activity=new Activity();boolean batchMode;int coverGeneration;
+final Activity activity=new Activity();boolean batchMode,tiles;int coverGeneration;
 final Set<String> selected=new HashSet<>(),coverPending=new HashSet<>();
 final Map<String,Cover> coverCache=new HashMap<>();final Worker coverWorker=new Worker();
 final Handler main=new Handler();final List<LibraryStore.Entry> entries=new ArrayList<>();
@@ -147,6 +148,14 @@ public static void main(String[] args){
     check(row.text.drawable==null&&!row.isChecked(),"exit batch removes check mark and recycled check state");
     f.selected.clear();f.batchMode=true;row=f.bind(2,row);
     settled(row,false,"reenter batch has no stale choice or transition");
+    f.selected.add("b");CoverRow previous=row;f.tiles=true;row=f.bind(1,row);
+    check(row!=previous&&row.tile,"switching to tiles replaces layout, not model");
+    settled(row,true,"tile checked binding settled");
+    check(row.image.bitmap!=null&&f.selected.contains("b"),"tile reuses cached cover and selection");
+    previous=row;row=f.bind(2,row);check(row==previous,"same-mode tile recycling reused");
+    settled(row,false,"recycled tile maps current comic selection");
+    f.tiles=false;row=f.bind(1,row);check(!row.tile&&row!=previous,"switching back restores list row");
+    settled(row,true,"switching back retains selection without animation");
     System.out.println("LibraryRowsTest: "+checks+" checks passed (production rows/adapter, host drawable states)");
 }
 }

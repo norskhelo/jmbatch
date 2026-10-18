@@ -29,6 +29,7 @@ int top;int getTop(){return top;}void requestFocus(){}void clearFocus(){}Object 
 void setVisibility(int v){visibility=v;}void setEnabled(boolean v){enabled=v;}boolean isEnabled(){return enabled;}}
 static class TextView extends View {String text="";void setText(String s){text=s;}}
 static class Button extends TextView {}
+static class RadioGroup {View child=new View();int getChildCount(){return 2;}View getChildAt(int i){return child;}}
 static class EditText extends TextView {String getText(){return text;}}
 static class CheckBox extends View {boolean checked;boolean isChecked(){return checked;}}
 static class Context {static final String INPUT_METHOD_SERVICE="keyboard";}
@@ -55,7 +56,7 @@ EditText query=new EditText();CheckBox favorites=new CheckBox();int loads;
 boolean visible(){return !dialog.dismissed;}void load(){loads++;pendingViewState=viewportState();}
 Set<String> selected=new HashSet<>();List<LibraryStore.Entry> entries=new ArrayList<>();
 ListView list=new ListView();Dialog dialog=new Dialog();Adapter adapter=new Adapter();
-Button modeButton=new Button();TextView hint=new TextView(),status=new TextView();
+RadioGroup displaySelector=new RadioGroup();Button modeButton=new Button();TextView hint=new TextView(),status=new TextView();
 View selectionControls=new View(),batchActions=new View();
 List<Button> singleButtons=Arrays.asList(new Button()),batchButtons=Arrays.asList(new Button());
 '''+methods+'''

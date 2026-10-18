@@ -29,7 +29,9 @@ public final class LibraryScreen {
     private EditText query;
     private CheckBox favorites;
     private TextView status;
-    private ListView list;
+    private GridView list;
+    private boolean tiles;
+    private RadioGroup displaySelector;
     private Button stop;
     private Button modeButton;
     private TextView hint;
@@ -87,11 +89,15 @@ public final class LibraryScreen {
         hint=new TextView(activity);hint.setTextSize(12);body.addView(hint);
         query=new EditText(activity);query.setSingleLine(true);query.setHint("搜索编号或标题");body.addView(query);
         favorites=new CheckBox(activity);favorites.setText("仅显示收藏");body.addView(new ActionRow(activity,favorites,button("扫描保存目录",this::scan),button("刷新",this::load)));
-        modeButton=button("批量处理",()->setBatchMode(!batchMode));body.addView(modeButton);
+        modeButton=button("批量处理",()->setBatchMode(!batchMode));
+        tiles=DisplayMode.tiles(activity,"library");displaySelector=DisplayMode.selector(activity,"library",this::changeDisplay);
+        body.addView(new ActionRow(activity,modeButton,displaySelector));
         selectionControls=new LinearLayout(activity);selectionControls.setOrientation(LinearLayout.VERTICAL);
         row(selectionControls,button("全选",()->select(0)),button("反选",()->select(1)),button("取消选择",()->select(2)));body.addView(selectionControls);
         status=new TextView(activity);status.setTextSize(12);body.addView(status);
-        list=new ListView(activity);list.setChoiceMode(ListView.CHOICE_MODE_NONE);adapter=new CoverAdapter();list.setAdapter(adapter);
+        list=new GridView(activity);list.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);list.setHorizontalSpacing(dp(8));list.setVerticalSpacing(dp(4));
+        list.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol)updateColumns(r-l);});
+        list.setNumColumns(1);list.setChoiceMode(ListView.CHOICE_MODE_NONE);adapter=new CoverAdapter();list.setAdapter(adapter);
         list.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScroll(AbsListView v,int first,int count,int total){}public void onScrollStateChanged(AbsListView v,int state){if(state==SCROLL_STATE_IDLE)adapter.notifyDataSetChanged();}});
         root.addView(new ControlScroll(activity,body));root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
         LinearLayout actions=new LinearLayout(activity);actions.setOrientation(LinearLayout.VERTICAL);
@@ -119,6 +125,16 @@ public final class LibraryScreen {
         root.requestFocus();
         query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int before,int count){load();}public void afterTextChanged(Editable e){}});
         favorites.setOnCheckedChangeListener((b,c)->load());load();
+    }
+    private void updateColumns(int width){
+        int minimum=Math.round(dp(148)*Math.max(1f,activity.getResources().getConfiguration().fontScale));
+        int columns=DisplayMode.columns(width,minimum,dp(8),tiles);
+        if(columns!=list.getNumColumns()){Bundle state=viewportState();list.setNumColumns(columns);list.post(()->restoreViewport(state));}
+    }
+    private void changeDisplay(boolean value){
+        if(busy||loading)return;
+        Bundle state=viewportState();tiles=value;updateColumns(list.getWidth());adapter.notifyDataSetChanged();
+        list.post(()->restoreViewport(state));
     }
     private void read(LibraryStore.Entry entry){
         returningFromReader=true;
@@ -152,15 +168,15 @@ public final class LibraryScreen {
     }
     private void resetCovers(){coverGeneration++;coverWorker.getQueue().clear();coverPending.clear();coverCache.evictAll();}
     private final class CoverRow extends LinearLayout implements Checkable {
-        final ImageView image;final TextView placeholder;final CheckedTextView text;
+        final ImageView image;final TextView placeholder;final CheckedTextView text;final boolean tile=tiles;
         CoverRow(){
-            super(activity);setGravity(Gravity.CENTER_VERTICAL);setPadding(dp(4),dp(8),dp(4),dp(8));
+            super(activity);setOrientation(tile?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);setGravity(Gravity.CENTER_VERTICAL);setPadding(dp(4),dp(8),dp(4),dp(8));
             FrameLayout frame=new FrameLayout(activity);frame.setBackgroundColor(Color.rgb(232,237,241));
             image=new ImageView(activity);image.setScaleType(ImageView.ScaleType.FIT_CENTER);frame.addView(image,new FrameLayout.LayoutParams(-1,-1));
             placeholder=new TextView(activity);placeholder.setText("暂无\n封面");placeholder.setTextSize(12);placeholder.setGravity(Gravity.CENTER);placeholder.setTextColor(Color.rgb(97,115,135));frame.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
-            addView(frame,new LinearLayout.LayoutParams(dp(64),dp(86)));
-            text=new CheckedTextView(activity);text.setTextSize(14);text.setMaxLines(4);text.setEllipsize(TextUtils.TruncateAt.END);text.setPadding(dp(12),0,0,0);
-            addView(text,new LinearLayout.LayoutParams(0,-2,1));
+            addView(frame,new LinearLayout.LayoutParams(tile?-1:dp(64),dp(tile?136:86)));
+            text=new CheckedTextView(activity);text.setTextSize(14);text.setMaxLines(4);if(tile)text.setMinLines(4);text.setEllipsize(TextUtils.TruncateAt.END);text.setPadding(tile?dp(4):dp(12),tile?dp(6):0,0,0);
+            addView(text,tile?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
         }
         private void bindChoice(boolean show,boolean checked){
             if(show!=(text.getCheckMarkDrawable()!=null)){
@@ -176,7 +192,7 @@ public final class LibraryScreen {
     private final class CoverAdapter extends BaseAdapter {
         public int getCount(){return entries.size();}public Object getItem(int position){return entries.get(position);}public long getItemId(int position){return position;}
         public View getView(int position,View recycled,ViewGroup parent){
-            CoverRow row=recycled instanceof CoverRow?(CoverRow)recycled:new CoverRow();LibraryStore.Entry entry=entries.get(position);
+            CoverRow row=recycled instanceof CoverRow&&((CoverRow)recycled).tile==tiles?(CoverRow)recycled:new CoverRow();LibraryStore.Entry entry=entries.get(position);
             row.text.setText((entry.favorite?"★ ":"")+title(entry)+"\n"+entry.format.toUpperCase(Locale.ROOT)+" · "+entry.label);
             row.bindChoice(batchMode,selected.contains(entry.uri));
             Cover cover=coverCache.get(entry.uri);Bitmap bitmap=cover==null?null:cover.bitmap;
@@ -191,7 +207,7 @@ public final class LibraryScreen {
         }
     }
     private void cancel(){cancelled.set(true);if(scanSignal!=null)scanSignal.cancel();}
-    private void counts(){status.setText("共 "+entries.size()+" 项"+(batchMode?"，已选 "+selected.size()+" 项":"")+(report.isEmpty()?"":"\n"+report));modeButton.setEnabled(!busy&&!loading);for(Button b:singleButtons)b.setEnabled(!busy&&!loading&&selected.size()==1);for(Button b:batchButtons)b.setEnabled(!busy&&!loading&&!selected.isEmpty());}
+    private void counts(){status.setText("共 "+entries.size()+" 项"+(batchMode?"，已选 "+selected.size()+" 项":"")+(report.isEmpty()?"":"\n"+report));modeButton.setEnabled(!busy&&!loading);for(int i=0;i<displaySelector.getChildCount();i++)displaySelector.getChildAt(i).setEnabled(!busy&&!loading);for(Button b:singleButtons)b.setEnabled(!busy&&!loading&&selected.size()==1);for(Button b:batchButtons)b.setEnabled(!busy&&!loading&&!selected.isEmpty());}
     private void select(int mode){if(busy||loading||!batchMode)return;for(int i=0;i<entries.size();i++){String uri=entries.get(i).uri;boolean checked=mode==0||(mode==1&&!selected.contains(uri));if(checked)selected.add(uri);else selected.remove(uri);list.setItemChecked(i,checked);}counts();}
     private List<LibraryStore.Entry> selection(){List<LibraryStore.Entry> result=new ArrayList<>();for(LibraryStore.Entry e:entries)if(selected.contains(e.uri))result.add(e);return result;}
     private void acceptEntries(List<LibraryStore.Entry> result){

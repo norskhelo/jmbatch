@@ -29,6 +29,8 @@ class LibraryInteractionTest(unittest.TestCase):
         self.temp.cleanup()
 
     def event(self, name, index=0, dx=0, dy=0):
+        # A real pointer event targets the laid-out view after showing batch tools.
+        self.root.update()
         x, y, width, height = self.ui.tree.bbox(self.keys[index])
         self.ui.tree.event_generate(name, x=x+30+dx, y=y+height//2+dy)
         self.root.update()

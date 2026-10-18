@@ -22,7 +22,7 @@ for name, text in pager.items():
         stubs[name] = text
 view = stubs['android/view/View.java']
 view = view.replace(' public View(Context c)', ''' public float alpha=1;public int dispatches;
- public void setAlpha(float f){alpha=f;}public void requestLayout(){}public void post(Runnable r){r.run();}
+ public void setAlpha(float f){alpha=f;}public void post(Runnable r){r.run();}
  public void setClickable(boolean v){}public boolean onTouchEvent(MotionEvent e){return true;}
  public boolean dispatchTouchEvent(MotionEvent e){dispatches++;return onTouchEvent(e);}
  public View(Context c)''')

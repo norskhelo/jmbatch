@@ -60,7 +60,10 @@ class LibraryWindow:
         holder = ttk.Frame(body)
         holder.grid(row=3, column=0, sticky="nsew")
         ttk.Style(self.window).configure("Library.Treeview", rowheight=106)
-        self.tree = ttk.Treeview(holder, columns=("favorite", "id", "title", "format"), height=1, show="tree headings", selectmode="none", style="Library.Treeview")
+        from display_view import DisplayView, load_mode, mode_buttons
+        self.display_mode = tk.StringVar(value=load_mode(self.library.path.parent, "library"))
+        mode_buttons(select_bar, self.display_mode, self.change_display).pack(side="right", padx=12)
+        self.tree = DisplayView(holder, kind="library", columns=("favorite", "id", "title", "format"), height=1, show="tree headings", selectmode="none", style="Library.Treeview")
         self.tree.heading("#0", text="封面")
         self.tree.column("#0", width=92, minwidth=92, stretch=False)
         from PIL import Image, ImageDraw, ImageTk
@@ -112,6 +115,7 @@ class LibraryWindow:
                 button.pack(side="left", padx=(0, 6))
                 self.action_buttons[action] = button
         self.refresh()
+        self.tree.set_mode(self.display_mode.get())
         self.window.update_idletasks()
         # Leave at least a heading and a few rows after honoring the actual font metrics.
         fixed_height = body.winfo_reqheight() - holder.winfo_reqheight()
@@ -120,6 +124,18 @@ class LibraryWindow:
         self.update_mode()
         self.cover_timer = self.window.after(100, self.poll_covers)
         self.window.bind("<Destroy>", self.cover_destroyed, add="+")
+
+    def change_display(self):
+        from display_view import save_mode
+        if self.busy:
+            self.display_mode.set(self.tree.mode)
+            return
+        self.cancel_press()
+        self.tree.set_mode(self.display_mode.get())
+        try:
+            save_mode(self.library.path.parent, "library", self.display_mode.get())
+        except OSError as exc:
+            self.status.set(f"显示方式未能保存：{exc}")
 
     def cover_destroyed(self, event):
         if event.widget == self.window:
@@ -137,7 +153,7 @@ class LibraryWindow:
     def press(self, event):
         self.cancel_press()
         self.row_press = False
-        key = self.tree.identify_row(event.y)
+        key = self.tree.identify_at(event.x, event.y)
         if self.busy:
             return "break"
         if not key or self.tree.identify_region(event.x, event.y) not in ("tree", "cell"):
@@ -172,7 +188,7 @@ class LibraryWindow:
         row_press, self.row_press = self.row_press, False
         pressed = self.pressed
         self.cancel_press()
-        if (pressed and not self.busy and self.tree.identify_row(event.y) == pressed[0]
+        if (pressed and not self.busy and self.tree.identify_at(event.x, event.y) == pressed[0]
                 and abs(event.x-pressed[1]) <= 8 and abs(event.y-pressed[2]) <= 8):
             if self.batch_mode:
                 key = pressed[0]
@@ -258,7 +274,7 @@ class LibraryWindow:
         except queue.Empty:
             pass
         # Request only visible rows; Tk images are created only on Tk's thread.
-        visible = dict.fromkeys(self.tree.identify_row(y) for y in range(0, self.tree.winfo_height(), 20))
+        visible = self.tree.visible_keys()
         for key in visible:
             if not key:
                 continue
@@ -306,7 +322,7 @@ class LibraryWindow:
         selected = self.tree.selection() if same_filter and self.batch_mode else ()
         children = self.tree.get_children()
         focus = self.tree.focus() if same_filter else ""
-        position = self.tree.yview()[0] * len(children) if children else 0
+        position = self.tree.item_position() if children else 0
         first = min(int(position), max(0, len(children) - 1))
         self.filter = current_filter
         items = self.library.select(*current_filter)
@@ -335,7 +351,7 @@ class LibraryWindow:
             # Keep the first visible comic in place, even if rows above it changed.
             anchor = next((k for k in children[first:] if k in present), None)
             top = keys.index(anchor) if anchor else min(first, len(keys) - 1)
-            self.tree.yview_moveto((top + position - int(position)) / len(keys))
+            self.tree.move_to_index(top + position - int(position))
             if focus in present:
                 self.tree.focus(focus)
         elif not same_filter:

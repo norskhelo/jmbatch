@@ -718,6 +718,19 @@ def run_self_test(directory: Path):
         from library_state_checks import check_library_state
         check_library_state(root, directory)
         report["checks"].append("Library state survives reader open/close, repeated window reuse and favorite refresh: filters, batch choices, focus and scroll anchor")
+        from display_view import load_mode
+        keys = application.tree.get_children()
+        if keys:
+            application.tree.selection_set(keys[0])
+        selection = application.tree.selection()
+        for mode in ('tiles', 'list', 'tiles', 'list'):
+            application.download_mode.set(mode)
+            application.change_display()
+            root.update()
+            assert application.tree.mode == mode and application.tree.selection() == selection
+            assert application.tree.get_children() == keys
+            assert load_mode(application.home, 'downloads') == mode
+        report["checks"].append("Download display switches repeatedly between list and responsive tiles with task identities, selection and saved mode intact")
         root.destroy()
         report["ok"] = True
     except Exception:

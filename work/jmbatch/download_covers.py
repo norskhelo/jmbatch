@@ -97,7 +97,7 @@ class DownloadCovers:
         except queue.Empty:
             pass
         now = time.monotonic()
-        visible = dict.fromkeys(self.tree.identify_row(y) for y in range(0, self.tree.winfo_height(), 20))
+        visible = self.tree.visible_keys() if hasattr(self.tree, "visible_keys") else dict.fromkeys(self.tree.identify_row(y) for y in range(0, self.tree.winfo_height(), 20))
         for key in visible:
             if key not in by_key or key in self.pending:
                 continue
