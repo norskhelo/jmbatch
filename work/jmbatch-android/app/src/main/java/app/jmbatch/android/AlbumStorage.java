@@ -64,7 +64,7 @@ public final class AlbumStorage {
         Node found=null;for(Node node:children(context,parent))if(node.name.equals(name)){if(found!=null)throw new IOException("目录含同名文件");found=node;}
         if(found==null)throw new FileNotFoundException(name);return found;
     }
-    private static File index(Context context,Uri folder)throws Exception {
+    static File index(Context context,Uri folder)throws Exception {
         byte[] digest=java.security.MessageDigest.getInstance("SHA-256").digest(folder.toString().getBytes(StandardCharsets.UTF_8));
         StringBuilder name=new StringBuilder();for(byte b:digest)name.append(String.format(Locale.ROOT,"%02x",b&255));
         return new File(new File(context.getFilesDir(),"albums"),name+".json");
@@ -78,6 +78,10 @@ public final class AlbumStorage {
         if(file.exists()&&!file.delete())throw new IOException("无法删除任务图片索引");
     }
     private static JSONObject scan(Context context,Uri folder)throws Exception {
+        return scan(context,folder,()->{},count->{});
+    }
+    interface ScanProgress { void update(int count); }
+    static JSONObject scan(Context context,Uri folder,Check check,ScanProgress progress)throws Exception {
         File local=local(context,folder);String name;
         if(local!=null)name=local.getName();
         else try(Cursor c=context.getContentResolver().query(folder,new String[]{"_display_name"},null,null,null)){
@@ -87,19 +91,22 @@ public final class AlbumStorage {
         if(!match.matches())throw new IOException("无法识别图片目录名称");
         JSONArray records=new JSONArray();Map<Integer,SortedSet<Integer>> order=new TreeMap<>();
         for(Node node:children(context,folder)){
-            if(!node.directory&&node.name.matches("[0-9]{5,}\\.jpg"))scanImage(context,records,order,node,1,node.name);
-            else if(node.directory&&node.name.matches("[0-9]{4,}"))for(Node image:children(context,node.uri))
-                if(!image.directory&&image.name.matches("[0-9]{5,}\\.jpg"))scanImage(context,records,order,image,Integer.parseInt(node.name),node.name+"/"+image.name);
+            check.run();
+            if(!node.directory&&node.name.matches("[0-9]{5,}\\.jpg")){scanImage(context,records,order,node,1,node.name,check);progress.update(records.length());}
+            else if(node.directory&&node.name.matches("[0-9]{4,}"))for(Node image:children(context,node.uri)){
+                check.run();
+                if(!image.directory&&image.name.matches("[0-9]{5,}\\.jpg")){scanImage(context,records,order,image,Integer.parseInt(node.name),node.name+"/"+image.name,check);progress.update(records.length());}
+            }
         }
         int chapter=0;for(Map.Entry<Integer,SortedSet<Integer>> group:order.entrySet()){
             if(group.getKey()!=++chapter)throw new IOException("章节不连续");int page=0;for(int p:group.getValue())if(p!=++page)throw new IOException("页码不连续");
         }
         return new JSONObject().put("version",AlbumRules.LAYOUT_VERSION).put("id",match.group(1)).put("title",match.group(2)).put("entries",records);
     }
-    private static void scanImage(Context context,JSONArray records,Map<Integer,SortedSet<Integer>> order,Node image,int chapter,String relative)throws Exception {
+    private static void scanImage(Context context,JSONArray records,Map<Integer,SortedSet<Integer>> order,Node image,int chapter,String relative,Check check)throws Exception {
         int page=Integer.parseInt(image.name.substring(0,image.name.length()-4));
         if(!order.computeIfAbsent(chapter,k->new TreeSet<>()).add(page)||records.length()>=20000)throw new IOException("图片数量或页码无效");
-        long size=image.size;if(size<0){size=0;try(InputStream in=open(context,image.uri)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1)size+=n;}}
+        long size=image.size;if(size<0){size=0;try(InputStream in=open(context,image.uri)){byte[] b=new byte[65536];int n;while((n=in.read(b))!=-1){check.run();size+=n;}}}
         records.put(new JSONObject().put("chapter",chapter).put("page",page).put("file",relative).put("size",size));
     }
     public static Album load(Context context,Uri folder)throws Exception {

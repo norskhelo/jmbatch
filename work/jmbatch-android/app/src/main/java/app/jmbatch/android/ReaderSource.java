@@ -12,7 +12,7 @@ import java.util.zip.*;
 /** One worker owns all open handles. ZIPs and PDFs are rendered page by page. */
 public final class ReaderSource implements AutoCloseable {
     private final Context context;
-    private AlbumStorage.Album album;
+    private ReaderAlbum album;
     private ZipFile zip;
     private List<ArchivePages.Page> archive;
     private PdfRenderer pdf;
@@ -20,12 +20,14 @@ public final class ReaderSource implements AutoCloseable {
     private File temporary;
     public int[] chapters,pageNumbers;
     public ReaderSource(Context context,LibraryStore.Entry entry,AlbumStorage.Check cancelled)throws Exception {
+        this(context,entry,cancelled,text->{});
+    }
+    public ReaderSource(Context context,LibraryStore.Entry entry,AlbumStorage.Check cancelled,ReaderAlbum.Progress progress)throws Exception {
         this.context=context;
         try{
             Uri uri=Uri.parse(entry.uri);cancelled.run();
             if(entry.format.equals("images")){
-                album=AlbumStorage.load(context,uri);chapters=new int[album.images.size()];pageNumbers=new int[chapters.length];
-                for(int i=0;i<chapters.length;i++){chapters[i]=album.images.get(i).chapter;pageNumbers[i]=album.images.get(i).page;}
+                album=new ReaderAlbum(context,uri,cancelled,progress);chapters=album.chapters;pageNumbers=album.pageNumbers;
             }else if(entry.format.equals("zip")){
                 File input=AlbumStorage.local(context,uri);
                 if(input==null)input=copy(uri,".zip",cancelled);
@@ -55,12 +57,17 @@ public final class ReaderSource implements AutoCloseable {
         }
         return temporary;
     }
-    private InputStream image(int index)throws IOException {
-        long size=zip!=null?archive.get(index).entry.getSize():album.images.get(index).size;
+    private InputStream image(int index)throws Exception {
+        AlbumStorage.Image page=zip==null?album.image(index):null;
+        long size=zip!=null?archive.get(index).entry.getSize():page.size;
         if(size>ArchivePages.MAX_IMAGE_BYTES)throw new IOException("图片文件过大");
-        InputStream stream=zip!=null?zip.getInputStream(archive.get(index).entry):AlbumStorage.open(context,album.images.get(index).uri);
+        InputStream stream=zip!=null?zip.getInputStream(archive.get(index).entry):AlbumStorage.open(context,page.uri);
         return new BufferedInputStream(stream);
     }
+    public boolean hasChecks(){return album!=null&&album.pending();}
+    public Map<Integer,String> check(int anchor)throws Exception {return album==null?Collections.emptyMap():album.check(anchor);}
+    public String progress(){return album==null?"":(album.pending()?"后台检查 ":"检查完成 ")+album.checked()+"/"+chapters.length+" 页"+(album.failed()>0?" · "+album.failed()+" 页异常，可跳过":"");}
+    public void retry(int index){if(album!=null)album.retry(index);}
     public Bitmap render(int index,int width,int height)throws Exception {
         if(Thread.currentThread().isInterrupted())throw new InterruptedIOException();
         if(pdf!=null){

@@ -28,5 +28,14 @@ and landscape screens, including cases where only one row fits onscreen.
 The main activity also ignores the obsolete download tile preference and uses
 the vertical download list.
 
+ReaderAlbumRuntimeTest exercises the production reader with synthetic image
+folders, persistent page metadata and a counting Android content provider.
+It covers opening a saved page in a 5000-page book before whole-book validation,
+forward checks across chapter boundaries, jumping priorities, old and flat
+layouts, missing/changed images, corrupt-index recovery and cancellation.
+Both scrolling and paging are opened through ReaderActivity; the tests check
+saved position, bounded image cache/request queue and worker shutdown. Provider
+query counts establish lazy chapter access, not real phone storage timings.
+
 For a before/after proof, pass `--library-source <path-to-old-LibraryScreen.java>`
 and a separate run ID. The production tree is never replaced by that option.

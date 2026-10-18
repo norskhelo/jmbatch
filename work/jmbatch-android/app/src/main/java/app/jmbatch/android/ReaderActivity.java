@@ -26,6 +26,12 @@ public final class ReaderActivity extends Activity {
     private final ReaderRequests requests=new ReaderRequests();
     private static final ExecutorService historyWorker=Executors.newSingleThreadExecutor();
     private final Map<Integer,String> errors=new HashMap<>();
+    private final Set<Integer> retries=new HashSet<>();
+    private boolean checking,checkScheduled,firstPageAttempted;
+    private String checkStatus="";
+    private long openingNoticeTime;
+    private final Runnable refreshVisible=()->loadVisible();
+    private final Runnable backgroundCheck=()->checkBackground();
     private final TreeSet<Integer> marks=new TreeSet<>();
     private LibraryStore.Entry entry;
     private ReaderSource source;
@@ -67,7 +73,7 @@ public final class ReaderActivity extends Activity {
         viewport.setOnClickListener(v->{if(ready&&!closed){chrome.toggle();updateChromeDescription();}});
         LinearLayout navigation=new LinearLayout(this);navigation.setOrientation(LinearLayout.VERTICAL);
         navigation.setPadding(dp(6),dp(4),dp(6),dp(4));
-        status=new TextView(this);status.setText("正在读取漫画…\n首次打开外部 ZIP 可能需要一些时间，点击返回可取消。");status.setTextSize(12);status.setLines(3);status.setEllipsize(android.text.TextUtils.TruncateAt.END);status.setGravity(Gravity.CENTER);navigation.addView(status);
+        status=new TextView(this);status.setText(entry.format.equals("images")?"正在读取页面索引…\n将优先打开上次阅读页及后续页面。":"正在读取漫画…\n外部 ZIP 需要准备本地副本，点击返回可取消。");status.setTextSize(12);status.setLines(3);status.setEllipsize(android.text.TextUtils.TruncateAt.END);status.setGravity(Gravity.CENTER);navigation.addView(status);
         row(navigation,button("‹ 上一页",()->step(-1)),button("跳转页码",this::jumpPage),button("下一页 ›",()->step(1)));
         chrome=new ReaderChrome(this,new ControlScroll(this,controls),new ControlScroll(this,navigation),viewport,()->{
             if(closed)return;
@@ -84,10 +90,13 @@ public final class ReaderActivity extends Activity {
                 LibraryStore library=LibraryStore.get(this);Store store=Store.get(this);
                 synchronized(store){library.sync(new ArrayList<>(store.tasks));}
                 for(LibraryStore.Entry item:library.list("",false))if(item.uri.equals(entry.uri)){entry=item;break;}
-                source=new ReaderSource(getApplicationContext(),entry,()->{if(closed||Thread.currentThread().isInterrupted())throw new InterruptedIOException("已关闭阅读器");});
+                source=new ReaderSource(getApplicationContext(),entry,()->{if(closed||Thread.currentThread().isInterrupted())throw new InterruptedIOException("已关闭阅读器");},text->{
+                    long now=System.nanoTime();if(now-openingNoticeTime<100_000_000L)return;openingNoticeTime=now;
+                    main.post(()->{if(!closed&&!ready)status.setText(text+"\n完成后优先打开上次阅读页，点击返回可取消。");});
+                });
                 library.importFound(Collections.singletonList(entry));
                 main.post(()->{
-                    if(closed)return;chapters=source.chapters;pageNumbers=source.pageNumbers;starts=ReaderRules.starts(chapters);restore();ready=true;viewport.post(()->{if(!closed){buildPages();update();}});
+                    if(closed)return;chapters=source.chapters;pageNumbers=source.pageNumbers;starts=ReaderRules.starts(chapters);restore();ready=true;checkStatus=entry.format.equals("images")?"正在加载第 "+(page+1)+" 页，随后检查后续 4 页":"";viewport.post(()->{if(!closed){buildPages();update();}});
                 });
             }catch(Exception|OutOfMemoryError error){main.post(()->{if(!closed){status.setText("无法阅读："+error.getMessage());message("无法阅读，请检查文件和目录授权："+error.getMessage());}});}
         });
@@ -130,7 +139,7 @@ public final class ReaderActivity extends Activity {
         if(!ready)return;
         int chapter=ReaderRules.chapter(starts,page);
         chapterButton.setText("第 "+chapters[page]+" 章");
-        status.setText(statusText()+"\n点按漫画隐藏或显示工具栏"+(!scroll?" · 左右滑动翻页":""));
+        status.setText(statusText()+"\n"+(checkStatus.isEmpty()?"点按漫画隐藏或显示工具栏"+(!scroll?" · 左右滑动翻页":""):checkStatus));
     }
     private String statusText(){
         int chapter=ReaderRules.chapter(starts,page),end=chapter+1<starts.size()?starts.get(chapter+1):chapters.length;
@@ -151,7 +160,7 @@ public final class ReaderActivity extends Activity {
             updateChromeDescription();
             list.setOnScrollListener(new AbsListView.OnScrollListener(){
                 public void onScrollStateChanged(AbsListView view,int state){if(state==SCROLL_STATE_IDLE)loadVisible();}
-                public void onScroll(AbsListView view,int first,int count,int total){if(count>0){page=first;update();scheduleSave();}}
+                public void onScroll(AbsListView view,int first,int count,int total){if(count>0){page=first;update();scheduleSave();main.removeCallbacks(refreshVisible);main.post(refreshVisible);}}
             });
         }else{
             list=null;pager=new ReaderPager(this,chapters.length,page,new ReaderPager.Listener(){
@@ -184,8 +193,9 @@ public final class ReaderActivity extends Activity {
         if(target!=noticeTarget){noticeTarget=target;main.removeCallbacks(loadingNotice);update();main.postDelayed(loadingNotice,180);}
         ReaderRequests.Job first=job(target);
         long estimate=Math.min(4000000L,(long)Math.min(1600,first.width)*Math.min(8192,first.height))*4;
-        int limit=(int)Math.max(1,Math.min(3,32L*1024*1024/Math.max(1,estimate)));
-        int[] desired=pager.busy()?new int[]{target}:new int[]{target,target+pager.direction(),target-pager.direction()};
+        int limit=(int)Math.max(1,Math.min(6,32L*1024*1024/Math.max(1,estimate)));
+        int direction=pager.direction();
+        int[] desired=pager.busy()?new int[]{target}:new int[]{target,target+direction,target+2*direction,target+3*direction,target+4*direction,target-direction};
         int count=0;for(int index:desired){
             if(index<0||index>=chapters.length)continue;if(count++>=limit)break;
             ReaderRequests.Job candidate=job(index);if(cache.get(candidate.key)==null&&!errors.containsKey(index))jobs.add(candidate);
@@ -194,28 +204,64 @@ public final class ReaderActivity extends Activity {
         if(errors.containsKey(target)){main.removeCallbacks(loadingNotice);status.setText(statusText()+"\n第 "+(target+1)+" 页读取失败，可跳过或再次跳转重试："+errors.get(target));}
     }
     private void pump(){
-        if(closed)return;
-        ReaderRequests.Job job=requests.take();if(job==null)return;
+        if(closed||checking)return;
+        ReaderRequests.Job job=requests.take();if(job==null){scheduleCheck();return;}
+        boolean retry=retries.remove(job.index);
         try{worker.execute(()->{
             Bitmap result=null;String failure=null;
-            try{if(!closed&&job.generation==generation){result=source.render(job.index,job.width,job.height);result.prepareToDraw();}}catch(Exception|OutOfMemoryError error){failure=error.getMessage()==null?"页面无法解码":error.getMessage();}
-            final Bitmap loaded=result;final String error=failure;
+            try{if(!closed&&job.generation==generation){if(retry)source.retry(job.index);result=source.render(job.index,job.width,job.height);result.prepareToDraw();}}catch(Exception|OutOfMemoryError error){failure=error.getMessage()==null?"页面无法解码":error.getMessage();}
+            final Bitmap loaded=result;final String error=failure;final String progress=source.progress();
             main.post(()->{
                 requests.complete(job);
                 if(closed||job.generation!=generation){if(loaded!=null)loaded.recycle();pump();return;}
                 if(loaded!=null)cache.put(job.key,loaded);else errors.put(job.index,error);
+                if(job.index==(pager!=null?pager.target():page))firstPageAttempted=true;
+                checkStatus=progress;update();
                 loadVisible();pump();
             });
         });}catch(RejectedExecutionException error){requests.complete(job);}
     }
     private void loadVisible(){
         if(closed||!ready)return;
-        if(scroll&&list!=null){for(int i=0;i<list.getChildCount();i++){View row=list.getChildAt(i);if(row instanceof PageRow)bind((PageRow)row,list.getFirstVisiblePosition()+i);}}
+        if(scroll&&list!=null){
+            requests.clear();int first=list.getFirstVisiblePosition(),count=list.getChildCount();long budget=32L*1024*1024;
+            for(int i=0;i<count;i++){
+                int index=first+i;if(index>=chapters.length)break;
+                View row=list.getChildAt(i);if(row instanceof PageRow)bind((PageRow)row,index);
+                Bitmap image=cache.get(job(index).key);budget-=image==null?16_000_000:image.getByteCount();
+            }
+            // Current visible rows always win. Unknown images reserve the maximum decoded size.
+            for(int i=first+count;count>0&&i<Math.min(chapters.length,first+count+4);i++){
+                ReaderRequests.Job next=job(i);Bitmap image=cache.get(next.key);long bytes=image==null?16_000_000:image.getByteCount();
+                if(bytes>budget)break;budget-=bytes;
+                if(image==null&&!errors.containsKey(i))requests.offer(next);
+            }
+            pump();
+        }
         else if(pager!=null)planPages();
+    }
+    private void scheduleCheck(){
+        if(closed||checksFinished||checking||checkScheduled||requests.running()||!ready||!firstPageAttempted||!entry.format.equals("images"))return;
+        checkScheduled=true;main.postDelayed(backgroundCheck,40);
+    }
+    private boolean checksFinished;
+    private void checkBackground(){
+        checkScheduled=false;
+        if(closed||checksFinished||checking||requests.running())return;
+        if(requests.waiting()>0){pump();return;}
+        checking=true;final int anchor=pager!=null?pager.target():page;
+        try{worker.execute(()->{
+            Map<Integer,String> failed=Collections.emptyMap();String progress="";boolean done=false;
+            try{failed=source.check(anchor);progress=source.progress();done=!source.hasChecks();}
+            catch(Exception|OutOfMemoryError error){progress="后台检查已暂停，可继续阅读";done=true;}
+            final Map<Integer,String> failures=failed;final String text=progress;final boolean finished=done;
+            main.post(()->{checking=false;if(closed)return;errors.putAll(failures);checkStatus=text;checksFinished=finished;update();loadVisible();pump();});
+        });}catch(RejectedExecutionException error){checking=false;}
     }
     private void go(int target){
         if(!ready)return;
         target=ReaderRules.clamp(target,chapters.length);
+        if(errors.remove(target)!=null)retries.add(target);
         if(!scroll&&pager!=null){
             errors.remove(target);main.removeCallbacks(loadingNotice);update();pager.go(target);main.postDelayed(loadingNotice,180);return;
         }
@@ -256,7 +302,7 @@ public final class ReaderActivity extends Activity {
     @Override protected void onPause(){main.removeCallbacks(savePosition);save();super.onPause();}
     @Override public void onBackPressed(){if(chrome!=null&&!chrome.controlsVisible()){chrome.show(true);updateChromeDescription();}else super.onBackPressed();}
     @Override protected void onDestroy(){
-        closed=true;if(chrome!=null)chrome.dispose();main.removeCallbacks(savePosition);main.removeCallbacks(loadingNotice);requests.clear();if(pager!=null)pager.dispose();
+        closed=true;if(chrome!=null)chrome.dispose();main.removeCallbacks(savePosition);main.removeCallbacks(loadingNotice);main.removeCallbacks(refreshVisible);main.removeCallbacks(backgroundCheck);requests.clear();if(pager!=null)pager.dispose();
         worker.execute(()->{if(source!=null)source.close();});worker.shutdown();libraryWorker.shutdown();cache.evictAll();super.onDestroy();
     }
 }

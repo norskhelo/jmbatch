@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.21 / Android 0.5.19 — 下载列表与漫画库四列平铺\n\n显示调整\n\n• 下载页移除平铺显示及显示方式切换，统一使用列表。升级前保存的下载平铺设置不再生效，原任务、下载进度及操作保留。\n• 漫画库继续支持“列表 / 平铺”切换；平铺固定每行 4 本，卡片宽度随窗口或屏幕调整，末行不足 4 本时按实际数量显示。\n• 漫画库保留搜索、收藏筛选、批量选择和浏览位置，以及 Android 触摸模式下进入漫画库的闪退修复。\n\n版本与验证\n\n• Windows 0.3.20 → 0.3.21；Android 0.5.18 → 0.5.19（versionCode 519）。沿用原 Android 包名、APK 签名证书及更新公钥。\n• 验证下载列表、漫画库四列布局、显示切换与选择保留；执行 Windows 回归及源码/成品自检、Android 宿主回归、Android 10 触摸模式框架回归及原签名构建。\n• Android 框架回归覆盖窄屏、大字号及横屏布局；未连接 Android 真机，手机视觉和手势效果仍需设备验证。\n";
+    private static final String CURRENT_NOTES="Android 0.5.20 — 图片文件夹阅读提速\n\n更新内容\n\n• 图片文件夹阅读复用已有页面索引，优先打开上次阅读页，不再等待整本逐页文件检查完成后才显示漫画。\n• 优先检查当前页及后续 4 页，跨章节同样有效；滚动和左右翻页按内存预算预加载后续图片，优先保障连续阅读。\n• 其余页面在后台分批检查，当前阅读、翻页和跳章请求优先；显示索引建立、页面加载和后台检查进度。\n• 缺失或损坏的索引尝试从可识别的图片目录重建并保存；保留旧版目录布局支持。缺图和大小变化按页提示，不阻止阅读其他正常页面，再次跳转可重试。\n• 保留章节、书签、阅读位置、沉浸阅读和漫画库状态；图片缓存保持 32 MiB 上限，关闭阅读器停止后续检查。导出和删除继续使用完整校验。\n\n版本与验证\n\n• Android 0.5.19 → 0.5.20，versionCode 520；Windows 保持 0.3.21。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。\n• Android 10 框架回归覆盖 5000 页索引、外部目录按章读取、后续页面优先、滚动/翻页恢复、缺图重试、索引恢复与取消，并保留漫画库触摸模式回归；执行完整宿主回归、编译与原证书签名核验。\n• 测试使用合成文件及 Android 框架环境；未取得手机实测耗时，不承诺具体提速倍数。无索引的旧漫画首次打开仍需建立索引；外部存储单次目录查询的等待时间取决于存储服务。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

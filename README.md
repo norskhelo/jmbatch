@@ -2,20 +2,20 @@
 
 支持 Windows 和 Android 的批量漫画下载工具。下载可选择 PDF、ZIP 或图片文件夹，三种成品可离线互相导出。
 
-当前源码及正式版本：**Windows 0.3.21 / Android 0.5.19（versionCode 519）**。下载页统一列表显示，漫画库平铺固定每行 4 本，保留列表切换、批量选择与浏览位置。安装包、更新日志与镜像入口见下方。
+当前源码及正式版本：**Windows 0.3.21 / Android 0.5.20（versionCode 520）**。Android 图片文件夹复用索引，优先打开上次阅读页及后续页面，其余页面后台检查并显示进度。安装包、更新日志与镜像入口见下方。
 
 ## 下载安装包（含国内镜像）
 
 GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
 
-当前正式版为 **Windows 0.3.21 / Android 0.5.19**（[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.21-0.5.19)、[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.21-0.5.19)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+当前正式版为 **Windows 0.3.21 / Android 0.5.20**（[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.21-0.5.19)、[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-android-0.5.20)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
 
 | 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
 | --- | --- | --- | --- |
 | Windows 0.3.21 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.3.21-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.3.21-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.3.21-Windows-x64.zip) |
-| Android 0.5.19 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.5.19-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.5.19-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/JMBatch-0.5.19-Android.apk) |
+| Android 0.5.20 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.20/JMBatch-0.5.20-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.20/JMBatch-0.5.20-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.20/JMBatch-0.5.20-Android.apk) |
 | Windows 0.3.21 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/SHA256-release-0.3.21-0.5.19.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/SHA256-release-0.3.21-0.5.19.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/SHA256-release-0.3.21-0.5.19.txt) |
-| Android 0.5.19 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/SHA256-release-0.3.21-0.5.19.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/SHA256-release-0.3.21-0.5.19.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.21-0.5.19/SHA256-release-0.3.21-0.5.19.txt) |
+| Android 0.5.20 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.20/SHA256-release-android-0.5.20.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.20/SHA256-release-android-0.5.20.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.5.20/SHA256-release-android-0.5.20.txt) |
 
 镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像同时用于手动下载及本版应用内更新文件下载的自动回退，版本查询仍使用 GitHub API，应用内更新仓库填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
 
@@ -47,6 +47,8 @@ GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或�
 下载列表会在首章第一页成功下载后自动显示封面，无需等待整本完成；暂停、继续和重启后可从缓存恢复。尚未就绪或无法读取时显示占位，完成后优先使用已保存的小尺寸封面，缺失时从 PDF、ZIP 或文件夹成品读取并缓存。漫画库首次成功读取后持久缓存封面，关闭重开及重启软件可复用；新下载漫画在清理临时图片前预生成，减少大文件重复读取。缓存总计最多 128 MiB / 4096 项，按可用文件元数据检查变化，损坏时重建，移除记录时清理。
 
 ## 内置阅读器
+
+Android 图片文件夹复用页面索引，先打开上次阅读页，优先检查后续 4 页并按内存预算预加载；其余页面后台分批检查，显示加载及检查进度。当前阅读请求优先，异常按页提示并允许再次跳转重试。缺失索引的旧目录首次打开需先建立索引。
 
 在任务列表或漫画库中打开漫画，即可使用内置阅读器。从漫画库进入阅读会保留原页面，返回继续原来的搜索、收藏筛选、滚动位置和批量选择；阅读中修改收藏会同步刷新，尽量保留当前可见漫画的位置。支持章节切换、本章/总页码、跳页、快捷收藏、书签列表及跳转；再次打开恢复上次页码和模式。上下滚动时相邻图片无间隔直接相接，页码显示在状态栏；原图自身的白边保留。滚动阅读与左右翻页可随时切换，轻点漫画隐藏或恢复工具栏，并有平滑过渡。Windows 使用滚轮、方向键或左右拖动，Android 使用上下滚动或左右滑动。Windows 按 Esc、Android 隐藏时按返回也可恢复工具栏。PDF 按一个章节显示。阅读记录绑定原文件路径/地址；移动文件或清除应用数据后不自动迁移。Android 外部 ZIP 首次打开需准备临时缓存，返回可取消，关闭后清理。
 

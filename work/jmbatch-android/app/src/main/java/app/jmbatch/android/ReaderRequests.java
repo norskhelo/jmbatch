@@ -23,4 +23,5 @@ public final class ReaderRequests {
     public void complete(Job job){if(active==job)active=null;}
     public void clear(){queued.clear();}
     public int waiting(){return queued.size();}
+    public boolean running(){return active!=null;}
 }
