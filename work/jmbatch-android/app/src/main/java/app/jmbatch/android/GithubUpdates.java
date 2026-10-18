@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.17 / Android 0.5.13 — 漫画库批量导出\n\n漫画库\n\n• 批量处理支持一次导出多本漫画。长按进入批量模式，勾选多本后点击“导出漫画”，统一选择导出格式和保存目录。\n• 支持混选图片文件夹、ZIP 和 PDF，逐本导出为独立文件，不合并不同漫画；保留纯编号命名和按章节分别导出 PDF 的选项。\n• 导出时显示当前漫画和总进度，结束后汇总成功、失败、未处理的漫画数量及已保存项目数，并将已导出的结果加入漫画库。\n• 单本失败后继续处理其余漫画；同名文件拒绝覆盖并列出失败原因。停止导出会清理当前漫画未完成的输出，保留此前完成的结果和全部源漫画。\n• Android 停止导出后保持进度提示，等待清理与汇总完成；完成后刷新漫画库。导出前继续检查下载与其他文件操作状态。\n\n版本与验证\n\n• Windows 0.3.16 → 0.3.17；Android 0.5.12 → 0.5.13（versionCode 513）。保留原应用包名、APK 签名证书和更新公钥。\n• 保留已有漫画、收藏、阅读进度、书签和下载设置，延续点击阅读、长按批量处理的操作方式。\n• 验证覆盖 Windows 混合格式实际导出、失败继续、取消回滚、界面及冻结成品，Android 生产批量调度宿主回归、完整构建与签名校验。未连接 Android 真机，手机界面及目录授权流程仍需设备验证。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.18 / Android 0.5.14 — 阅读保留漫画库\n\n漫画库与阅读\n\n• 从漫画库进入阅读后保留原漫画库页面，返回时继续原来的浏览位置，无需重新打开漫画库。\n• 保留搜索文字、仅显示收藏筛选、列表滚动位置，以及批量处理模式和已选漫画。\n• 阅读中修改收藏后，漫画库同步显示最新结果，并尽量保持当前可见漫画的位置；该漫画不再符合筛选时，显示附近仍符合条件的漫画。\n• Windows 再次打开已有漫画库窗口或刷新列表时保留位置与选择，避免阅读后返回列表顶部。\n• Android 返回阅读前的漫画库时收起搜索键盘，并保存页面状态供系统重建主页面时恢复。主动关闭漫画库仍正常关闭并释放资源。\n\n版本与验证\n\n• Windows 0.3.17 → 0.3.18；Android 0.5.13 → 0.5.14（versionCode 514）。沿用原 Android 包名、APK 签名证书和更新公钥。\n• 验证覆盖 Windows 实际漫画库/阅读器窗口、反复进出、收藏筛选与列表变化，以及源码和冻结成品；Android 覆盖生产状态处理器宿主回归、状态保存恢复、完整构建和原签名核验。\n• 未连接 Android 真机，返回界面、系统回收重建及输入法的设备表现仍需真机确认。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

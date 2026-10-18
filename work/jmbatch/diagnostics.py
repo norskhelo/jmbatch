@@ -715,6 +715,9 @@ def run_self_test(directory: Path):
         from update_download_checks import check_update_download
         check_update_download(directory)
         report["checks"].append("Update downloads: GitHub/GHFast/GH-Proxy fallback resets partial bytes and progress; cancellation and SHA-256 rejection retained")
+        from library_state_checks import check_library_state
+        check_library_state(root, directory)
+        report["checks"].append("Library state survives reader open/close, repeated window reuse and favorite refresh: filters, batch choices, focus and scroll anchor")
         root.destroy()
         report["ok"] = True
     except Exception:

@@ -10,6 +10,7 @@ import android.util.LruCache;
 import android.os.*;
 import android.text.*;
 import android.view.*;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -43,6 +44,8 @@ public final class LibraryScreen {
     private int coverGeneration;
     private List<LibraryStore.Entry> entries=new ArrayList<>();
     private boolean busy,loading;
+    private boolean returningFromReader;
+    private Bundle pendingViewState;
     private int generation;
     private String filter="",report="";
     private volatile CancellationSignal scanSignal;
@@ -52,8 +55,33 @@ public final class LibraryScreen {
     private String title(LibraryStore.Entry e){return e.id.isEmpty()?e.title:"JM"+e.id+" · "+e.title;}
     private Button button(String text,Runnable action){Button b=new ActionButton(activity);b.setText(text);b.setTextSize(12);b.setOnClickListener(v->{if(!busy&&!loading)action.run();});return b;}
     private void row(LinearLayout body,Button... buttons){body.addView(new ActionRow(activity,buttons));}
-    public void show(){
+    public boolean isOpen(){return visible();}
+    public void close(){if(dialog!=null)dialog.dismiss();}
+    public void resume(){if(returningFromReader&&visible()){returningFromReader=false;load();}}
+    public Bundle saveState(){
+        if(!visible())return null;
+        Bundle state=new Bundle();state.putString("query",query.getText().toString());state.putBoolean("favorites",favorites.isChecked());
+        state.putBoolean("batch",batchMode);state.putStringArrayList("selected",new ArrayList<>(selected));state.putString("report",report);
+        Bundle viewport=pendingViewState!=null?pendingViewState:viewportState();state.putBundle("viewport",viewport);
+        return state;
+    }
+    private Bundle viewportState(){
+        Bundle state=new Bundle();int first=list.getFirstVisiblePosition();View child=list.getChildAt(0);
+        state.putInt("first",first);state.putInt("top",child==null?0:child.getTop());
+        if(first>=0&&first<entries.size())state.putString("anchor",entries.get(first).uri);
+        return state;
+    }
+    private void restoreViewport(Bundle state){
+        if(state==null||entries.isEmpty())return;
+        int first=Math.max(0,Math.min(state.getInt("first"),entries.size()-1));String anchor=state.getString("anchor","");
+        for(int i=0;i<entries.size();i++)if(entries.get(i).uri.equals(anchor)){first=i;break;}
+        list.setSelectionFromTop(first,state.getInt("top"));
+    }
+    public void show(){show(null);}
+    public void show(Bundle saved){
+        if(visible())return;
         LinearLayout root=new LinearLayout(activity);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(12),dp(12),dp(12),dp(8));
+        root.setFocusableInTouchMode(true);
         LinearLayout body=new LinearLayout(activity);body.setOrientation(LinearLayout.VERTICAL);
         TextView heading=new TextView(activity);heading.setText("漫画库");heading.setTextSize(21);body.addView(heading);
         hint=new TextView(activity);hint.setTextSize(12);body.addView(hint);
@@ -81,11 +109,24 @@ public final class LibraryScreen {
         row(actions,stop,button("关闭",()->dialog.dismiss()));root.addView(new ControlScroll(activity,actions));
         dialog=new Dialog(activity);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);dialog.setContentView(root);
         dialog.setOnKeyListener((d,key,event)->{if(key==KeyEvent.KEYCODE_BACK&&batchMode&&!busy){if(event.getAction()==KeyEvent.ACTION_UP)setBatchMode(false);return true;}return false;});
-        dialog.setOnDismissListener(d->{generation++;resetCovers();cancel();worker.shutdown();coverWorker.shutdownNow();});dialog.show();dialog.getWindow().setLayout(-1,(int)(activity.getResources().getDisplayMetrics().heightPixels*0.93));dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        dialog.setOnDismissListener(d->{generation++;resetCovers();cancel();worker.shutdown();coverWorker.shutdownNow();});dialog.show();dialog.getWindow().setLayout(-1,(int)(activity.getResources().getDisplayMetrics().heightPixels*0.93));dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN|WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        setBatchMode(saved!=null&&saved.getBoolean("batch"));
+        if(saved!=null){
+            query.setText(saved.getString("query",""));favorites.setChecked(saved.getBoolean("favorites"));report=saved.getString("report","");
+            ArrayList<String> choices=saved.getStringArrayList("selected");if(batchMode&&choices!=null)selected.addAll(choices);
+            filter=query.getText().toString()+"|"+favorites.isChecked();pendingViewState=saved.getBundle("viewport");
+        }
+        root.requestFocus();
         query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int before,int count){load();}public void afterTextChanged(Editable e){}});
-        favorites.setOnCheckedChangeListener((b,c)->load());setBatchMode(false);load();
+        favorites.setOnCheckedChangeListener((b,c)->load());load();
     }
-    private void read(LibraryStore.Entry entry){dialog.dismiss();ReaderActivity.open(activity,entry);}
+    private void read(LibraryStore.Entry entry){
+        returningFromReader=true;
+        query.clearFocus();list.requestFocus();
+        InputMethodManager keyboard=(InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+        if(keyboard!=null)keyboard.hideSoftInputFromWindow(query.getWindowToken(),0);
+        ReaderActivity.open(activity,entry);
+    }
     private void itemClick(int position){
         if(busy||position<0||position>=entries.size()||!list.isEnabled())return;
         LibraryStore.Entry entry=entries.get(position);
@@ -149,12 +190,14 @@ public final class LibraryScreen {
         loading=false;entries=result;Set<String> present=new HashSet<>();list.clearChoices();
         for(LibraryStore.Entry e:result)present.add(e.uri);selected.retainAll(present);
         for(int i=0;i<entries.size();i++)list.setItemChecked(i,selected.contains(entries.get(i).uri));
-        adapter.notifyDataSetChanged();list.setEnabled(true);counts();
+        adapter.notifyDataSetChanged();restoreViewport(pendingViewState);pendingViewState=null;list.setEnabled(true);counts();
     }
     private void load(){
         if(!visible()||busy)return;
         final int ticket=++generation;String search=query.getText().toString();boolean only=favorites.isChecked();String nextFilter=search+"|"+only;
-        if(!filter.equals(nextFilter)){selected.clear();filter=nextFilter;}loading=true;counts();status.setText("正在读取…");list.setEnabled(false);
+        if(!filter.equals(nextFilter)){selected.clear();filter=nextFilter;pendingViewState=new Bundle();}
+        else if(pendingViewState==null)pendingViewState=viewportState();
+        loading=true;counts();status.setText("正在读取…");list.setEnabled(false);
         worker.execute(()->{
             try{
                 library=LibraryStore.get(activity);library.sync(store.snapshot());List<LibraryStore.Entry> result=library.list(search,only);
@@ -200,7 +243,7 @@ public final class LibraryScreen {
         }).setNegativeButton("关闭",null).show();
     }
     private void open(LibraryStore.Entry entry,boolean share){
-        if(!share){ReaderActivity.open(activity,entry);return;}
+        if(!share){read(entry);return;}
         Uri uri=Uri.parse(entry.uri);String mime=entry.format.equals("pdf")?"application/pdf":"application/zip";
         Intent intent=new Intent(share?Intent.ACTION_SEND:Intent.ACTION_VIEW).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.setClipData(ClipData.newRawUri("漫画",uri));
         if(share){intent.setType(mime);intent.putExtra(Intent.EXTRA_STREAM,uri);}else intent.setDataAndType(uri,mime);

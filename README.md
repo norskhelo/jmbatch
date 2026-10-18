@@ -2,19 +2,19 @@
 
 支持 Windows 和 Android 的批量漫画下载工具。下载可选择 PDF、ZIP 或图片文件夹，三种成品可离线互相导出。
 
-当前源码及正式版本：**Windows 0.3.17 / Android 0.5.13（versionCode 513）**。漫画库批量处理支持一次导出多本漫画，统一选择格式与目录。安装包、更新日志与镜像入口见下方。
+当前源码及正式版本：**Windows 0.3.18 / Android 0.5.14（versionCode 514）**。进入阅读后保留漫画库页面，返回继续原来的搜索、筛选、滚动位置和批量选择。安装包、更新日志与镜像入口见下方。
 
 ## 下载安装包（含国内镜像）
 
 GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
 
-当前正式版为 **Windows 0.3.17 / Android 0.5.13**（[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.17-0.5.13)、[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.17-0.5.13)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+当前正式版为 **Windows 0.3.18 / Android 0.5.14**（[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.18-0.5.14)、[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.18-0.5.14)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
 
 | 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
 | --- | --- | --- | --- |
-| Windows 0.3.17 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.17-0.5.13/JMBatch-0.3.17-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.17-0.5.13/JMBatch-0.3.17-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.17-0.5.13/JMBatch-0.3.17-Windows-x64.zip) |
-| Android 0.5.13 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.17-0.5.13/JMBatch-0.5.13-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.17-0.5.13/JMBatch-0.5.13-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.17-0.5.13/JMBatch-0.5.13-Android.apk) |
-| 双端 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.17-0.5.13/SHA256-release-0.3.17-0.5.13.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.17-0.5.13/SHA256-release-0.3.17-0.5.13.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.17-0.5.13/SHA256-release-0.3.17-0.5.13.txt) |
+| Windows 0.3.18 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.18-0.5.14/JMBatch-0.3.18-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.18-0.5.14/JMBatch-0.3.18-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.18-0.5.14/JMBatch-0.3.18-Windows-x64.zip) |
+| Android 0.5.14 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.18-0.5.14/JMBatch-0.5.14-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.18-0.5.14/JMBatch-0.5.14-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.18-0.5.14/JMBatch-0.5.14-Android.apk) |
+| 双端 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.18-0.5.14/SHA256-release-0.3.18-0.5.14.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.18-0.5.14/SHA256-release-0.3.18-0.5.14.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.18-0.5.14/SHA256-release-0.3.18-0.5.14.txt) |
 
 镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像同时用于手动下载及本版应用内更新文件下载的自动回退，版本查询仍使用 GitHub API，应用内更新仓库填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
 
@@ -43,7 +43,7 @@ GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或�
 
 ## 内置阅读器
 
-在任务列表或漫画库中打开漫画，即可使用内置阅读器。支持章节切换、本章/总页码、跳页、快捷收藏、书签列表及跳转；再次打开恢复上次页码和模式。上下滚动时相邻图片无间隔直接相接，页码显示在状态栏；原图自身的白边保留。滚动阅读与左右翻页可随时切换，轻点漫画隐藏或恢复工具栏，并有平滑过渡。Windows 使用滚轮、方向键或左右拖动，Android 使用上下滚动或左右滑动。Windows 按 Esc、Android 隐藏时按返回也可恢复工具栏。PDF 按一个章节显示。阅读记录绑定原文件路径/地址；移动文件或清除应用数据后不自动迁移。Android 外部 ZIP 首次打开需准备临时缓存，返回可取消，关闭后清理。
+在任务列表或漫画库中打开漫画，即可使用内置阅读器。从漫画库进入阅读会保留原页面，返回继续原来的搜索、收藏筛选、滚动位置和批量选择；阅读中修改收藏会同步刷新，尽量保留当前可见漫画的位置。支持章节切换、本章/总页码、跳页、快捷收藏、书签列表及跳转；再次打开恢复上次页码和模式。上下滚动时相邻图片无间隔直接相接，页码显示在状态栏；原图自身的白边保留。滚动阅读与左右翻页可随时切换，轻点漫画隐藏或恢复工具栏，并有平滑过渡。Windows 使用滚轮、方向键或左右拖动，Android 使用上下滚动或左右滑动。Windows 按 Esc、Android 隐藏时按返回也可恢复工具栏。PDF 按一个章节显示。阅读记录绑定原文件路径/地址；移动文件或清除应用数据后不自动迁移。Android 外部 ZIP 首次打开需准备临时缓存，返回可取消，关闭后清理。
 
 ## 更新日志
 

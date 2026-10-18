@@ -301,16 +301,44 @@ class LibraryWindow:
             return
         self.cancel_press()
         current_filter = (self.query.get(), self.only_favorites.get())
-        selected = self.tree.selection() if current_filter == self.filter and self.batch_mode else ()
+        same_filter = current_filter == self.filter
+        selected = self.tree.selection() if same_filter and self.batch_mode else ()
+        children = self.tree.get_children()
+        focus = self.tree.focus() if same_filter else ""
+        position = self.tree.yview()[0] * len(children) if children else 0
+        first = min(int(position), max(0, len(children) - 1))
         self.filter = current_filter
-        self.cover_generation += 1
-        self.cover_worker.clear()
-        self.cover_pending.clear()
-        self.cover_images.clear()
-        self.tree.delete(*self.tree.get_children())
-        for key, item in self.library.select(self.query.get(), self.only_favorites.get()):
-            self.tree.insert("", "end", iid=key, image=self.cover_placeholder, values=("★" if item["favorite"] else "", item["id"] or "未识别", item["title"], item["format"].upper()))
+        items = self.library.select(*current_filter)
+        keys = [key for key, _ in items]
+        present = set(keys)
+        if not same_filter:
+            self.cover_generation += 1
+            self.cover_worker.clear()
+            self.cover_pending.clear()
+            self.cover_images.clear()
+            self.tree.delete(*children)
+        else:
+            for key in children:
+                if key not in present:
+                    self.tree.delete(key)
+                    self.cover_images.pop(key, None)
+        for index, (key, item) in enumerate(items):
+            values = ("★" if item["favorite"] else "", item["id"] or "未识别", item["title"], item["format"].upper())
+            if self.tree.exists(key):
+                self.tree.item(key, values=values)
+                self.tree.move(key, "", index)
+            else:
+                self.tree.insert("", index, iid=key, image=self.cover_placeholder, values=values)
         self.tree.selection_set([k for k in selected if self.tree.exists(k)])
+        if same_filter and keys:
+            # Keep the first visible comic in place, even if rows above it changed.
+            anchor = next((k for k in children[first:] if k in present), None)
+            top = keys.index(anchor) if anchor else min(first, len(keys) - 1)
+            self.tree.yview_moveto((top + position - int(position)) / len(keys))
+            if focus in present:
+                self.tree.focus(focus)
+        elif not same_filter:
+            self.tree.yview_moveto(0)
         self.details()
 
     def details(self, *_):
