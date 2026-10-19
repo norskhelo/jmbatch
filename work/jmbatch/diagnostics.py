@@ -353,7 +353,9 @@ def run_tile_self_test(directory: Path):
         view.set_mode('tiles');root.update()
         assert anchor in view.visible_keys()
         report['checks'].append('Mode switches preserve selection and visible comic without changing list covers')
-        assert VERSION in CURRENT_NOTES and '首图自适应封面' in CURRENT_NOTES
+        from cover_display_checks import check_cover_displays
+        report['checks'].extend(check_cover_displays(root,directory/'all-cover-displays'))
+        assert VERSION in CURRENT_NOTES and '全部封面统一自适应' in CURRENT_NOTES
         report['checks'].append('Packaged version and offline release notes match the tile-cover release')
         report['ok']=True
     except Exception:
