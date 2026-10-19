@@ -1,12 +1,12 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from PIL import Image
 
 from core import Settings, Task, task_cache
 from covers import load_cover
-from download_covers import cover_source, DownloadCoverLoader
+from download_covers import cover_source, cover_identity, DownloadCoverLoader, DownloadCovers
 from diagnostics import FixtureClient
 from worker import run_download
 
@@ -96,3 +96,63 @@ class DownloadCoverTests(unittest.TestCase):
         red, blue = loader(self.task, "")[1], loader(other, "")[1]
         self.assertGreater(red.getpixel((0, 0))[0], 200)
         self.assertGreater(blue.getpixel((0, 0))[2], 200)
+
+
+class DownloadCoverBindingTests(unittest.TestCase):
+    def setUp(self):
+        import queue
+        from collections import OrderedDict
+        self.task = Task("123456", Settings().__dict__, status="running")
+        self.covers = DownloadCovers.__new__(DownloadCovers)
+        self.covers.tree = Mock()
+        self.covers.tree.exists.return_value = True
+        self.covers.tree.visible_keys.return_value = [self.task.key]
+        self.covers.placeholder = object()
+        self.covers.worker = Mock(jobs=queue.Queue(24), results=queue.Queue(24))
+        self.covers.pending = set()
+        self.covers.images = OrderedDict()
+        self.covers.next_check = {}
+        self.covers.identities = {}
+        self.photo = object()
+        self.patch = patch("PIL.ImageTk.PhotoImage", return_value=self.photo)
+        self.decode = self.patch.start()
+        self.addCleanup(self.patch.stop)
+        self.covers.poll([self.task])
+        self.identity = cover_identity(self.task)
+
+    def result(self, source, image, identity=None):
+        self.covers.worker.results.put((identity or self.identity, self.task.key, (source, image)))
+        self.covers.poll([self.task])
+
+    def test_repeated_progress_keeps_same_photo_and_does_not_rebind(self):
+        self.result("page-v1", Image.new("RGB", (80, 120)))
+        self.covers.tree.item.reset_mock()
+        for n in range(12):
+            self.task.done = n
+            self.result("page-v1", Image.new("RGB", (80, 120)))
+        self.assertEqual(self.decode.call_count, 1)
+        self.covers.tree.item.assert_not_called()
+
+    def test_cleanup_gap_preserves_photo_until_final_source_arrives(self):
+        self.result("page-v1", Image.new("RGB", (80, 120)))
+        self.covers.tree.item.reset_mock()
+        self.result(None, None)
+        self.covers.tree.item.assert_not_called()
+        self.assertIs(self.covers.images[self.task.key][2], self.photo)
+        self.task.status = "done"
+        self.task.result = "finished.zip"
+        self.result("finished-v1", Image.new("RGB", (80, 120)))
+        self.assertEqual(self.decode.call_count, 2)
+
+    def test_changed_selection_drops_old_callback_and_clears_old_cover(self):
+        self.result("page-v1", Image.new("RGB", (80, 120)))
+        self.task.selected_chapters = [{"number": 2}]
+        self.result("old-page", Image.new("RGB", (80, 120)))
+        self.assertNotIn(self.task.key, self.covers.images)
+        self.covers.tree.item.assert_called_with(self.task.key, image=self.covers.placeholder)
+        self.assertIn(self.task.key, self.covers.pending)
+
+    def test_repaired_source_updates_photo(self):
+        self.result("page-v1", Image.new("RGB", (80, 120)))
+        self.result("page-v2", Image.new("RGB", (80, 120)))
+        self.assertEqual(self.decode.call_count, 2)

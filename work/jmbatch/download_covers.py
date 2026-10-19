@@ -8,6 +8,11 @@ from core import task_cache
 from covers import CoverWorker, load_cover
 
 
+def cover_identity(task):
+    chosen = task.selected_chapters or [{"number": 1}]
+    return (task.key, chosen[0]["number"], task.settings["format"], task.settings["output"])
+
+
 def cover_source(task):
     chosen = task.get("selected_chapters") or [{"number": 1}]
     first = task_cache(task) / "images" / f"{chosen[0]['number']:04d}" / "00001.jpg"
@@ -61,6 +66,7 @@ class DownloadCovers:
         self.pending = set()
         self.images = OrderedDict()
         self.next_check = {}
+        self.identities = {}
         tree.bind("<Destroy>", self.destroy, add="+")
 
     def destroy(self, event):
@@ -71,17 +77,33 @@ class DownloadCovers:
     def poll(self, tasks):
         from PIL import ImageTk
         by_key = {task.key: task for task in tasks}
+        identities = {key: cover_identity(task) for key, task in by_key.items()}
+        self.pending.intersection_update(by_key)
+        for key, identity in identities.items():
+            if self.identities.get(key) != identity:
+                self.images.pop(key, None)
+                self.next_check.pop(key, None)
+                self.pending.discard(key)
+                if self.tree.exists(key):
+                    self.tree.item(key, image=self.placeholder)
+        self.identities = identities
         for key in list(self.images):
             if key not in by_key:
                 self.images.pop(key)
         self.next_check = {key: value for key, value in self.next_check.items() if key in by_key}
         try:
             while True:
-                _, key, (source, result) = self.worker.results.get_nowait()
+                identity, key, (source, result) = self.worker.results.get_nowait()
+                if identities.get(key) != identity:
+                    continue
                 self.pending.discard(key)
                 if key not in by_key or not self.tree.exists(key):
                     continue
                 previous = self.images.get(key)
+                # Export removes the live page before the finished path reaches
+                # the UI. Preserve the valid preview during that handoff/failure.
+                if previous and previous[1] and result is None:
+                    continue
                 if previous and previous[0] == source and previous[1] == (result is not None):
                     continue
                 if result is not None:
@@ -106,7 +128,7 @@ class DownloadCovers:
             if now < self.next_check.get(key, 0):
                 continue
             try:
-                self.worker.jobs.put_nowait((0, key, by_key[key].to_dict(), "task"))
+                self.worker.jobs.put_nowait((identities[key], key, by_key[key].to_dict(), "task"))
             except queue.Full:
                 break
             self.pending.add(key)

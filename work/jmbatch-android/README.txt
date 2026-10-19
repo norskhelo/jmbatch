@@ -1,4 +1,4 @@
-JM Batch 0.6.3 — Android 使用说明
+JM Batch 0.6.4 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.6.3 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-19）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/JMBatch-0.6.3-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/JMBatch-0.6.3-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/JMBatch-0.6.3-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/SHA256-release-0.3.23-0.6.3.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/JMBatch-0.6.4-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/JMBatch-0.6.4-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/JMBatch-0.6.4-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/SHA256-release-0.3.24-0.6.4.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,20 +28,18 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.23 / Android 0.6.3 — 漫画库收藏夹
+Windows 0.3.24 / Android 0.6.4 — 下载列表封面刷新修复
 
-更新内容
+修复内容
 
-• 漫画库现在也是默认收藏夹。旧漫画和新下载仍在漫画库根层显示；自建收藏夹直接出现在原漫画列表或四列平铺区域，与漫画共用位置。
-• 收藏夹卡片显示名称、漫画数量，并以夹内最近加入漫画的最多四张本地封面组成预览；空收藏夹和无法读取的封面显示占位。
-• 支持新建、重命名收藏夹；长按漫画或进入“批量处理”，勾选后点击“移入收藏夹”，也可选择“漫画库”移回默认位置。每本漫画归属一个收藏夹，分类不移动实际文件。
-• 点击收藏夹查看内容，点击漫画开始阅读；“返回漫画库”回到默认收藏夹。Android 返回键先退出批量处理，再返回漫画库；阅读返回或重建界面保留所在收藏夹。
-• “管理收藏夹”可重命名或删除收藏夹。删除前确认，夹内漫画回到漫画库，保留漫画文件、星标、书签和阅读位置。默认漫画库不能重命名或删除。
-• 原星标收藏继续保留。“仅显示收藏”可筛选星标漫画；根层搜索也能找到名称匹配或含匹配漫画的收藏夹。移动、扫描、下载记录刷新、修改星标和删除章节均保留分类。
-• 收藏夹与漫画记录一起原子保存，保存失败保留原状态；封面复用现有有界后台加载与本地缓存，不增加网站请求。
+• Android 下载列表滚出屏幕后，再滚回时立即复用仍在内存缓存中的封面，不再等待下一次后台轮询后才显示。
+• Android 下载进度及定时刷新不再重复设置同一张封面，减少反复刷新和闪烁；离屏仍释放行内图片引用，保留原有有界缓存。
+• 双端在下载完成清理临时图片、切换至最终成品或短暂读取失败时保留已显示的有效封面，新的封面成功读取后再替换。
+• 切换任务或首个所选章节时清除旧封面，丢弃过期后台结果，避免旧请求覆盖新任务；第一页就绪、修复或变更后仍自动刷新。
+• 封面继续使用本地图片和现有缩略图缓存，不增加网站图片请求，不改变下载文件、断点续传或保存结构。
 
 版本与验证
 
-• Windows 0.3.22 → 0.3.23；Android 0.6.2 → 0.6.3（versionCode 603），保留原 Android 包名、签名证书与更新公钥。
-• 验证旧记录兼容、创建/移动/重命名/删除、搜索与星标、保存失败回滚、封面预览上限和真实界面导航；执行双端回归、自检、构建及签名核验。
-• Android 使用 Android 10/15 框架和隔离演示数据验证，未连接真机。效果图使用演示漫画，不读取个人漫画。
+• Windows 0.3.23 → 0.3.24；Android 0.6.3 → 0.6.4（versionCode 604），保留原包名、签名证书和更新公钥。
+• 验证连续进度刷新、滚出滚回、离屏加载完成、清理交接、首图修复、过期回调与移除任务，执行双端回归、构建和签名核验。
+• Android 使用 Android 10/15 框架及隔离测试数据验证，未连接真机。

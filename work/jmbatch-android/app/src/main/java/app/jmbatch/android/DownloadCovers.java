@@ -28,24 +28,42 @@ public final class DownloadCovers {
     }
     public static final class Target {
         final ImageView image;final TextView placeholder;long next;boolean pending,removed;
+        String identity="",stamp;Bitmap displayed;long generation;
         public Target(ImageView image,TextView placeholder){this.image=image;this.placeholder=placeholder;}
-        public void clear(){image.setImageDrawable(null);image.setContentDescription("等待第一页封面");placeholder.setVisibility(View.VISIBLE);}
-        public void remove(){removed=true;clear();}
+        private void show(Bitmap bitmap){
+            if(displayed==bitmap)return;
+            displayed=bitmap;
+            if(bitmap==null)image.setImageDrawable(null);else image.setImageBitmap(bitmap);
+            image.setContentDescription(bitmap==null?"等待第一页封面":"首章第一页封面");
+            placeholder.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
+        }
+        public void clear(){show(null);}
+        public void remove(){removed=true;generation++;stamp=null;clear();}
     }
     public DownloadCovers(Context context){this.context=context.getApplicationContext();}
     public void bind(Store.Task task,Target target){
         if(closed||target.removed)return;
-        if(!target.image.getGlobalVisibleRect(new Rect())){target.clear();return;}
-        long now=SystemClock.elapsedRealtime();
-        if(target.pending||now<target.next)return;
         final String key=task.key,status=task.status,result=task.resultUri,format=task.settings.format;
         final int firstChapter=task.selectedChapters.isEmpty()?1:task.selectedChapters.get(0).number;
+        String identity=key+"|"+firstChapter+"|"+format+"|"+task.settings.outputUri;
+        if(!identity.equals(target.identity)){
+            target.identity=identity;target.generation++;target.pending=false;target.next=0;target.stamp=null;target.clear();
+        }
+        if(!target.image.getGlobalVisibleRect(new Rect())){target.clear();return;}
+        // Restore synchronously before the polling/pending gate. Off-screen rows
+        // release their bitmap references, but scrolling back must not flash blank.
+        Cover retained=target.stamp==null?null:cache.get(target.stamp);
+        if(retained!=null&&retained.bitmap!=null)target.show(retained.bitmap);
+        long now=SystemClock.elapsedRealtime();
+        if(target.pending||now<target.next)return;
+        final long generation=target.generation;
         target.pending=true;target.next=now+1000;
         try{worker.execute(()->{
-            Bitmap bitmap=null;
+            Bitmap bitmap=null;String stamp=null;
             try{
                 DownloadCoverRules.Source source=DownloadCoverRules.resolve(new File(context.getFilesDir(),"work"),key,status,result,format,firstChapter);
                 if(source!=null){
+                    stamp=source.stamp;
                     Cover found=cache.get(source.stamp);
                     if(found==null||(found.bitmap==null&&SystemClock.elapsedRealtime()-found.checked>=3000)){
                         Bitmap loaded=source.format.equals("image")?LibraryCover.loadImage(new File(source.path)):
@@ -55,14 +73,15 @@ public final class DownloadCovers {
                     bitmap=found.bitmap;
                 }
             }catch(Exception|OutOfMemoryError ignored){ /* Preview failure must not stop the queue. */ }
-            final Bitmap ready=bitmap;
+            final Bitmap ready=bitmap;final String readyStamp=stamp;
             main.post(()->{
+                if(closed||target.removed||target.generation!=generation)return;
                 target.pending=false;
-                if(closed||target.removed)return;
+                // Keep the last valid preview through export/cache cleanup or a
+                // transient read failure; replace it only when a new image is ready.
+                if(ready!=null)target.stamp=readyStamp;
                 if(!target.image.getGlobalVisibleRect(new Rect())){target.clear();return;}
-                target.image.setImageBitmap(ready);
-                target.image.setContentDescription(ready==null?"等待第一页封面":"首章第一页封面");
-                target.placeholder.setVisibility(ready==null?View.VISIBLE:View.GONE);
+                if(ready!=null)target.show(ready);
             });
         });}catch(RejectedExecutionException ignored){target.pending=false;target.next=now;}
     }

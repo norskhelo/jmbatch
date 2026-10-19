@@ -41,6 +41,7 @@ public final class MainActivity extends Activity {
         for(Store.Task task:store.snapshot())if(task.discardRequested&&task.status.equals("cancelling"))send(DownloadService.CANCEL,task.key);
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
+        scroll.setOnScrollChangeListener((view,x,y,oldX,oldY)->refreshDownloadCovers());
         layout=column();layout.setPadding(dp(18),dp(20),dp(18),dp(28));scroll.addView(layout);
         inputFocus=new InputFocusLayout(this);inputFocus.addView(scroll);setContentView(inputFocus);inputFocus.requestFocus();
         LinearLayout header=horizontal();TextView brand=text("JM Batch",27,INK);brand.setTypeface(null,Typeface.BOLD);header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));header.addView(button("下载设置",v->settings()));layout.addView(header);
@@ -105,6 +106,13 @@ public final class MainActivity extends Activity {
         Intent intent=new Intent(this,DownloadService.class).setAction(DownloadService.START);startForegroundService(intent);
     }
     private void send(String action,String key){Intent intent=new Intent(this,DownloadService.class).setAction(action);if(key!=null)intent.putExtra("key",key);startService(intent);}
+
+    private void refreshDownloadCovers(){
+        for(Store.Task task:store.snapshot()){
+            Row row=rows.get(task.key);
+            if(row!=null)downloadCovers.bind(task,row.cover);
+        }
+    }
 
     private void render(){
         if(queue==null)return;List<Store.Task> tasks=store.snapshot();int completed=0,failed=0,active=0;long speed=0;
