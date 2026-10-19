@@ -24,6 +24,7 @@ public final class JmApi {
     private final Store.Settings settings;
     private final String userCookie;
     private final FallbackDns fallbackDns;
+    private final OriginTls.Session originTls=new OriginTls.Session();
     private final Set<String> dnsConnected=ConcurrentHashMap.newKeySet();
     private List<String> domains = new ArrayList<>(Arrays.asList(DEFAULT_API));
     private volatile int preferred;
@@ -197,30 +198,47 @@ public final class JmApi {
         try{return "HTTP "+response.status+"（仅连接测试，未验证漫画接口）";}finally{response.request.finish(false);}
     }
     private Response openResponse(URL url,Map<String,String> headers,boolean api,int timeout,boolean image,String method)throws Exception {
-        try{return response(url,(HttpURLConnection)url.openConnection(),headers,api,timeout,image,method);}
+        FallbackDns.Result cached=fallbackDns.cached(url.getHost());
+        if(cached!=null&&FallbackDns.permitsDirect(url)){
+            try{return fallbackResponse(url,cached,headers,api,timeout,image,method);}
+            catch(Exception error){
+                control.check();if(!routeFailure(error))throw error;
+                // The network or address set may have changed. Recheck the system
+                // path instead of repeatedly paying for known failed cached IPs.
+                fallbackDns.discard(url.getHost(),cached);
+            }
+        }
+        try{return response(url,(HttpURLConnection)url.openConnection(),headers,api,timeout,image,method,Math.min(8,timeout));}
         catch(Exception original){
             control.check();if(!FallbackDns.permitsDirect(url))throw original;
             boolean zero;try{zero=fallbackDns.confirmedZero(url.getHost(),original);}catch(IOException lookupFailure){throw original;}
             control.check();if(!zero)throw original;
             FallbackDns.Result result=fallbackDns.resolve(url.getHost(),this::dnsQuery,control::check,control.routeMessage::accept);
-            Exception last=original;long deadline=SystemClock.elapsedRealtime()+12000;
-            for(InetAddress ip:result.addresses){
-                control.check();long remaining=deadline-SystemClock.elapsedRealtime();if(remaining<=0)break;
-                int seconds=Math.max(1,Math.min(4,Math.min(timeout,(int)(remaining/3000))));
-                try {
-                    Response response=response(url,OriginTls.open(url,ip,seconds*1000),headers,api,seconds,image,method);
-                    if(dnsConnected.add(url.getHost()))control.routeMessage.accept("备用 DNS 连接已响应："+url.getHost()+"（HTTP "+response.status+"）");return response;
-                }catch(Exception failure){
-                    control.check();last=failure;String kind=NetworkRoutes.kind(failure);
-                    if(!Arrays.asList("connect","refused","unreachable","timeout","address").contains(kind))throw failure;
-                }
-            }
-            control.routeMessage.accept("备用 DNS 已取得地址，但连接仍失败："+url.getHost());throw last;
+            return fallbackResponse(url,result,headers,api,timeout,image,method);
         }
     }
-    private Response response(URL url,HttpURLConnection connection,Map<String,String> headers,boolean api,int timeout,boolean image,String method)throws Exception {
+    private static boolean routeFailure(Exception failure){return Arrays.asList("connect","refused","unreachable","timeout","address").contains(NetworkRoutes.kind(failure));}
+    private Response fallbackResponse(URL url,FallbackDns.Result result,Map<String,String> headers,boolean api,int timeout,boolean image,String method)throws Exception {
+        Exception last=new ConnectException("备用地址暂时不可用");long deadline=SystemClock.elapsedRealtime()+12000;
+        for(InetAddress ip:result.routes(fallbackDns.clock.getAsLong())){
+            control.check();if(SystemClock.elapsedRealtime()>=deadline)break;
+            int connectSeconds=Math.min(4,timeout);
+            try{
+                // Short connection/handshake attempts must not shorten image-body
+                // reads: retain the configured inactivity timeout for the transfer.
+                Response response=response(url,originTls.open(url,ip,connectSeconds*1000),headers,api,timeout,image,method,connectSeconds);
+                result.connected(ip);
+                if(dnsConnected.add(url.getHost()))control.routeMessage.accept("备用 DNS 连接已响应："+url.getHost()+"（HTTP "+response.status+"）");return response;
+            }catch(Exception failure){
+                control.check();last=failure;if(!routeFailure(failure))throw failure;
+                result.failed(ip,fallbackDns.clock.getAsLong());
+            }
+        }
+        control.routeMessage.accept("备用 DNS 已取得地址，但连接仍失败："+url.getHost());throw last;
+    }
+    private Response response(URL url,HttpURLConnection connection,Map<String,String> headers,boolean api,int timeout,boolean image,String method,int connectSeconds)throws Exception {
         connection.setRequestMethod(method);
-        connection.setConnectTimeout(Math.min(8,timeout)*1000); connection.setReadTimeout(timeout*1000); connection.setInstanceFollowRedirects(false);
+        connection.setConnectTimeout(connectSeconds*1000); connection.setReadTimeout(timeout*1000); connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("User-Agent", UA); connection.setRequestProperty("Accept-Encoding", image ? "identity" : "gzip");
         for (Map.Entry<String,String> header : headers.entrySet()) connection.setRequestProperty(header.getKey(), header.getValue());
         for (Map.Entry<String,List<String>> header : cookies.get(url.toURI(), Collections.emptyMap()).entrySet())

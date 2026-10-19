@@ -15,7 +15,15 @@ final class FallbackDns {
     static final class Failure extends UnknownHostException {Failure(){super("系统 DNS 返回全零地址，备用 DNS 也未取得可用地址");}}
     static final class Result {
         final List<InetAddress> addresses;final String provider;final long expires;
+        private InetAddress preferred;private final Map<InetAddress,Long> cooldown=new HashMap<>();
         Result(List<InetAddress> addresses,String provider,long expires){this.addresses=Collections.unmodifiableList(addresses);this.provider=provider;this.expires=expires;}
+        synchronized List<InetAddress> routes(long now){
+            List<InetAddress> ready=new ArrayList<>();
+            for(InetAddress address:addresses)if(cooldown.getOrDefault(address,0L)<=now)ready.add(address);
+            if(preferred!=null&&ready.remove(preferred))ready.add(0,preferred);return ready;
+        }
+        synchronized void connected(InetAddress address){preferred=address;cooldown.remove(address);}
+        synchronized void failed(InetAddress address,long now){cooldown.put(address,now+15000);if(address.equals(preferred))preferred=null;}
     }
     private static final class Entry {final ReentrantLock lock=new ReentrantLock();volatile Result result;volatile long failedUntil;}
     private final Map<String,Entry> entries=new LinkedHashMap<>();
@@ -25,7 +33,8 @@ final class FallbackDns {
     private synchronized Entry entry(String host){
         Entry entry=entries.get(host);if(entry==null){if(entries.size()>=32)entries.remove(entries.keySet().iterator().next());entry=new Entry();entries.put(host,entry);}return entry;
     }
-    Result cached(String host){Result result=entry(host).result;return result!=null&&clock.getAsLong()<result.expires?result:null;}
+    synchronized Result cached(String host){Entry entry=entries.get(host.toLowerCase(Locale.ROOT));Result result=entry==null?null:entry.result;return result!=null&&clock.getAsLong()<result.expires?result:null;}
+    synchronized void discard(String host,Result expected){Entry entry=entries.get(host.toLowerCase(Locale.ROOT));if(entry!=null&&entry.result==expected)entry.result=null;}
     boolean confirmedZero(String host,Exception failure)throws IOException {
         if(!Arrays.asList("address","connect","refused","unreachable","dns").contains(NetworkRoutes.kind(failure)))return false;
         for(InetAddress address:lookup.get(host))if(address.isAnyLocalAddress())return true;

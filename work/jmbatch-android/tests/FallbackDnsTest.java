@@ -56,7 +56,13 @@ public final class FallbackDnsTest {
         FallbackDns.Fetch fetch=(url,deadline)->{fetches.incrementAndGet();return reply(url,2);};
         FallbackDns.Result first=dns.resolve("api.test",fetch,()->{},s->{});check(first.addresses.size()==2);check(fetches.get()==2);
         check(dns.resolve("api.test",fetch,()->{},s->{})==first);check(fetches.get()==2);
+        first.connected(first.addresses.get(1));check(first.routes(time.get()).get(0).equals(first.addresses.get(1)));
+        first.failed(first.addresses.get(1),time.get());check(first.routes(time.get()).size()==1);
+        first.failed(first.addresses.get(0),time.get());check(first.routes(time.get()).isEmpty());
+        check(first.routes(time.get()+15000).size()==2);
         time.addAndGet(2001);check(dns.cached("api.test")==null);dns.resolve("api.test",fetch,()->{},s->{});check(fetches.get()==4);
+        dns.discard("api.test",first);check(dns.cached("api.test")!=null);
+        dns.discard("api.test",dns.cached("api.test"));check(dns.cached("api.test")==null);
         AtomicInteger second=new AtomicInteger();
         FallbackDns.Result switched=dns.resolve("other.test",(url,deadline)->{second.incrementAndGet();if(url.getHost().equals("dns.alidns.com"))return answer(query(url),null,0);return reply(url,20);},()->{},s->{});
         check(second.get()==4&&switched.provider.equals("doh.pub"));

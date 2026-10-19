@@ -17,6 +17,13 @@ the fixture uses an isolated temporary certificate and never a release key.
 This checks TLS identity preservation, not a phone's mobile network or API 36.
 Use --tests FallbackTlsRuntimeTest for a focused run.
 
+The fallback suite also compares eight same-origin requests: per-request TLS
+policies require eight connections, while the task-local policy permits one
+keep-alive connection. A pooled socket must never authenticate a different
+origin, even at the same IP and port. A delayed response body checks that the
+configured read timeout is independent of the shorter TLS handshake budget.
+These are loopback protocol checks, not real mobile-network speed measurements.
+
 Run from the repository root on Windows:
 
 ```powershell

@@ -1,4 +1,4 @@
-JM Batch 0.6.1 — Android 使用说明
+JM Batch 0.6.2 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -6,11 +6,11 @@ JM Batch 0.6.1 — Android 使用说明
 4. 文件夹和 ZIP 只含图片：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。导出和文件删除前请暂停下载并等待请求退出。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
-安装包下载（2026-10-18）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.1/JMBatch-0.6.1-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.1/JMBatch-0.6.1-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.1/JMBatch-0.6.1-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.1/SHA256-release-android-0.6.1.txt
+安装包下载（2026-10-19）
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.2/JMBatch-0.6.2-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.2/JMBatch-0.6.2-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.2/JMBatch-0.6.2-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.2/SHA256-release-android-0.6.2.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,16 +28,16 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Android 0.6.1 — 全零 DNS 自动备用解析
+Android 0.6.2 — 备用 DNS 图片下载提速
 
-• 漫画接口、线路列表和图片请求因目标地址全零连接失败时，确认系统 DNS 返回 0.0.0.0 或 ::，再自动尝试阿里公共 DNS、DNSPod 的 HTTPS 加密解析；正常请求继续使用系统网络栈。
-• 备用查询仅发送域名和 A/AAAA 类型，不携带漫画编号、请求路径、Cookie 或 API 令牌。结果按 DNS TTL 缓存，最长 5 分钟，任务内合并并发查询；拒绝全零、回环和内网等不可用备用地址。
-• 使用备用地址时保留原域名 Host、SNI 和系统 HTTPS 证书链/域名校验；保留 HTTP 错误处理、响应完整性检查与取消。系统配置 HTTP/SOCKS 代理时保留代理路径，不自动改为直连；VPN 仍使用当前网络。
-• 首页“权限与联网检测”在系统 DNS 全零且 HTTPS 失败时测试实际下载的备用路径，报告可复制、保存、分享；下载状态显示备用解析及连接结果。
-• Android 0.6.1 / versionCode 601，沿用原包名和签名，可覆盖安装 0.6.0；Windows 保持 0.3.22。
-• 尚未在 Redmi K70 Pro 的 Android 16 移动网络上验证。若网络还存在 IP、TLS/SNI 或服务端访问限制，更换 DNS 后仍可能失败；已有任务和漫画无需清理。
+• 已确认系统 DNS 全零并取得备用地址后，在有效期内直接使用备用路径，避免每张图片都先重试已知失败的系统连接。缓存到期重新检查；备用地址失效时重新尝试系统路径。
+• 优先使用最近连接成功的 IP，短暂避开连接失败的地址，减少每张图片重复等待失败线路。
+• 同一原始域名允许复用 HTTPS 长连接，减少重复 TCP/TLS 握手；不同域名、端口及证书校验配置仍隔离，保留原域名 Host、SNI、系统证书链及域名校验。
+• 将短连接尝试超时与图片读取超时分开。读取继续采用下载设置中的请求超时（默认 25 秒），避免弱网图片因几秒内没有数据而过早中断、重复下载。
+• 保留 DNS TTL、代理路径、取消、HTTP 错误和图片完整性校验，不清理已有下载或缓存。暂停并覆盖安装后，重新开始或重试原任务即可使用优化。
+• Android 0.6.2 / versionCode 602，保留原包名和签名；Windows 保持 0.3.22。Android 10/15 的合成 TLS 测试中，8 次同域名请求由 8 条连接降为 1 条；这不代表手机真实提速倍数。Redmi K70 Pro 移动网络效果待实测。
 
 验证范围
 
-• 1542 项宿主检查、96 组布局场景和 63 项 Android 框架用例通过，包括 Android 10/15 下的备用连接、原域名 SNI/Host 和证书拒绝测试。
-• Windows 本机对阿里、DNSPod 的 8 项公开 DNS 查询通过；没有连接手机，以上不代表 Redmi K70 Pro 的实际移动网络已恢复。
+• 1624 项宿主检查、96 组布局场景和 71 项 Android 框架用例通过，包括 14 项 TLS 专项，覆盖连接复用、跨域隔离、证书拒绝及独立读取超时。
+• 保留原包名、APK 签名和更新公钥，可覆盖安装并继续原任务；没有连接手机，尚未验证 Redmi K70 Pro 的实际移动网络吞吐。
