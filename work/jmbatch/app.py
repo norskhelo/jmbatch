@@ -561,6 +561,11 @@ def main():
             ctypes.windll.shcore.SetProcessDpiAwareness(1)
         except Exception:
             pass
+    if "--self-test-tiles" in sys.argv:
+        from diagnostics import run_tile_self_test
+        index = sys.argv.index("--self-test-tiles")
+        run_tile_self_test(Path(sys.argv[index + 1]).resolve())
+        return
     if "--self-test" in sys.argv:
         from diagnostics import run_self_test
         index = sys.argv.index("--self-test")

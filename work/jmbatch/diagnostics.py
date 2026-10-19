@@ -304,6 +304,67 @@ def check_manual_update_ui(application, directory):
             ui.dialog.destroy()
 
 
+def run_tile_self_test(directory: Path):
+    """Focused source/frozen smoke check with synthetic covers and no network."""
+    import tkinter as tk
+    from PIL import Image, ImageTk
+    from display_view import DisplayView
+    from core import VERSION
+    from updates import CURRENT_NOTES
+    directory.mkdir(parents=True, exist_ok=True)
+    report = dict(ok=False, version=VERSION, network_used=False, checks=[])
+    root = None
+    try:
+        root = tk.Tk()
+        root.geometry('900x600')
+        view = DisplayView(root, kind='library', columns=('star','id','title','format'), selectmode='extended')
+        view.pack(fill='both', expand=True)
+        pictures = [ImageTk.PhotoImage(Image.new('RGB', size, color), master=root)
+                    for size,color in (((72,96),'red'),((72,36),'green'),((24,96),'blue'))]
+        for n in range(48):
+            view.insert('', 'end', iid=str(n), image=pictures[n%3], values=('',str(n),'Local cover '+str(n),'ZIP'))
+        root.update()
+        view.selection_set(('0','1'))
+        view.set_mode('tiles')
+        for width in (360,900,1400,360):
+            root.geometry(f'{width}x600');root.update()
+            assert view.columns==4
+            assert abs(view.cover_height/view.cover_width-4/3)<.02
+            images=[item for item in view.canvas.find_all() if view.canvas.type(item)=='image']
+            assert len(images)>=4
+            for n,item in enumerate(images[:4]):
+                left,top,right,bottom=view.canvas.bbox(item)
+                x,y,w,h=view.bbox(str(n))
+                assert left>=x+14 and right<=x+w-14
+                assert top>=y+14 and bottom<=y+view.cover_height+16
+                original=pictures[n%3]
+                assert abs((right-left)/(bottom-top)-original.width()/original.height())<.03
+            assert view.selection()==('0','1')
+        report['checks'].append('Four columns and uncropped proportional covers at 360/900/1400 widths')
+        cached=dict(view.tile_images)
+        view.item('0',values=('', '0', 'Refreshed title', 'ZIP'));root.update()
+        assert view.tile_images==cached and len(view.tile_images)==3
+        report['checks'].append('Refresh reuses visible scaled covers with bounded image references')
+        view.yview_moveto(.5);root.update()
+        anchor=view.visible_keys()[0]
+        view.set_mode('list');root.update()
+        assert anchor in view.visible_keys() and view.selection()==('0','1')
+        assert not view.tile_images
+        assert (pictures[0].width(),pictures[0].height())==(72,96)
+        view.set_mode('tiles');root.update()
+        assert anchor in view.visible_keys()
+        report['checks'].append('Mode switches preserve selection and visible comic without changing list covers')
+        assert VERSION in CURRENT_NOTES and '平铺封面缩放修复' in CURRENT_NOTES
+        report['checks'].append('Packaged version and offline release notes match the tile-cover release')
+        report['ok']=True
+    except Exception:
+        report['error']=traceback.format_exc()
+    finally:
+        if root is not None:root.destroy()
+    atomic_json(directory/'self-test.json',report)
+    if not report['ok']:raise RuntimeError(report['error'])
+
+
 def run_self_test(directory: Path):
     directory.mkdir(parents=True, exist_ok=True)
     report = {"ok": False, "network_used": False, "checks": []}
