@@ -4,6 +4,7 @@ import tkinter as tk
 import unittest
 from pathlib import Path
 from tkinter import ttk
+from PIL import Image, ImageTk
 from display_view import DisplayView, load_mode, save_mode
 from tests import test_library_interaction as interaction
 
@@ -101,6 +102,39 @@ class DisplayViewTest(unittest.TestCase):
         self.assertEqual(positions[-1],self.view.canvas.yview())
         self.view._list_scrolled('0','0.01')
         self.assertEqual(positions[-1],self.view.canvas.yview())
+
+    def test_covers_fit_resized_cards_and_reuse_only_visible_images(self):
+        pictures = [ImageTk.PhotoImage(Image.new('RGB', size, color), master=self.root)
+                    for size, color in (((72,96), 'red'), ((72,36), 'green'), ((24,96), 'blue'))]
+        for n, picture in enumerate(pictures):
+            self.view.item(str(n), image=picture)
+        self.view.set_mode('tiles')
+        for width in (360, 900, 1400, 360):
+            self.root.geometry(f'{width}x550')
+            self.root.update()
+            self.assertEqual(self.view.columns, 4)
+            self.assertAlmostEqual(self.view.cover_height/self.view.cover_width, 4/3, delta=.02)
+            painted = [i for i in self.view.canvas.find_all() if self.view.canvas.type(i) == 'image']
+            self.assertEqual(len(painted), 3)
+            for n, item in enumerate(painted):
+                left, top, right, bottom = self.view.canvas.bbox(item)
+                x,y,w,h = self.view.bbox(str(n))
+                self.assertGreaterEqual(left, x+14)
+                self.assertLessEqual(right, x+w-14)
+                self.assertGreaterEqual(top, y+14)
+                self.assertLessEqual(bottom, y+16+self.view.cover_height)
+                self.assertAlmostEqual((right-left)/(bottom-top), pictures[n].width()/pictures[n].height(), delta=.03)
+            cached = dict(self.view.tile_images)
+            self.view.item('0', values=('', '0', 'Refreshed', 'ZIP'))
+            self.root.update()
+            self.assertEqual(cached, self.view.tile_images)
+        self.view.yview_moveto(.8)
+        self.root.update()
+        self.assertFalse(self.view.tile_images)
+        self.view.set_mode('list')
+        self.root.update()
+        self.assertEqual(self.view.item('0', 'image'), (str(pictures[0]),))
+        self.assertEqual((pictures[0].width(), pictures[0].height()), (72,96))
 
     def test_preferences_are_independent_and_invalid_values_default(self):
         with tempfile.TemporaryDirectory() as folder:

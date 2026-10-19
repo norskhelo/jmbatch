@@ -3,6 +3,7 @@ import json
 import math
 import tkinter as tk
 from tkinter import ttk, font
+from PIL import Image, ImageOps, ImageTk
 from core import atomic_json
 
 
@@ -47,6 +48,7 @@ class DisplayView(ttk.Treeview):
                                 takefocus=True, yscrollincrement=1)
         self.columns, self.cell_width, self.cell_height = 1, 210, 238 if kind == 'library' else 270
         self.paint_timer = None
+        self.tile_images = {}
         self.extent = None
         self.scroll_callback = None
         self.tile_font = font.Font(self, family='Microsoft YaHei UI', size=10)
@@ -80,6 +82,7 @@ class DisplayView(ttk.Treeview):
             if self.paint_timer:
                 self.after_cancel(self.paint_timer)
             self.canvas.destroy()
+            self.tile_images.clear()
 
     def set_mode(self, mode):
         mode = 'tiles' if mode == 'tiles' else 'list'
@@ -90,6 +93,9 @@ class DisplayView(ttk.Treeview):
         placement = active.pack_info()
         active.pack_forget()
         self.mode = mode
+        if mode == 'list':
+            self.canvas.delete('all')
+            self.tile_images.clear()
         (self.canvas if mode == 'tiles' else self).pack(**placement)
         self.update_idletasks()
         if mode == 'tiles':
@@ -111,6 +117,10 @@ class DisplayView(ttk.Treeview):
         width = max(1, self.canvas.winfo_width())
         self.columns = 4
         self.cell_width = width / self.columns
+        if self.kind == 'library':
+            self.cover_width = max(1, int(self.cell_width-30))
+            self.cover_height = max(1, round(self.cover_width*4/3))
+            self.cell_height = self.cover_height + 3*self.tile_font.metrics('linespace') + 40
         self._extent()
         self.move_to_index(position)
         self._schedule()
@@ -284,6 +294,7 @@ class DisplayView(ttk.Treeview):
         self.canvas.delete('all')
         keys = self.get_children()
         selected = set(self.selection())
+        painted_images = {}
         for key in self.visible_keys():
             n = keys.index(key)
             x, y = (n % self.columns)*self.cell_width+5, (n//self.columns)*self.cell_height+5
@@ -293,7 +304,22 @@ class DisplayView(ttk.Treeview):
                 outline='#087f8c' if chosen or key == self.focus() else '#dce4eb', width=2 if chosen else 1)
             data = super().item(key)
             picture = data['image']
-            if picture:
+            if self.kind == 'library':
+                self.canvas.create_rectangle(x+10,y+10,x+10+self.cover_width,y+10+self.cover_height,
+                                             fill='#e8edf1',outline='')
+                if picture:
+                    cache_key = (picture[0], self.cover_width, self.cover_height)
+                    photo = painted_images.get(cache_key) or self.tile_images.get(cache_key)
+                    if photo is None:
+                        # Copy the existing local thumbnail; keep the list image unchanged.
+                        source = tk.PhotoImage(master=self)
+                        self.tk.call(str(source), 'copy', picture[0])
+                        image = ImageOps.contain(ImageTk.getimage(source),
+                                                (self.cover_width, self.cover_height), Image.Resampling.LANCZOS)
+                        photo = ImageTk.PhotoImage(image, master=self)
+                    painted_images[cache_key] = photo
+                    self.canvas.create_image(x+10+self.cover_width/2,y+10+self.cover_height/2,image=photo)
+            elif picture:
                 self.canvas.create_image(x+width/2,y+58,image=picture[0])
             values = [str(v) for v in data['values']]
             if self.kind == 'library':
@@ -304,6 +330,8 @@ class DisplayView(ttk.Treeview):
                 number,title,status,progress,size,fmt,resets = values
                 text = self._lines(title or number,width-20,2)+'\n'+self._lines(f'{number} · {fmt}',width-20,1)
                 text += '\n'+status+'\n'+self._lines(progress,width-20,1)+'\n'+self._lines(size,width-20,1)
-            self.canvas.create_text(x+10,y+115,anchor='nw',text=text,font=self.tile_font,fill='#172c3e')
+            text_top = self.cover_height+20 if self.kind == 'library' else 115
+            self.canvas.create_text(x+10,y+text_top,anchor='nw',text=text,font=self.tile_font,fill='#172c3e')
             if chosen:
                 self.canvas.create_text(x+width-10,y+8,anchor='ne',text='✓',fill='#087f8c',font=self.tile_font)
+        self.tile_images = painted_images

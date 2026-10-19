@@ -179,10 +179,17 @@ public final class LibraryScreen {
         final ImageView image;final TextView placeholder;final CheckedTextView text;final boolean tile=tiles;
         CoverRow(){
             super(activity);setOrientation(tile?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);setGravity(Gravity.CENTER_VERTICAL);setPadding(dp(4),dp(8),dp(4),dp(8));
-            FrameLayout frame=new FrameLayout(activity);frame.setBackgroundColor(Color.rgb(232,237,241));
+            FrameLayout frame=new FrameLayout(activity){
+                @Override protected void onMeasure(int widthSpec,int heightSpec){
+                    // Four columns can be much narrower than the old fixed 136dp cover.
+                    if(tile&&MeasureSpec.getMode(widthSpec)!=MeasureSpec.UNSPECIFIED)
+                        heightSpec=MeasureSpec.makeMeasureSpec(Math.max(1,Math.round(MeasureSpec.getSize(widthSpec)*4f/3f)),MeasureSpec.EXACTLY);
+                    super.onMeasure(widthSpec,heightSpec);
+                }
+            };frame.setBackgroundColor(Color.rgb(232,237,241));
             image=new ImageView(activity);image.setScaleType(ImageView.ScaleType.FIT_CENTER);frame.addView(image,new FrameLayout.LayoutParams(-1,-1));
             placeholder=new TextView(activity);placeholder.setText("暂无\n封面");placeholder.setTextSize(12);placeholder.setGravity(Gravity.CENTER);placeholder.setTextColor(Color.rgb(97,115,135));frame.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));
-            addView(frame,new LinearLayout.LayoutParams(tile?-1:dp(64),dp(tile?136:86)));
+            addView(frame,new LinearLayout.LayoutParams(tile?-1:dp(64),tile?-2:dp(86)));
             text=new CheckedTextView(activity);text.setTextSize(14);text.setMaxLines(4);if(tile)text.setMinLines(4);text.setEllipsize(TextUtils.TruncateAt.END);text.setPadding(tile?dp(4):dp(12),tile?dp(6):0,0,0);
             addView(text,tile?new LinearLayout.LayoutParams(-1,-2):new LinearLayout.LayoutParams(0,-2,1));
         }

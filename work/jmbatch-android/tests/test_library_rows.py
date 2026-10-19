@@ -27,7 +27,16 @@ def nested_class(name):
 program = r'''import java.util.*;
 import java.util.concurrent.RejectedExecutionException;
 public class LibraryRowsTest {
-static class View {static final int VISIBLE=0,GONE=8;int visibility;void setVisibility(int v){visibility=v;}}
+static class View {
+    static final int VISIBLE=0,GONE=8;int visibility;void setVisibility(int v){visibility=v;}
+    protected void onMeasure(int width,int height){}
+    static class MeasureSpec {
+        static final int UNSPECIFIED=0,EXACTLY=0x40000000;
+        static int getMode(int value){return value&0xc0000000;}
+        static int getSize(int value){return value&0x3fffffff;}
+        static int makeMeasureSpec(int size,int mode){return size|mode;}
+    }
+}
 static class ViewGroup extends View {}
 static class LinearLayout extends ViewGroup {
     static final int VERTICAL=1,HORIZONTAL=0;void setOrientation(int n){}

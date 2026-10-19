@@ -153,11 +153,43 @@ public class LibraryScreenRuntimeTest {
     }
     @Test @Config(qualifiers="w800dp-h360dp-mdpi")
     public void wideTiles() throws Exception {open(true,80);assertFourAcross();}
+    @Test @Config(sdk={29,35})
+    public void coversFollowCardWidthWithoutCroppingAndSurviveModeSwitch() throws Exception {
+        open(true,12);
+        android.view.View row=grid().getAdapter().getView(0,null,grid());
+        android.widget.ImageView image=(android.widget.ImageView)field(row,"image");
+        for(int width:new int[]{48,64,96,180}){
+            for(int[] size:new int[][]{{72,96},{192,96},{48,192}}){
+                android.graphics.Bitmap bitmap=android.graphics.Bitmap.createBitmap(size[0],size[1],android.graphics.Bitmap.Config.ARGB_8888);
+                image.setImageBitmap(bitmap);
+                row.measure(android.view.View.MeasureSpec.makeMeasureSpec(width,android.view.View.MeasureSpec.EXACTLY),
+                            android.view.View.MeasureSpec.makeMeasureSpec(0,android.view.View.MeasureSpec.UNSPECIFIED));
+                row.layout(0,0,width,row.getMeasuredHeight());
+                android.view.View frame=(android.view.View)image.getParent();
+                assertEquals(Math.round(frame.getWidth()*4f/3f),frame.getHeight());
+                android.graphics.RectF bounds=new android.graphics.RectF(image.getDrawable().getBounds());
+                image.getImageMatrix().mapRect(bounds);
+                assertTrue(bounds.left>=-.01f&&bounds.top>=-.01f);
+                assertTrue(bounds.right<=image.getWidth()+.01f&&bounds.bottom<=image.getHeight()+.01f);
+                assertEquals(size[0]/(float)size[1],bounds.width()/bounds.height(),.01f);
+                assertEquals(image.getWidth()/2f,bounds.centerX(),.6f);
+                assertEquals(image.getHeight()/2f,bounds.centerY(),.6f);
+            }
+        }
+        display(false);
+        android.view.View listRow=grid().getAdapter().getView(0,row,grid());
+        assertNotSame(row,listRow);
+        android.view.View frame=(android.view.View)((android.widget.ImageView)field(listRow,"image")).getParent();
+        assertEquals(64,frame.getLayoutParams().width);assertEquals(86,frame.getLayoutParams().height);
+        display(true);assertFourAcross();
+    }
     private void assertFourAcross() throws Exception {
         for(int i=0;i<4;i++){
             android.view.View child=grid().getChildAt(i);
             assertEquals(grid().getChildAt(0).getTop(),child.getTop());
             assertTrue(child.getLeft()>=0&&child.getRight()<=grid().getWidth());
+            android.view.View frame=((android.view.ViewGroup)child).getChildAt(0);
+            assertEquals("cover height follows the actual column width",Math.round(frame.getWidth()*4f/3f),frame.getHeight());
         }
         if(grid().getChildCount()>4)assertTrue(grid().getChildAt(4).getTop()>grid().getChildAt(0).getTop());
         else assertEquals("one complete row fits the landscape viewport",4,grid().getChildCount());
