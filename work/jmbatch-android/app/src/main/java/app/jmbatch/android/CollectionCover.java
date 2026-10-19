@@ -15,9 +15,14 @@ final class CollectionCover {
         for(int i=0;i<Math.min(4,entries.size());i++){
             int x=12+(i%2)*64,y=30+(i/2)*76;paint.setColor(Color.rgb(245,247,250));canvas.drawRect(x,y,x+56,y+70,paint);
             Bitmap image=LibraryCover.load(context,entries.get(i));
-            if(image!=null){float scale=Math.min(56f/image.getWidth(),70f/image.getHeight()),w=image.getWidth()*scale,h=image.getHeight()*scale;
-                canvas.drawBitmap(image,null,new RectF(x+(56-w)/2,y+(70-h)/2,x+(56+w)/2,y+(70+h)/2),paint);}
+            if(image!=null)drawCover(canvas,image,x,y,paint);
         }
         return result;
+    }
+    static void drawCover(Canvas canvas,Bitmap image,int x,int y,Paint paint){
+        float scale=Math.max(56f/image.getWidth(),70f/image.getHeight()),w=image.getWidth()*scale,h=image.getHeight()*scale;
+        int saved=canvas.save();canvas.clipRect(x,y,x+56,y+70);
+        canvas.drawBitmap(image,null,new RectF(x+(56-w)/2,y+(70-h)/2,x+(56+w)/2,y+(70+h)/2),paint);
+        canvas.restoreToCount(saved);
     }
 }

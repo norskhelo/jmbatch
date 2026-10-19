@@ -84,6 +84,29 @@ public class CollectionRuntimeTest {
         Bitmap bitmap=CollectionCover.load(context,previews);assertNotNull(bitmap);assertEquals(144,bitmap.getWidth());assertEquals(192,bitmap.getHeight());
         library.moveToCollection(comics,"");assertTrue(library.collectionPreviews().get(folder).isEmpty());assertNotNull(CollectionCover.load(context,Collections.emptyList()));
     }
+    @Test @Config(sdk=35) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    public void collectionCoverFillsOnlyItsSlotFromTheCenter(){
+        for(int[] size:new int[][]{{240,96},{48,192},{72,96}}){
+            Bitmap source=Bitmap.createBitmap(size[0],size[1],Bitmap.Config.ARGB_8888);
+            source.eraseColor(android.graphics.Color.GREEN);
+            if(size[0]>size[1]){
+                android.graphics.Canvas stripes=new android.graphics.Canvas(source);
+                android.graphics.Paint red=new android.graphics.Paint();red.setColor(android.graphics.Color.RED);
+                stripes.drawRect(0,0,72,96,red);stripes.drawRect(168,0,240,96,red);
+            }
+            Bitmap preview=Bitmap.createBitmap(144,192,Bitmap.Config.ARGB_8888);preview.eraseColor(android.graphics.Color.WHITE);
+            android.graphics.Canvas canvas=new android.graphics.Canvas(preview);
+            android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG);
+            CollectionCover.drawCover(canvas,source,12,30,paint);
+            for(int y:new int[]{32,65,97})for(int x:new int[]{14,40,65})assertEquals(android.graphics.Color.GREEN,preview.getPixel(x,y));
+            for(int[] point:new int[][]{{11,65},{68,65},{40,29},{40,100},{90,65}})assertEquals(android.graphics.Color.WHITE,preview.getPixel(point[0],point[1]));
+            // The clip must be restored before the next cell or any following drawing.
+            paint.setColor(android.graphics.Color.BLUE);canvas.drawRect(76,30,132,100,paint);
+            assertEquals(android.graphics.Color.BLUE,preview.getPixel(90,65));
+            assertEquals(size[0],source.getWidth());assertEquals(size[1],source.getHeight());
+            preview.recycle();source.recycle();
+        }
+    }
     @Test public void corruptFolderReferenceProtectsOriginalFile()throws Exception {
         JSONObject data=new JSONObject(new String(Files.readAllBytes(file.toPath()),"UTF-8"));data.getJSONArray("entries").getJSONObject(0).put("collection","missing");
         byte[] bad=data.toString().getBytes("UTF-8");Files.write(file.toPath(),bad);reset();library=LibraryStore.get(context);

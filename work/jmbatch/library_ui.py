@@ -359,6 +359,7 @@ class LibraryWindow:
 
     def poll_covers(self):
         from PIL import ImageTk
+        from covers import fit_cover
         try:
             while True:
                 generation, key, result = self.cover_worker.results.get_nowait()
@@ -367,7 +368,7 @@ class LibraryWindow:
                 self.cover_pending.discard(key)
                 if not self.tree.exists(key):
                     continue
-                photo = ImageTk.PhotoImage(result, master=self.window) if result is not None else self.cover_placeholder
+                photo = ImageTk.PhotoImage(fit_cover(result), master=self.window) if result is not None else self.cover_placeholder
                 self.cover_images[key] = photo
                 self.tree.item(key, image=photo)
                 while len(self.cover_images) > 64:

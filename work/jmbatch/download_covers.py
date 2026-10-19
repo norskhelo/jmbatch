@@ -5,7 +5,7 @@ import queue
 import time
 
 from core import task_cache
-from covers import CoverWorker, load_cover
+from covers import CoverWorker, load_cover, fit_cover
 
 
 def cover_identity(task):
@@ -107,8 +107,7 @@ class DownloadCovers:
                 if previous and previous[0] == source and previous[1] == (result is not None):
                     continue
                 if result is not None:
-                    result = result.copy()
-                    result.thumbnail((54, 72))
+                    result = fit_cover(result, (54, 72))
                 photo = ImageTk.PhotoImage(result, master=self.tree) if result is not None else self.placeholder
                 self.images[key] = (source, result is not None, photo)
                 self.tree.item(key, image=photo)

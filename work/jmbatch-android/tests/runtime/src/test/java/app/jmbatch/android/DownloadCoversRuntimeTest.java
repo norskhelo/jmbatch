@@ -106,6 +106,7 @@ public class DownloadCoversRuntimeTest {
             Field queue=MainActivity.class.getDeclaredField("queue");queue.setAccessible(true);int y=((android.view.View)queue.get(activity)).getTop();
             Field rows=MainActivity.class.getDeclaredField("rows");rows.setAccessible(true);Object row=((java.util.Map)rows.get(activity)).get(task.key);
             Field cover=row.getClass().getDeclaredField("cover");cover.setAccessible(true);DownloadCovers.Target actual=(DownloadCovers.Target)cover.get(row);
+            assertEquals(ImageView.ScaleType.CENTER_CROP,actual.image.getScaleType());
             scroll.scrollTo(0,y);flush();assertNotNull("First scroll must load a visible row",actual.image.getDrawable());
             scroll.scrollTo(0,0);assertNull("Row should release its off-screen bitmap",actual.image.getDrawable());
             actual.next=Long.MAX_VALUE;scroll.scrollTo(0,y);

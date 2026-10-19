@@ -118,6 +118,7 @@ public static void main(String[] args){
     LibraryRowsTest f=new LibraryRowsTest();
     CoverRow row=f.bind(0,null);
     check(row.text.drawable==null&&!row.isChecked(),"browsing has no check mark");
+    check(row.image.scaleType==ImageView.ScaleType.CENTER_CROP,"list comic fills frame from center");
     f.batchMode=true;row=f.bind(0,row);
     settled(row,false,"entering batch must not replay a check/uncheck animation");
     Drawable original=row.text.drawable;int loads=f.activity.drawableLoads;
@@ -173,9 +174,9 @@ public static void main(String[] args){
     f.coverWorker.complete();check(CollectionCover.calls==1,"folder preview uses folder loader");
     row=f.bind(3,row);check(row.image.bitmap!=null&&row.placeholder.visibility==View.GONE,"folder preview replaces placeholder");
     f.tiles=true;row=f.bind(3,row);
-    check(row.image.scaleType==ImageView.ScaleType.FIT_CENTER,"collection tile keeps all panels visible");
+    check(row.image.scaleType==ImageView.ScaleType.CENTER_CROP,"collection tile fills cover frame");
     row=f.bind(0,row);check(row.image.scaleType==ImageView.ScaleType.CENTER_CROP,"recycled collection becomes center-filled comic");
-    row=f.bind(3,row);check(row.image.scaleType==ImageView.ScaleType.FIT_CENTER,"recycled comic restores full collection preview");
+    row=f.bind(3,row);check(row.image.scaleType==ImageView.ScaleType.CENTER_CROP,"recycled collection keeps center fill");
     System.out.println("LibraryRowsTest: "+checks+" checks passed (production rows/adapter, host drawable states)");
 }
 }

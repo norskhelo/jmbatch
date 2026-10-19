@@ -13,6 +13,11 @@ MAX_PIXELS = 40_000_000
 _pdf_lock = threading.Lock()  # PDFium calls must not overlap, even across windows.
 
 
+def fit_cover(image, size=SIZE):
+    """Fill a cover slot proportionally from the center, leaving the source intact."""
+    return ImageOps.fit(image, size, Image.Resampling.LANCZOS)
+
+
 def page_key(name):
     return [int(part) if part.isascii() and part.isdigit() else part.casefold()
             for part in re.split(r"([0-9]+)", name.replace("\\", "/"))]

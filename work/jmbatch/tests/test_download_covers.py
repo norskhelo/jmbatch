@@ -133,6 +133,18 @@ class DownloadCoverBindingTests(unittest.TestCase):
         self.assertEqual(self.decode.call_count, 1)
         self.covers.tree.item.assert_not_called()
 
+    def test_landscape_fills_download_slot_from_center_without_changing_source(self):
+        image = Image.new('RGB', (240,96), 'red')
+        image.paste('green',(84,0,156,96))
+        image.paste('blue',(156,0,240,96))
+        original = image.tobytes()
+        self.result('wide-page',image)
+        rendered = self.decode.call_args.args[0]
+        self.assertEqual(rendered.size,(54,72))
+        for xy in ((4,4),(49,67),(27,36)):
+            self.assertEqual(rendered.getpixel(xy),(0,128,0))
+        self.assertEqual(image.tobytes(),original)
+
     def test_cleanup_gap_preserves_photo_until_final_source_arrives(self):
         self.result("page-v1", Image.new("RGB", (80, 120)))
         self.covers.tree.item.reset_mock()

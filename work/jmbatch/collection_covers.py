@@ -1,5 +1,6 @@
 """Small local-only folder previews, loaded through the existing cover worker."""
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw
+from covers import fit_cover
 
 
 def load_collection_cover(children, load):
@@ -12,6 +13,6 @@ def load_collection_cover(children, load):
         draw.rectangle((x, y, x + 55, y + 69), fill="#f5f7fa", outline="#b5c4ce")
         image = load(path, fmt)
         if image is not None:
-            image = ImageOps.contain(image.convert("RGB"), (56, 70))
-            preview.paste(image, (x + (56-image.width)//2, y + (70-image.height)//2))
+            image = fit_cover(image.convert("RGB"), (56, 70))
+            preview.paste(image, (x, y))
     return preview.resize((72, 96), Image.Resampling.LANCZOS)

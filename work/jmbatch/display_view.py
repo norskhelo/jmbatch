@@ -3,7 +3,8 @@ import json
 import math
 import tkinter as tk
 from tkinter import ttk, font
-from PIL import Image, ImageOps, ImageTk
+from PIL import ImageTk
+from covers import fit_cover
 from core import atomic_json
 
 
@@ -308,18 +309,13 @@ class DisplayView(ttk.Treeview):
                 self.canvas.create_rectangle(x+10,y+10,x+10+self.cover_width,y+10+self.cover_height,
                                              fill='#e8edf1',outline='')
                 if picture:
-                    collection = data['values'][3] == '收藏夹'
-                    cache_key = (picture[0], self.cover_width, self.cover_height, collection)
+                    cache_key = (picture[0], self.cover_width, self.cover_height)
                     photo = painted_images.get(cache_key) or self.tile_images.get(cache_key)
                     if photo is None:
                         # Copy the existing local thumbnail; keep the list image unchanged.
                         source = tk.PhotoImage(master=self)
                         self.tk.call(str(source), 'copy', picture[0])
-                        # Fill comic tiles from the first page, cropping equally at
-                        # both edges. Keep every panel of collection previews visible.
-                        fit = ImageOps.contain if collection else ImageOps.fit
-                        image = fit(ImageTk.getimage(source),
-                                    (self.cover_width, self.cover_height), Image.Resampling.LANCZOS)
+                        image = fit_cover(ImageTk.getimage(source), (self.cover_width, self.cover_height))
                         photo = ImageTk.PhotoImage(image, master=self)
                     painted_images[cache_key] = photo
                     self.canvas.create_image(x+10+self.cover_width/2,y+10+self.cover_height/2,image=photo)

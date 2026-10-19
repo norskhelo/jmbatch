@@ -180,7 +180,7 @@ public class LibraryScreenRuntimeTest {
         display(false);
         android.view.View listRow=grid().getAdapter().getView(0,row,grid());
         assertNotSame(row,listRow);
-        assertEquals(android.widget.ImageView.ScaleType.FIT_CENTER,((android.widget.ImageView)field(listRow,"image")).getScaleType());
+        assertEquals(android.widget.ImageView.ScaleType.CENTER_CROP,((android.widget.ImageView)field(listRow,"image")).getScaleType());
         android.view.View frame=(android.view.View)((android.widget.ImageView)field(listRow,"image")).getParent();
         assertEquals(64,frame.getLayoutParams().width);assertEquals(86,frame.getLayoutParams().height);
         display(true);assertFourAcross();

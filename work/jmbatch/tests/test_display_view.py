@@ -147,7 +147,7 @@ class DisplayViewTest(unittest.TestCase):
             (home/'display.json').write_text('broken',encoding='utf-8')
             self.assertEqual(load_mode(home,'library'),'list')
 
-    def test_landscape_keeps_center_and_collection_keeps_all_panels(self):
+    def test_comic_and_collection_tiles_use_same_center_fill(self):
         image = Image.new('RGB', (240, 96), 'red')
         image.paste('green', (84, 0, 156, 96))
         image.paste('blue', (156, 0, 240, 96))
@@ -161,6 +161,5 @@ class DisplayViewTest(unittest.TestCase):
         comic, folder = [photos[self.view.canvas.itemcget(i, 'image')] for i in painted]
         self.assertEqual(comic.getpixel((comic.width//2,comic.height//2))[:3], (0,128,0))
         self.assertEqual(comic.size, (self.view.cover_width,self.view.cover_height))
-        self.assertGreater(folder.width/folder.height, 2)
-        self.assertEqual(folder.getpixel((0,folder.height//2))[:3], (255,0,0))
-        self.assertEqual(folder.getpixel((folder.width-1,folder.height//2))[:3], (0,0,255))
+        self.assertEqual(folder.size,comic.size)
+        self.assertEqual(folder.tobytes(),comic.tobytes())
