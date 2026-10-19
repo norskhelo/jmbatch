@@ -117,6 +117,30 @@ public class LibraryScreenRuntimeTest {
         assertTrue("scrolled away from beginning",grid().getFirstVisiblePosition()>0);
     }
     @Test public void emptyList() throws Exception {open(false,0);}
+    @Test public void collectionsShareGridNavigateMoveAndRestoreState() throws Exception {
+        open(true,6);LibraryStore library=LibraryStore.get(activity);
+        String folder=library.createCollection("待读");
+        java.util.List<LibraryStore.Entry> comics=library.list("",false);
+        library.moveToCollection(comics.subList(0,2),folder);call("load",new Class<?>[0]);settle();
+        assertEquals(5,grid().getCount());assertTrue(((LibraryStore.Entry)grid().getItemAtPosition(0)).isCollection());
+        call("setBatchMode",new Class<?>[]{boolean.class},true);frames();call("select",new Class<?>[]{int.class},0);
+        assertEquals(4,screen.saveState().getStringArrayList("selected").size());
+        call("itemClick",new Class<?>[]{int.class},0);settle();
+        assertEquals(folder,screen.saveState().getString("collection"));assertFalse(screen.saveState().getBoolean("batch"));assertEquals(2,grid().getCount());
+        Bundle saved=screen.saveState();screen.close();frames();screen=new LibraryScreen(activity,Store.get(activity));screen.show(saved);settle();
+        assertEquals(folder,screen.saveState().getString("collection"));assertEquals(2,grid().getCount());
+        call("setBatchMode",new Class<?>[]{boolean.class},true);frames();call("select",new Class<?>[]{int.class},0);
+        call("moveToCollection",new Class<?>[0]);
+        android.app.AlertDialog chooser=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+        assertEquals(2,chooser.getListView().getCount());chooser.getListView().performItemClick(null,0,0);settle();settle();
+        assertEquals(0,grid().getCount());assertEquals(7,library.browse("",false,"").size());
+        ((android.widget.Button)field(screen,"backButton")).performClick();settle();assertEquals(7,grid().getCount());
+        call("itemLongClick",new Class<?>[]{int.class},0);
+        android.app.AlertDialog manage=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();assertEquals(3,manage.getListView().getCount());
+        manage.getListView().performItemClick(null,2,2);
+        android.app.AlertDialog confirm=org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();assertNotSame(manage,confirm);
+        confirm.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();settle();settle();assertEquals(6,grid().getCount());
+    }
     @Test public void emptyTiles() throws Exception {open(true,0);}
     @Test public void populatedList() throws Exception {open(false,80);}
     @Test public void populatedTiles() throws Exception {open(true,80);}

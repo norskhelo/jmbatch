@@ -298,7 +298,8 @@ class DisplayView(ttk.Treeview):
             values = [str(v) for v in data['values']]
             if self.kind == 'library':
                 favorite, number, title, fmt = values
-                text = self._lines(title,width-20,2)+'\n'+self._lines(f'{favorite} JM{number} · {fmt}',width-20,1)
+                subtitle = f'{number} · 收藏夹' if fmt == '收藏夹' else f'{favorite} JM{number} · {fmt}'
+                text = self._lines(title,width-20,2)+'\n'+self._lines(subtitle,width-20,1)
             else:
                 number,title,status,progress,size,fmt,resets = values
                 text = self._lines(title or number,width-20,2)+'\n'+self._lines(f'{number} · {fmt}',width-20,1)

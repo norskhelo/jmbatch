@@ -17,11 +17,15 @@ class LibraryWindow:
         self.pressed = None
         self.row_press = False
         self.filter = ("", False)
+        self.collection = ""
+        self.visible_items = {}
         self.cancelled = threading.Event()
         self.events = queue.Queue()
         from covers import CoverWorker
         from cover_cache import CoverCache
-        self.cover_worker = CoverWorker(CoverCache(self.library.path.parent).load)
+        cache = CoverCache(self.library.path.parent)
+        from collection_covers import load_collection_cover
+        self.cover_worker = CoverWorker(lambda path, fmt: load_collection_cover(path, cache.load) if fmt == "collection" else cache.load(path, fmt))
         self.cover_generation = 0
         self.cover_pending = set()
         self.cover_images = OrderedDict()
@@ -33,7 +37,7 @@ class LibraryWindow:
         body = ttk.Frame(self.window, padding=16)
         body.pack(fill="both", expand=True)
         body.columnconfigure(0, weight=1)
-        body.rowconfigure(3, weight=1)
+        body.rowconfigure(4, weight=1)
         self.hint = tk.StringVar(value="点击漫画开始阅读，长按进入批量处理。")
         ttk.Label(body, textvariable=self.hint).grid(row=0, column=0, sticky="w")
         bar = ttk.Frame(body)
@@ -47,8 +51,16 @@ class LibraryWindow:
         ttk.Button(bar, text="扫描保存目录", command=self.scan).grid(row=0, column=3, padx=6)
         ttk.Button(bar, text="刷新", command=self.refresh).grid(row=0, column=4)
         self.query.trace_add("write", lambda *_: self.render())
+        collection_bar = ttk.Frame(body)
+        collection_bar.grid(row=2, column=0, sticky="ew", pady=(0, 6))
+        self.breadcrumb = tk.StringVar(value="漫画库（默认收藏夹）")
+        ttk.Label(collection_bar, textvariable=self.breadcrumb, width=32).pack(side="left", fill="x", expand=True)
+        self.back_button = ttk.Button(collection_bar, text="返回漫画库", command=lambda: self.navigate(""))
+        self.back_button.pack(side="left", padx=4)
+        ttk.Button(collection_bar, text="新建收藏夹", command=self.create_collection).pack(side="left", padx=4)
+        ttk.Button(collection_bar, text="管理收藏夹", command=self.manage_collection).pack(side="left")
         select_bar = ttk.Frame(body)
-        select_bar.grid(row=2, column=0, sticky="ew", pady=(0, 6))
+        select_bar.grid(row=3, column=0, sticky="ew", pady=(0, 6))
         self.mode_button = ttk.Button(select_bar, text="批量处理", command=self.toggle_batch)
         self.mode_button.pack(side="left", padx=(0, 6))
         self.selection_controls = ttk.Frame(select_bar)
@@ -58,7 +70,7 @@ class LibraryWindow:
         self.stop_button = ttk.Button(select_bar, text="停止操作", command=self.cancelled.set, state="disabled")
         self.stop_button.pack(side="right")
         holder = ttk.Frame(body)
-        holder.grid(row=3, column=0, sticky="nsew")
+        holder.grid(row=4, column=0, sticky="nsew")
         ttk.Style(self.window).configure("Library.Treeview", rowheight=106)
         from display_view import DisplayView, load_mode, mode_buttons
         self.display_mode = tk.StringVar(value=load_mode(self.library.path.parent, "library"))
@@ -90,11 +102,11 @@ class LibraryWindow:
         self.tree.bind("<Return>", self.keyboard_activate)
         self.tree.bind("<space>", self.keyboard_activate)
         self.tree.bind("<Control-a>", lambda e: self.select("all") or "break")
-        self.window.bind("<Escape>", lambda e: self.exit_batch())
+        self.window.bind("<Escape>", lambda e: self.exit_batch() if self.batch_mode else self.navigate(""))
         self.tree.bind("<<TreeviewSelect>>", self.details)
         # Reserve footer space independently of the list's requested height.
         footer = ttk.Frame(body)
-        footer.grid(row=4, column=0, sticky="ew", pady=(8, 0))
+        footer.grid(row=5, column=0, sticky="ew", pady=(8, 0))
         footer.columnconfigure(0, weight=1)
         self.detail = tk.StringVar()
         ttk.Label(footer, textvariable=self.detail, width=1).grid(row=0, column=0, sticky="ew")
@@ -106,7 +118,7 @@ class LibraryWindow:
         self.action_buttons = {}
         self.batch_rows = []
         for row, pairs in enumerate(((("开始阅读", "open"), ("导出漫画", "export"), ("打开保存目录", "folder"), ("删除章节", "chapters")),
-                      (("批量收藏", "favorite_on"), ("取消收藏", "favorite_off"), ("批量删除文件", "delete"), ("仅移除记录", "forget"))), start=3):
+                      (("批量收藏", "favorite_on"), ("取消收藏", "favorite_off"), ("移入收藏夹", "collection"), ("批量删除文件", "delete"), ("仅移除记录", "forget"))), start=3):
             actions = ttk.Frame(footer)
             actions.grid(row=row, column=0, sticky="ew", pady=3)
             self.batch_rows.append(actions)
@@ -136,6 +148,97 @@ class LibraryWindow:
             save_mode(self.library.path.parent, "library", self.display_mode.get())
         except OSError as exc:
             self.status.set(f"显示方式未能保存：{exc}")
+
+    def navigate(self, collection):
+        if self.busy:
+            return "break"
+        self.collection = collection
+        self.exit_batch()
+        self.query.set("")
+        self.only_favorites.set(False)
+        self.render()
+        return "break"
+
+    def activate(self, key):
+        if key in self.library.collections:
+            self.navigate(key)
+        elif key in self.library.entries:
+            self.app.read_comic(key)
+
+    def create_collection(self):
+        if self.busy:
+            return
+        from tkinter import simpledialog
+        name = simpledialog.askstring("新建收藏夹", "收藏夹名称（1–40 个字符）", parent=self.window)
+        if name is not None:
+            try:
+                key = self.library.create_collection(name)
+                self.navigate("")
+                self.tree.see(key)
+                self.status.set("收藏夹已创建。长按漫画或进入批量处理后，可移入收藏夹。")
+            except Exception as exc:
+                self.messagebox.showerror("无法创建收藏夹", str(exc), parent=self.window)
+
+    def choose_collection(self, title, callback, include_default=False):
+        import tkinter as tk
+        from tkinter import ttk
+        choices = ([ ("", "漫画库（默认收藏夹）") ] if include_default else []) + list(self.library.collections.items())
+        if not choices:
+            self.messagebox.showinfo("收藏夹", "请先新建收藏夹。", parent=self.window)
+            return
+        dialog = tk.Toplevel(self.window)
+        dialog.title(title)
+        dialog.transient(self.window)
+        box = tk.Listbox(dialog, width=44, height=min(12, len(choices)), exportselection=False)
+        box.pack(fill="both", expand=True, padx=12, pady=12)
+        for _, name in choices:
+            box.insert("end", name)
+        box.selection_set(0)
+        def confirm():
+            if box.curselection():
+                key = choices[box.curselection()[0]][0]
+                dialog.destroy()
+                callback(key)
+        ttk.Button(dialog, text="确定", command=confirm).pack(pady=(0, 12))
+        box.bind("<Double-Button-1>", lambda e: confirm())
+        dialog.grab_set()
+
+    def manage_collection(self):
+        if self.busy:
+            return
+        import tkinter as tk
+        from tkinter import ttk, simpledialog
+        def manage(key):
+            dialog = tk.Toplevel(self.window)
+            dialog.title("管理收藏夹")
+            dialog.transient(self.window)
+            ttk.Label(dialog, text=self.library.collection_name(key), wraplength=360).pack(padx=16, pady=16)
+            def rename():
+                name = simpledialog.askstring("重命名收藏夹", "收藏夹名称", initialvalue=self.library.collection_name(key), parent=dialog)
+                if name is not None:
+                    try:
+                        self.library.rename_collection(key, name)
+                        dialog.destroy()
+                        self.render()
+                    except Exception as exc:
+                        self.messagebox.showerror("无法重命名", str(exc), parent=dialog)
+            def delete():
+                if self.messagebox.askyesno("删除收藏夹", "仅删除此收藏夹，其中的漫画将回到漫画库。漫画文件、星标和阅读记录保留。", parent=dialog):
+                    try:
+                        self.library.delete_collection(key)
+                        dialog.destroy()
+                        self.navigate("")
+                    except Exception as exc:
+                        self.messagebox.showerror("无法删除收藏夹", str(exc), parent=dialog)
+            ttk.Button(dialog, text="重命名", command=rename).pack(padx=16, pady=4)
+            ttk.Button(dialog, text="删除收藏夹", command=delete).pack(padx=16, pady=(4, 16))
+            dialog.grab_set()
+        keys = self.tree.selection()
+        key = keys[0] if len(keys) == 1 and keys[0] in self.library.collections else self.collection
+        if key:
+            manage(key)
+        else:
+            self.choose_collection("选择要管理的收藏夹", manage)
 
     def cover_destroyed(self, event):
         if event.widget == self.window:
@@ -198,7 +301,7 @@ class LibraryWindow:
                     self.tree.selection_add(key)
                 self.details()
             else:
-                self.app.read_comic(pressed[0])
+                self.activate(pressed[0])
         return "break" if row_press else None
 
     def keyboard_activate(self, event=None):
@@ -211,7 +314,7 @@ class LibraryWindow:
                     self.tree.selection_add(key)
                 self.details()
             else:
-                self.app.read_comic(key)
+                self.activate(key)
         return "break"
 
     def enter_batch(self, key=None):
@@ -241,7 +344,7 @@ class LibraryWindow:
 
     def update_mode(self):
         self.mode_button.configure(text="完成" if self.batch_mode else "批量处理")
-        self.hint.set("批量处理：点击漫画勾选或取消，点击“完成”或按 Esc 退出。" if self.batch_mode else "点击漫画开始阅读，长按进入批量处理。")
+        self.hint.set("批量处理：勾选漫画后可移入收藏夹，点击“完成”或按 Esc 退出。" if self.batch_mode else "点击漫画阅读，点击收藏夹进入；长按进入批量处理。")
         if self.batch_mode:
             self.selection_controls.pack(side="left")
             self.path_entry.grid()
@@ -280,8 +383,8 @@ class LibraryWindow:
                 continue
             if key in self.cover_images:
                 self.cover_images.move_to_end(key)
-            elif key not in self.cover_pending and key in self.library.entries:
-                item = self.library.entries[key]
+            elif key not in self.cover_pending and key in self.visible_items:
+                item = self.visible_items[key]
                 try:
                     self.cover_worker.jobs.put_nowait((self.cover_generation, key, item["path"], item["format"]))
                     self.cover_pending.add(key)
@@ -317,7 +420,9 @@ class LibraryWindow:
         if self.busy:
             return
         self.cancel_press()
-        current_filter = (self.query.get(), self.only_favorites.get())
+        if self.collection and self.collection not in self.library.collections:
+            self.collection = ""
+        current_filter = (self.query.get(), self.only_favorites.get(), self.collection)
         same_filter = current_filter == self.filter
         selected = self.tree.selection() if same_filter and self.batch_mode else ()
         children = self.tree.get_children()
@@ -325,7 +430,19 @@ class LibraryWindow:
         position = self.tree.item_position() if children else 0
         first = min(int(position), max(0, len(children) - 1))
         self.filter = current_filter
-        items = self.library.select(*current_filter)
+        items = self.library.browse(*current_filter)
+        previous_folders = {k: v for k, v in self.visible_items.items() if k in self.library.collections}
+        self.visible_items = dict(items)
+        current_folders = {k: v for k, v in items if k in self.library.collections}
+        self.breadcrumb.set("漫画库 / " + self.library.collection_name(self.collection) if self.collection else "漫画库（默认收藏夹）")
+        self.back_button.configure(state="normal" if self.collection else "disabled")
+        if previous_folders != current_folders and same_filter:
+            self.cover_generation += 1
+            self.cover_worker.clear()
+            self.cover_pending.clear()
+            self.cover_images.clear()
+            for key in children:
+                self.tree.item(key, image=self.cover_placeholder)
         keys = [key for key, _ in items]
         present = set(keys)
         if not same_filter:
@@ -340,7 +457,9 @@ class LibraryWindow:
                     self.tree.delete(key)
                     self.cover_images.pop(key, None)
         for index, (key, item) in enumerate(items):
-            values = ("★" if item["favorite"] else "", item["id"] or "未识别", item["title"], item["format"].upper())
+            values = ("" if item["format"] == "collection" else "★" if item["favorite"] else "",
+                      item["id"] + " 本" if item["format"] == "collection" else item["id"] or "未识别",
+                      item["title"], "收藏夹" if item["format"] == "collection" else item["format"].upper())
             if self.tree.exists(key):
                 self.tree.item(key, values=values)
                 self.tree.move(key, "", index)
@@ -367,6 +486,8 @@ class LibraryWindow:
         self.path_text.set(path)
         for action, button in self.action_buttons.items():
             enabled = self.batch_mode and (len(selected) == 1 if action in ("open", "folder", "chapters") else bool(selected))
+            if any(k not in self.library.entries for k in selected) and action != "open":
+                enabled = False
             button.configure(state="normal" if enabled else "disabled")
 
     def run(self, operation, finished, pause_required=False):
@@ -431,7 +552,23 @@ class LibraryWindow:
         if not selected:
             return
         try:
-            if action == "chapters":
+            if action == "open":
+                if len(selected) == 1:
+                    self.activate(selected[0])
+                return
+            if any(k not in self.library.entries for k in selected):
+                self.messagebox.showinfo("请选择漫画", "此操作仅适用于漫画。收藏夹请使用“管理收藏夹”。", parent=self.window)
+                return
+            if action == "collection":
+                def move(key):
+                    try:
+                        self.library.move_to_collection(selected, key)
+                        self.status.set(f"已将 {len(selected)} 本漫画移入{self.library.collection_name(key)}")
+                        self.render()
+                    except Exception as exc:
+                        self.messagebox.showerror("移动失败", str(exc), parent=self.window)
+                self.choose_collection("移入收藏夹", move, True)
+            elif action == "chapters":
                 if len(selected) == 1:
                     from chapter_delete_ui import show
                     show(self, selected[0])

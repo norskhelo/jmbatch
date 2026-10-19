@@ -75,9 +75,10 @@ static class Activity {
 }
 static class BaseAdapter {int changes;void notifyDataSetChanged(){changes++;}}
 static class LibraryStore {static class Entry {
-    String uri,format="zip",label="test";boolean favorite;Entry(String s){uri=s;}
+    String uri,format="zip",label="test";boolean favorite;Entry(String s){uri=s;}boolean isCollection(){return format.equals("collection");}
 }}
 static class LibraryCover {static Bitmap load(Activity a,LibraryStore.Entry e){return new Bitmap();}}
+static class CollectionCover {static int calls;static Bitmap load(Activity a,List<LibraryStore.Entry> e){calls++;return new Bitmap();}}
 static class Cover {final Bitmap bitmap;Cover(Bitmap b){bitmap=b;}}
 static class Worker {
     List<Runnable> queue=new ArrayList<>();boolean isShutdown(){return false;}
@@ -87,6 +88,7 @@ static class Handler {void post(Runnable r){r.run();}}
 final Activity activity=new Activity();boolean batchMode,tiles;int coverGeneration;
 final Set<String> selected=new HashSet<>(),coverPending=new HashSet<>();
 final Map<String,Cover> coverCache=new HashMap<>();final Worker coverWorker=new Worker();
+final Map<String,List<LibraryStore.Entry>> collectionPreviews=new HashMap<>();
 final Handler main=new Handler();final List<LibraryStore.Entry> entries=new ArrayList<>();
 final BaseAdapter adapter=new CoverAdapter();int dp(int n){return n;}
 String title(LibraryStore.Entry e){return e.uri;}boolean visible(){return true;}
@@ -156,6 +158,10 @@ public static void main(String[] args){
     settled(row,false,"recycled tile maps current comic selection");
     f.tiles=false;row=f.bind(1,row);check(!row.tile&&row!=previous,"switching back restores list row");
     settled(row,true,"switching back retains selection without animation");
+    LibraryStore.Entry folder=new LibraryStore.Entry("collection:one");folder.format="collection";folder.label="2 本漫画";f.entries.add(folder);
+    row=f.bind(3,row);check(row.text.drawable==null&&row.text.value.contains("收藏夹"),"folder card labelled and excluded from comic choices");
+    f.coverWorker.complete();check(CollectionCover.calls==1,"folder preview uses folder loader");
+    row=f.bind(3,row);check(row.image.bitmap!=null&&row.placeholder.visibility==View.GONE,"folder preview replaces placeholder");
     System.out.println("LibraryRowsTest: "+checks+" checks passed (production rows/adapter, host drawable states)");
 }
 }

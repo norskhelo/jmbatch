@@ -29,6 +29,10 @@ public final class LibraryScreen {
     private EditText query;
     private CheckBox favorites;
     private TextView status;
+    private TextView breadcrumb;
+    private Button backButton;
+    private String collection="";
+    private Map<String,List<LibraryStore.Entry>> collectionPreviews=new HashMap<>();
     private LibraryGridView list;
     private boolean tiles;
     private RadioGroup displaySelector;
@@ -64,6 +68,7 @@ public final class LibraryScreen {
         if(!visible())return null;
         Bundle state=new Bundle();state.putString("query",query.getText().toString());state.putBoolean("favorites",favorites.isChecked());
         state.putBoolean("batch",batchMode);state.putStringArrayList("selected",new ArrayList<>(selected));state.putString("report",report);
+        state.putString("collection",collection);
         Bundle viewport=pendingViewState!=null?pendingViewState:viewportState();state.putBundle("viewport",viewport);
         return state;
     }
@@ -89,6 +94,9 @@ public final class LibraryScreen {
         hint=new TextView(activity);hint.setTextSize(12);body.addView(hint);
         query=new EditText(activity);query.setSingleLine(true);query.setHint("搜索编号或标题");body.addView(query);
         favorites=new CheckBox(activity);favorites.setText("仅显示收藏");body.addView(new ActionRow(activity,favorites,button("扫描保存目录",this::scan),button("刷新",this::load)));
+        breadcrumb=new TextView(activity);breadcrumb.setTextSize(14);breadcrumb.setText("漫画库（默认收藏夹）");body.addView(breadcrumb);
+        backButton=button("返回漫画库",()->navigate(""));
+        row(body,backButton,button("新建收藏夹",()->editCollection(null)),button("管理收藏夹",this::manageCollection));
         modeButton=button("批量处理",()->setBatchMode(!batchMode));
         tiles=DisplayMode.tiles(activity,"library");displaySelector=DisplayMode.selector(activity,"library",this::changeDisplay);
         body.addView(new ActionRow(activity,modeButton,displaySelector));
@@ -109,18 +117,20 @@ public final class LibraryScreen {
         Button more=button("更多操作",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)details(items.get(0));});
         Button delete=button("删除文件",()->confirmRemove(true)),forget=button("仅移除记录",()->confirmRemove(false));
         Button chapters=button("删除章节",()->{List<LibraryStore.Entry> items=selection();if(items.size()==1)deleteChapters(items.get(0));});
+        Button move=button("移入收藏夹",this::moveToCollection);batchButtons.add(move);
         singleButtons.addAll(Arrays.asList(read,more,chapters));batchButtons.addAll(Arrays.asList(export,favoriteOn,favoriteOff,delete,forget));
-        row(batchActions,read,export,more);row(batchActions,favoriteOn,favoriteOff);row(batchActions,chapters,delete,forget);actions.addView(batchActions);
+        row(batchActions,read,export,more);row(batchActions,favoriteOn,favoriteOff,move);row(batchActions,chapters,delete,forget);actions.addView(batchActions);
         stop=new ActionButton(activity);stop.setText("停止操作");stop.setTextSize(12);stop.setEnabled(false);stop.setOnClickListener(v->cancel());
         row(actions,stop,button("关闭",()->dialog.dismiss()));root.addView(new ControlScroll(activity,actions));
         dialog=new Dialog(activity);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);dialog.setContentView(root);
-        dialog.setOnKeyListener((d,key,event)->{if(key==KeyEvent.KEYCODE_BACK&&batchMode&&!busy){if(event.getAction()==KeyEvent.ACTION_UP)setBatchMode(false);return true;}return false;});
+        dialog.setOnKeyListener((d,key,event)->{if(key==KeyEvent.KEYCODE_BACK&&!busy&&!loading&&(batchMode||!collection.isEmpty())){if(event.getAction()==KeyEvent.ACTION_UP){if(batchMode)setBatchMode(false);else navigate("");}return true;}return false;});
         dialog.setOnDismissListener(d->{generation++;resetCovers();cancel();worker.shutdown();coverWorker.shutdownNow();});dialog.show();dialog.getWindow().setLayout(-1,(int)(activity.getResources().getDisplayMetrics().heightPixels*0.93));dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN|WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         setBatchMode(saved!=null&&saved.getBoolean("batch"));
         if(saved!=null){
+            collection=saved.getString("collection","");
             query.setText(saved.getString("query",""));favorites.setChecked(saved.getBoolean("favorites"));report=saved.getString("report","");
             ArrayList<String> choices=saved.getStringArrayList("selected");if(batchMode&&choices!=null)selected.addAll(choices);
-            filter=query.getText().toString()+"|"+favorites.isChecked();pendingViewState=saved.getBundle("viewport");
+            filter=query.getText().toString()+"|"+favorites.isChecked()+"|"+collection;pendingViewState=saved.getBundle("viewport");
         }
         root.requestFocus();
         query.addTextChangedListener(new TextWatcher(){public void beforeTextChanged(CharSequence s,int st,int c,int a){}public void onTextChanged(CharSequence s,int st,int before,int count){load();}public void afterTextChanged(Editable e){}});
@@ -132,6 +142,7 @@ public final class LibraryScreen {
         list.post(()->restoreViewport(state));
     }
     private void read(LibraryStore.Entry entry){
+        if(entry.isCollection()){navigate(entry.uri);return;}
         returningFromReader=true;
         query.clearFocus();list.requestFocus();
         InputMethodManager keyboard=(InputMethodManager)activity.getSystemService(Context.INPUT_METHOD_SERVICE);
@@ -141,12 +152,14 @@ public final class LibraryScreen {
     private void itemClick(int position){
         if(busy||position<0||position>=entries.size()||!list.isEnabled())return;
         LibraryStore.Entry entry=entries.get(position);
+        if(entry.isCollection()){navigate(entry.uri);return;}
         if(!batchMode){read(entry);return;}
         if(!selected.add(entry.uri))selected.remove(entry.uri);
         list.setItemChecked(position,selected.contains(entry.uri));counts();
     }
     private boolean itemLongClick(int position){
         if(!busy&&position>=0&&position<entries.size()&&list.isEnabled()){
+            if(entries.get(position).isCollection()){manageCollection(entries.get(position).uri);return true;}
             if(!batchMode)setBatchMode(true);
             selected.add(entries.get(position).uri);list.setItemChecked(position,true);counts();
         }
@@ -157,7 +170,7 @@ public final class LibraryScreen {
         batchMode=value;selected.clear();list.clearChoices();
         list.setChoiceMode(value?ListView.CHOICE_MODE_MULTIPLE:ListView.CHOICE_MODE_NONE);
         modeButton.setText(value?"完成":"批量处理");
-        hint.setText(value?"批量处理：点击漫画勾选或取消，点击“完成”或按返回退出。":"点击漫画开始阅读，长按进入批量处理。");
+        hint.setText(value?"勾选漫画后可移入收藏夹；点击“完成”退出。":"点击漫画阅读，点击收藏夹进入；长按可管理。");
         selectionControls.setVisibility(value?View.VISIBLE:View.GONE);batchActions.setVisibility(value?View.VISIBLE:View.GONE);
         adapter.notifyDataSetChanged();counts();
     }
@@ -188,13 +201,14 @@ public final class LibraryScreen {
         public int getCount(){return entries.size();}public Object getItem(int position){return entries.get(position);}public long getItemId(int position){return position;}
         public View getView(int position,View recycled,ViewGroup parent){
             CoverRow row=recycled instanceof CoverRow&&((CoverRow)recycled).tile==tiles?(CoverRow)recycled:new CoverRow();LibraryStore.Entry entry=entries.get(position);
-            row.text.setText((entry.favorite?"★ ":"")+title(entry)+"\n"+entry.format.toUpperCase(Locale.ROOT)+" · "+entry.label);
-            row.bindChoice(batchMode,selected.contains(entry.uri));
+            row.text.setText((entry.favorite?"★ ":"")+title(entry)+"\n"+(entry.isCollection()?"收藏夹":entry.format.toUpperCase(Locale.ROOT))+" · "+entry.label);
+            row.bindChoice(batchMode&&!entry.isCollection(),selected.contains(entry.uri));
             Cover cover=coverCache.get(entry.uri);Bitmap bitmap=cover==null?null:cover.bitmap;
-            row.image.setImageBitmap(bitmap);row.image.setContentDescription(bitmap==null?"暂无封面":"第一页封面");row.placeholder.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
+            row.image.setImageBitmap(bitmap);row.image.setContentDescription(entry.isCollection()?"收藏夹内漫画封面预览":bitmap==null?"暂无封面":"第一页封面");row.placeholder.setText(entry.isCollection()?"收藏夹":"暂无\n封面");row.placeholder.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
             if(cover==null&&!coverPending.contains(entry.uri)&&!coverWorker.isShutdown()){
                 final int ticket=coverGeneration;coverPending.add(entry.uri);
-                try{coverWorker.execute(()->{Bitmap result=LibraryCover.load(activity.getApplicationContext(),entry);main.post(()->{
+                final List<LibraryStore.Entry> previews=collectionPreviews.getOrDefault(entry.uri,Collections.emptyList());
+                try{coverWorker.execute(()->{Bitmap result=entry.isCollection()?CollectionCover.load(activity.getApplicationContext(),previews):LibraryCover.load(activity.getApplicationContext(),entry);main.post(()->{
                     if(!visible()||ticket!=coverGeneration)return;coverPending.remove(entry.uri);coverCache.put(entry.uri,new Cover(result));adapter.notifyDataSetChanged();
                 });});}catch(RejectedExecutionException error){coverPending.remove(entry.uri);}
             }
@@ -202,25 +216,27 @@ public final class LibraryScreen {
         }
     }
     private void cancel(){cancelled.set(true);if(scanSignal!=null)scanSignal.cancel();}
-    private void counts(){status.setText("共 "+entries.size()+" 项"+(batchMode?"，已选 "+selected.size()+" 项":"")+(report.isEmpty()?"":"\n"+report));modeButton.setEnabled(!busy&&!loading);for(int i=0;i<displaySelector.getChildCount();i++)displaySelector.getChildAt(i).setEnabled(!busy&&!loading);for(Button b:singleButtons)b.setEnabled(!busy&&!loading&&selected.size()==1);for(Button b:batchButtons)b.setEnabled(!busy&&!loading&&!selected.isEmpty());}
-    private void select(int mode){if(busy||loading||!batchMode)return;for(int i=0;i<entries.size();i++){String uri=entries.get(i).uri;boolean checked=mode==0||(mode==1&&!selected.contains(uri));if(checked)selected.add(uri);else selected.remove(uri);list.setItemChecked(i,checked);}counts();}
-    private List<LibraryStore.Entry> selection(){List<LibraryStore.Entry> result=new ArrayList<>();for(LibraryStore.Entry e:entries)if(selected.contains(e.uri))result.add(e);return result;}
+    private void counts(){status.setText("共 "+entries.size()+" 项"+(batchMode?"，已选 "+selected.size()+" 项":"")+(report.isEmpty()?"":"\n"+report));modeButton.setEnabled(!busy&&!loading);backButton.setEnabled(!busy&&!loading&&!collection.isEmpty());for(int i=0;i<displaySelector.getChildCount();i++)displaySelector.getChildAt(i).setEnabled(!busy&&!loading);for(Button b:singleButtons)b.setEnabled(!busy&&!loading&&selected.size()==1);for(Button b:batchButtons)b.setEnabled(!busy&&!loading&&!selected.isEmpty());}
+    private void select(int mode){if(busy||loading||!batchMode)return;for(int i=0;i<entries.size();i++){LibraryStore.Entry entry=entries.get(i);if(entry.isCollection())continue;String uri=entry.uri;boolean checked=mode==0||(mode==1&&!selected.contains(uri));if(checked)selected.add(uri);else selected.remove(uri);list.setItemChecked(i,checked);}counts();}
+    private List<LibraryStore.Entry> selection(){List<LibraryStore.Entry> result=new ArrayList<>();for(LibraryStore.Entry e:entries)if(!e.isCollection()&&selected.contains(e.uri))result.add(e);return result;}
     private void acceptEntries(List<LibraryStore.Entry> result){
         loading=false;entries=result;Set<String> present=new HashSet<>();list.clearChoices();
-        for(LibraryStore.Entry e:result)present.add(e.uri);selected.retainAll(present);
+        for(LibraryStore.Entry e:result)if(!e.isCollection())present.add(e.uri);selected.retainAll(present);
         for(int i=0;i<entries.size();i++)list.setItemChecked(i,selected.contains(entries.get(i).uri));
         adapter.notifyDataSetChanged();restoreViewport(pendingViewState);pendingViewState=null;list.setEnabled(true);counts();
     }
     private void load(){
         if(!visible()||busy)return;
-        final int ticket=++generation;String search=query.getText().toString();boolean only=favorites.isChecked();String nextFilter=search+"|"+only;
+        final int ticket=++generation;String search=query.getText().toString();boolean only=favorites.isChecked();String requestedCollection=collection;String nextFilter=search+"|"+only+"|"+collection;
         if(!filter.equals(nextFilter)){selected.clear();filter=nextFilter;pendingViewState=new Bundle();}
         else if(pendingViewState==null)pendingViewState=viewportState();
         loading=true;counts();status.setText("正在读取…");list.setEnabled(false);
         worker.execute(()->{
             try{
-                library=LibraryStore.get(activity);library.sync(store.snapshot());List<LibraryStore.Entry> result=library.list(search,only);
-                main.post(()->{if(!visible()||ticket!=generation)return;resetCovers();acceptEntries(result);});
+                library=LibraryStore.get(activity);library.sync(store.snapshot());
+                String folder=library.collectionName(requestedCollection)==null?"":requestedCollection;
+                List<LibraryStore.Entry> result=library.browse(search,only,folder);Map<String,List<LibraryStore.Entry>> previews=library.collectionPreviews();String name=library.collectionName(folder);
+                main.post(()->{if(!visible()||ticket!=generation)return;collection=folder;breadcrumb.setText(folder.isEmpty()?"漫画库（默认收藏夹）":"漫画库 / "+name);collectionPreviews=previews;resetCovers();acceptEntries(result);});
             }catch(Exception error){main.post(()->{if(visible()&&ticket==generation){loading=false;list.setEnabled(true);counts();status.setText(error.getMessage());}});}
         });
     }
@@ -231,6 +247,39 @@ public final class LibraryScreen {
             final String error=failure,done=result;main.post(()->{busy=false;scanSignal=null;if(!visible())return;stop.setEnabled(false);list.setEnabled(true);query.setEnabled(true);favorites.setEnabled(true);dialog.setCancelable(true);report=error==null?done:"操作未完成";if(error!=null)message(error);else if(success!=null)success.run();load();});});
     }
     private void message(String text){if(visible())new AlertDialog.Builder(activity).setMessage(text).setPositiveButton("确定",null).show();}
+    private void navigate(String key){
+        if(busy||loading)return;
+        setBatchMode(false);collection=key;pendingViewState=new Bundle();
+        // Suppress intermediate text/filter loads while resetting navigation.
+        busy=true;query.setText("");favorites.setChecked(false);busy=false;
+        query.clearFocus();list.requestFocus();load();
+    }
+    private void editCollection(String key){
+        EditText name=new EditText(activity);name.setSingleLine(true);name.setHint("收藏夹名称（1–40 个字符）");if(key!=null)name.setText(library.collectionName(key));
+        new AlertDialog.Builder(activity).setTitle(key==null?"新建收藏夹":"重命名收藏夹").setView(name).setNegativeButton("取消",null)
+            .setPositiveButton("保存",(d,w)->{String text=name.getText().toString();perform(()->{if(key==null)library.createCollection(text);else library.renameCollection(key,text);return "收藏夹已保存";},null);}).show();
+    }
+    private interface CollectionChoice {void chosen(String key);}
+    private void chooseCollection(String title,boolean includeDefault,CollectionChoice action){
+        try{
+            LinkedHashMap<String,String> choices=new LinkedHashMap<>();if(includeDefault)choices.put("","漫画库（默认收藏夹）");choices.putAll(library.collections());
+            if(choices.isEmpty()){message("请先新建收藏夹");return;}
+            List<String> keys=new ArrayList<>(choices.keySet());new AlertDialog.Builder(activity).setTitle(title).setItems(choices.values().toArray(new String[0]),(d,i)->action.chosen(keys.get(i))).setNegativeButton("取消",null).show();
+        }catch(Exception error){message(error.getMessage());}
+    }
+    private void manageCollection(){if(!collection.isEmpty())manageCollection(collection);else chooseCollection("选择要管理的收藏夹",false,this::manageCollection);}
+    private void manageCollection(String key){
+        new AlertDialog.Builder(activity).setTitle(library.collectionName(key)).setItems(new String[]{"打开收藏夹","重命名","删除收藏夹"},(d,i)->{
+            if(i==0)navigate(key);
+            else if(i==1)editCollection(key);
+            else new AlertDialog.Builder(activity).setTitle("删除收藏夹").setMessage("仅删除收藏夹，其中漫画将回到漫画库。文件、星标和阅读记录保留。")
+                .setNegativeButton("取消",null).setPositiveButton("删除收藏夹",(confirm,w)->perform(()->{library.deleteCollection(key);return "收藏夹已删除，漫画已回到漫画库";},()->{if(collection.equals(key))collection="";})).show();
+        }).setNegativeButton("关闭",null).show();
+    }
+    private void moveToCollection(){
+        List<LibraryStore.Entry> items=selection();if(items.isEmpty())return;
+        chooseCollection("移入收藏夹",true,key->perform(()->"已将 "+library.moveToCollection(items,key)+" 本漫画移入"+library.collectionName(key),null));
+    }
     private void scan(){
         String tree=store.settings.outputUri,label=store.settings.outputLabel;
         new AlertDialog.Builder(activity).setTitle("扫描保存目录").setMessage(label+"\n将此目录中可识别的图片文件夹、PDF 和 ZIP 添加到漫画库。已存在的漫画保留原有标题和收藏。\n其他目录请先在首页选择后再扫描。").setNegativeButton("取消",null).setPositiveButton("开始扫描",(d,w)->perform(()->{

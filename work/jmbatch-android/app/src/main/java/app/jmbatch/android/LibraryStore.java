@@ -18,22 +18,28 @@ public final class LibraryStore {
         return instance;
     }
     public static final class Entry {
-        public final String id,title,uri,tree,label,format;
+        public final String id,title,uri,tree,label,format,collection;
         public final boolean favorite;
         Entry(String id,String title,String uri,String tree,String label,String format,boolean favorite) {
-            this.id=id;this.title=title;this.uri=uri;this.tree=tree;this.label=label;this.format=format;this.favorite=favorite;
+            this(id,title,uri,tree,label,format,favorite,"");
+        }
+        Entry(String id,String title,String uri,String tree,String label,String format,boolean favorite,String collection) {
+            this.id=id;this.title=title;this.uri=uri;this.tree=tree;this.label=label;this.format=format;this.favorite=favorite;this.collection=collection;
         }
         Entry(JSONObject j)throws JSONException {
-            this(j.getString("id"),j.getString("title"),j.getString("uri"),j.getString("tree"),j.getString("label"),j.getString("format"),j.getBoolean("favorite"));
+            this(j.getString("id"),j.getString("title"),j.getString("uri"),j.getString("tree"),j.getString("label"),j.getString("format"),j.getBoolean("favorite"),j.optString("collection",""));
             if(uri.isEmpty()||(!format.equals("images")&&!format.equals("pdf")&&!format.equals("zip")))throw new JSONException("漫画记录无效");
         }
         JSONObject json()throws JSONException {
-            return new JSONObject().put("id",id).put("title",title).put("uri",uri).put("tree",tree).put("label",label).put("format",format).put("favorite",favorite);
+            return new JSONObject().put("id",id).put("title",title).put("uri",uri).put("tree",tree).put("label",label).put("format",format).put("favorite",favorite).put("collection",collection);
         }
+        Entry inCollection(String value){return new Entry(id,title,uri,tree,label,format,favorite,value);}
+        boolean isCollection(){return format.equals("collection");}
     }
     private final Context context;
     private final AtomicFile file;
     private LinkedHashMap<String,Entry> entries=new LinkedHashMap<>();
+    private LinkedHashMap<String,String> collections=new LinkedHashMap<>();
     private String loadError="";
 
     private LibraryStore(Context context) {
@@ -43,19 +49,29 @@ public final class LibraryStore {
             ByteArrayOutputStream bytes=new ByteArrayOutputStream();Core.copy(input,bytes);
             JSONObject root=new JSONObject(bytes.toString("UTF-8"));
             if(root.getInt("version")!=1)throw new IOException("不支持的列表格式");
+            JSONObject folders=root.has("collections")?root.getJSONObject("collections"):new JSONObject();
+            Iterator<String> keys=folders.keys();while(keys.hasNext()){
+                String key=keys.next(),name=folders.getString(key);
+                if(!key.startsWith("collection:")||name.trim().isEmpty())throw new IOException("收藏夹记录无效");
+                collections.put(key,name);
+            }
             JSONArray array=root.getJSONArray("entries");
-            for(int i=0;i<array.length();i++){Entry entry=new Entry(array.getJSONObject(i));entries.put(entry.uri,entry);}
+            for(int i=0;i<array.length();i++){Entry entry=new Entry(array.getJSONObject(i));if(!entry.collection.isEmpty()&&!collections.containsKey(entry.collection))throw new IOException("漫画收藏夹不存在");entries.put(entry.uri,entry);}
         } catch(Exception error) {
-            entries.clear();loadError="无法读取漫画库，原记录已保留。为保护数据，本次无法修改记录："+error.getMessage();
+            entries.clear();collections.clear();loadError="无法读取漫画库，原记录已保留。为保护数据，本次无法修改记录："+error.getMessage();
         }
     }
     private void writable()throws IOException {if(!loadError.isEmpty())throw new IOException(loadError);}
     private void persist(LinkedHashMap<String,Entry> next)throws IOException {
+        persist(next,collections);
+    }
+    private void persist(LinkedHashMap<String,Entry> next,LinkedHashMap<String,String> folders)throws IOException {
         writable();FileOutputStream output=null;
         try {
             JSONArray list=new JSONArray();for(Entry item:next.values())list.put(item.json());
-            byte[] bytes=new JSONObject().put("version",1).put("entries",list).toString(2).getBytes(StandardCharsets.UTF_8);
-            output=file.startWrite();output.write(bytes);file.finishWrite(output);entries=next;
+            JSONObject names=new JSONObject();for(Map.Entry<String,String> folder:folders.entrySet())names.put(folder.getKey(),folder.getValue());
+            byte[] bytes=new JSONObject().put("version",1).put("entries",list).put("collections",names).toString(2).getBytes(StandardCharsets.UTF_8);
+            output=file.startWrite();output.write(bytes);file.finishWrite(output);entries=next;collections=folders;
         }catch(Exception error){if(output!=null)file.failWrite(output);throw new IOException("保存漫画列表失败："+error.getMessage(),error);}
     }
     public synchronized void sync(List<Store.Task> tasks)throws IOException {
@@ -64,7 +80,7 @@ public final class LibraryStore {
             if(!task.status.equals("done")||task.resultUri.isEmpty())continue;
             Entry old=next.get(task.resultUri);
             if(old!=null&&old.title.equals(task.title)&&old.id.equals(task.id))continue;
-            next.put(task.resultUri,new Entry(task.id,task.title,task.resultUri,task.settings.outputUri,task.settings.outputLabel,task.settings.format,old!=null&&old.favorite));changed=true;
+            next.put(task.resultUri,new Entry(task.id,task.title,task.resultUri,task.settings.outputUri,task.settings.outputLabel,task.settings.format,old!=null&&old.favorite,old==null?"":old.collection));changed=true;
         }
         if(changed)persist(next);
     }
@@ -76,7 +92,7 @@ public final class LibraryStore {
     public synchronized void favorite(Entry item)throws IOException {
         writable();Entry current=entries.get(item.uri);if(current==null)throw new IOException("记录已移除，请刷新");
         LinkedHashMap<String,Entry> next=new LinkedHashMap<>(entries);
-        next.put(current.uri,new Entry(current.id,current.title,current.uri,current.tree,current.label,current.format,!current.favorite));persist(next);
+        next.put(current.uri,new Entry(current.id,current.title,current.uri,current.tree,current.label,current.format,!current.favorite,current.collection));persist(next);
     }
     private File appFile(Entry item)throws IOException {
         Uri uri=Uri.parse(item.uri);
@@ -155,7 +171,7 @@ public final class LibraryStore {
         writable();LinkedHashMap<String,Entry> next=new LinkedHashMap<>(entries);Set<String> changed=new HashSet<>();
         for(Entry item:selected){
             Entry current=next.get(item.uri);if(current==null)throw new IOException("部分记录已移除，请刷新后重试");
-            next.put(current.uri,new Entry(current.id,current.title,current.uri,current.tree,current.label,current.format,favorite));changed.add(current.uri);
+            next.put(current.uri,new Entry(current.id,current.title,current.uri,current.tree,current.label,current.format,favorite,current.collection));changed.add(current.uri);
         }
         if(!changed.isEmpty())persist(next);return changed.size();
     }
@@ -164,7 +180,7 @@ public final class LibraryStore {
         synchronized(store){synchronized(this){
             writable();Entry current=entries.get(original.uri);if(current==null)throw new IOException("漫画记录已变化，请刷新");
             LinkedHashMap<String,Entry> previous=new LinkedHashMap<>(entries),next=new LinkedHashMap<>();
-            Entry updated=new Entry(current.id,current.title,replacement.uri,current.tree,current.label,current.format,current.favorite);
+            Entry updated=new Entry(current.id,current.title,replacement.uri,current.tree,current.label,current.format,current.favorite,current.collection);
             for(Entry entry:entries.values())next.put(entry.uri.equals(original.uri)?updated.uri:entry.uri,entry.uri.equals(original.uri)?updated:entry);
             List<Store.Task> affected=new ArrayList<>();for(Store.Task task:store.tasks)if(task.resultUri.equals(original.uri))affected.add(task);
             try{
@@ -188,5 +204,54 @@ public final class LibraryStore {
         int added=0;
         for(Entry entry:found)if(known.add(identity(entry))){next.put(entry.uri,entry);added++;}
         if(added>0)persist(next);return added;
+    }
+
+    public synchronized LinkedHashMap<String,String> collections()throws IOException {writable();return new LinkedHashMap<>(collections);}
+    public synchronized String collectionName(String key){return key.isEmpty()?"漫画库":collections.get(key);}
+    private String validName(String name,String except)throws IOException {
+        name=name.trim();
+        if(name.isEmpty()||name.codePointCount(0,name.length())>40)throw new IOException("收藏夹名称须为 1–40 个字符");
+        for(int i=0;i<name.length();i++)if(Character.isISOControl(name.charAt(i)))throw new IOException("收藏夹名称不能包含换行或控制字符");
+        if(name.equals("漫画库"))throw new IOException("收藏夹名称已存在");
+        for(Map.Entry<String,String> e:collections.entrySet())if(!e.getKey().equals(except)&&e.getValue().equalsIgnoreCase(name))throw new IOException("收藏夹名称已存在");
+        return name;
+    }
+    public synchronized String createCollection(String name)throws IOException {
+        writable();String key="collection:"+UUID.randomUUID();LinkedHashMap<String,String> next=new LinkedHashMap<>(collections);next.put(key,validName(name,""));persist(entries,next);return key;
+    }
+    public synchronized void renameCollection(String key,String name)throws IOException {
+        writable();if(!collections.containsKey(key))throw new IOException("收藏夹不存在");
+        LinkedHashMap<String,String> next=new LinkedHashMap<>(collections);next.put(key,validName(name,key));persist(entries,next);
+    }
+    public synchronized void deleteCollection(String key)throws IOException {
+        writable();if(!collections.containsKey(key))throw new IOException("收藏夹不存在");
+        LinkedHashMap<String,String> folders=new LinkedHashMap<>(collections);folders.remove(key);
+        LinkedHashMap<String,Entry> next=new LinkedHashMap<>();for(Entry entry:entries.values())next.put(entry.uri,entry.collection.equals(key)?entry.inCollection(""):entry);
+        persist(next,folders);
+    }
+    public synchronized int moveToCollection(List<Entry> selected,String key)throws IOException {
+        writable();if(!key.isEmpty()&&!collections.containsKey(key))throw new IOException("收藏夹不存在");
+        LinkedHashMap<String,Entry> next=new LinkedHashMap<>(entries);Set<String> moved=new HashSet<>();
+        for(Entry entry:selected){Entry current=next.get(entry.uri);if(current==null)throw new IOException("部分漫画记录已移除，请刷新");next.put(current.uri,current.inCollection(key));moved.add(current.uri);}
+        if(!moved.isEmpty())persist(next);return moved.size();
+    }
+    public synchronized List<Entry> browse(String query,boolean favorites,String collection)throws IOException {
+        writable();if(!collection.isEmpty()&&!collections.containsKey(collection))throw new IOException("收藏夹不存在");
+        List<Entry> matching=list(query,favorites),result=new ArrayList<>();
+        if(collection.isEmpty()){
+            Map<String,Integer> counts=new HashMap<>();Set<String> matched=new HashSet<>();
+            for(Entry entry:entries.values())counts.put(entry.collection,counts.getOrDefault(entry.collection,0)+1);
+            for(Entry entry:matching)matched.add(entry.collection);
+            for(Map.Entry<String,String> folder:collections.entrySet()){
+                if((!query.trim().isEmpty()||favorites)&&!matched.contains(folder.getKey())&&(favorites||!folder.getValue().toLowerCase(Locale.ROOT).contains(query.trim().toLowerCase(Locale.ROOT))))continue;
+                result.add(new Entry("",folder.getValue(),folder.getKey(),"",counts.getOrDefault(folder.getKey(),0)+" 本漫画","collection",false));
+            }
+        }
+        for(Entry entry:matching)if(entry.collection.equals(collection))result.add(entry);return result;
+    }
+    public synchronized Map<String,List<Entry>> collectionPreviews()throws IOException {
+        writable();Map<String,List<Entry>> result=new HashMap<>();for(String key:collections.keySet())result.put(key,new ArrayList<>());
+        List<Entry> ordered=new ArrayList<>(entries.values());Collections.reverse(ordered);
+        for(Entry entry:ordered){List<Entry> previews=result.get(entry.collection);if(previews!=null&&previews.size()<4)previews.add(entry);}return result;
     }
 }

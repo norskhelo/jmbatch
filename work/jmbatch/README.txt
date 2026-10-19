@@ -1,4 +1,4 @@
-JM Batch 0.3.22 — Windows 使用说明
+JM Batch 0.3.23 — Windows 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.3.22 — Windows 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-18）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-0.5.21/JMBatch-0.3.22-Windows-x64.zip
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-0.5.21/JMBatch-0.3.22-Windows-x64.zip
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-0.5.21/JMBatch-0.3.22-Windows-x64.zip
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-0.5.21/SHA256-release-0.3.22-0.5.21.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/JMBatch-0.3.23-Windows-x64.zip
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/JMBatch-0.3.23-Windows-x64.zip
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/JMBatch-0.3.23-Windows-x64.zip
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/SHA256-release-0.3.23-0.6.3.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,19 +28,20 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.22-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.22 / Android 0.5.21 — 漫画库删除章节
+Windows 0.3.23 / Android 0.6.3 — 漫画库收藏夹
 
 更新内容
 
-• 在漫画库长按或进入“批量处理”，选中一本漫画，点击“删除章节”；可一次勾选多个章节，显示每章页数，二次确认后执行。
-• 支持图片文件夹与按章节目录保存的 ZIP；至少保留一章。PDF、单章漫画或平铺 ZIP 仅识别为一章，删除整本请使用“删除文件”。
-• 先保存并校验保留章节，再切换漫画库记录并清理原文件。保留图片原始字节、漫画标题和收藏；文件名会更新，操作需要临时可用空间。图片目录剩余章节重新连续编号，仅剩一章时恢复为根目录图片布局。
-• 剩余页的书签与阅读位置自动调整，已删除页的书签移除；正在阅读的页被删除时定位到后续保留页，末尾则回到最后保留页。封面和下载完成记录同步更新。
-• 操作前须暂停下载；Windows 须先关闭本书阅读窗口。可在提交前停止，原漫画保留。拒绝修改含额外文件或链接的图片目录；保存或校验失败保留源文件。若旧文件清理失败，会明确提示其位置，保留已完成的新漫画。
-• Android 同时支持应用下载目录和已授权的外部目录；保留原包名、APK 签名证书和更新公钥，可覆盖安装。
+• 漫画库现在也是默认收藏夹。旧漫画和新下载仍在漫画库根层显示；自建收藏夹直接出现在原漫画列表或四列平铺区域，与漫画共用位置。
+• 收藏夹卡片显示名称、漫画数量，并以夹内最近加入漫画的最多四张本地封面组成预览；空收藏夹和无法读取的封面显示占位。
+• 支持新建、重命名收藏夹；长按漫画或进入“批量处理”，勾选后点击“移入收藏夹”，也可选择“漫画库”移回默认位置。每本漫画归属一个收藏夹，分类不移动实际文件。
+• 点击收藏夹查看内容，点击漫画开始阅读；“返回漫画库”回到默认收藏夹。Android 返回键先退出批量处理，再返回漫画库；阅读返回或重建界面保留所在收藏夹。
+• “管理收藏夹”可重命名或删除收藏夹。删除前确认，夹内漫画回到漫画库，保留漫画文件、星标、书签和阅读位置。默认漫画库不能重命名或删除。
+• 原星标收藏继续保留。“仅显示收藏”可筛选星标漫画；根层搜索也能找到名称匹配或含匹配漫画的收藏夹。移动、扫描、下载记录刷新、修改星标和删除章节均保留分类。
+• 收藏夹与漫画记录一起原子保存，保存失败保留原状态；封面复用现有有界后台加载与本地缓存，不增加网站请求。
 
 版本与验证
 
-• Windows 0.3.21 → 0.3.22；Android 0.5.20 → 0.5.21（versionCode 521）。
-• 验证覆盖多章/连续删章、旧目录布局、ZIP 字节保留、阅读位置/书签、取消、记录保存失败、外部存储重命名与清理失败，以及真实 Windows 章节选择界面；执行双端回归、自检、构建与签名核验。
-• Android 使用 Android 10 框架和模拟存储服务验证，未连接真机；手机视觉、手势和各厂商存储服务行为仍需设备验收。
+• Windows 0.3.22 → 0.3.23；Android 0.6.2 → 0.6.3（versionCode 603），保留原 Android 包名、签名证书与更新公钥。
+• 验证旧记录兼容、创建/移动/重命名/删除、搜索与星标、保存失败回滚、封面预览上限和真实界面导航；执行双端回归、自检、构建及签名核验。
+• Android 使用 Android 10/15 框架和隔离演示数据验证，未连接真机。效果图使用演示漫画，不读取个人漫画。

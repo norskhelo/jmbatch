@@ -49,14 +49,15 @@ Set<Integer> checked=new HashSet<>();void setChoiceMode(int n){mode=n;}void clea
 void setItemChecked(int n,boolean v){if(mode==0)return;if(v)checked.add(n);else checked.remove(n);}}
 static class Adapter {int changes;void notifyDataSetChanged(){changes++;}}
 static class Dialog {boolean dismissed;void dismiss(){dismissed=true;}}
-static class LibraryStore {static class Entry {String uri;Entry(String s){uri=s;}}}
+static class LibraryStore {static class Entry {String uri;Entry(String s){uri=s;}boolean isCollection(){return uri.startsWith("collection:");}}}
 static class ReaderActivity {static List<String> opened=new ArrayList<>();static void open(Object a,LibraryStore.Entry e){opened.add(e.uri);}}
-Activity activity=new Activity();boolean busy,loading,batchMode,returningFromReader;String report="";Bundle pendingViewState;
+Activity activity=new Activity();boolean busy,loading,batchMode,returningFromReader;String report="",collection="",managed="";Bundle pendingViewState;
+void navigate(String key){collection=key;setBatchMode(false);}void manageCollection(String key){managed=key;}
 EditText query=new EditText();CheckBox favorites=new CheckBox();int loads;
 boolean visible(){return !dialog.dismissed;}void load(){loads++;pendingViewState=viewportState();}
 Set<String> selected=new HashSet<>();List<LibraryStore.Entry> entries=new ArrayList<>();
 ListView list=new ListView();Dialog dialog=new Dialog();Adapter adapter=new Adapter();
-RadioGroup displaySelector=new RadioGroup();Button modeButton=new Button();TextView hint=new TextView(),status=new TextView();
+RadioGroup displaySelector=new RadioGroup();Button modeButton=new Button(),backButton=new Button();TextView hint=new TextView(),status=new TextView();
 View selectionControls=new View(),batchActions=new View();
 List<Button> singleButtons=Arrays.asList(new Button()),batchButtons=Arrays.asList(new Button());
 '''+methods+'''
@@ -123,6 +124,10 @@ restored.pendingViewState=saved.getBundle("viewport");restored.acceptEntries(new
 check(restored.pendingViewState==null,"empty filtered result is safe");
 f.read(f.entries.get(2));f.resume();check(f.loads==2&&!f.dialog.dismissed,"repeated read and return retains dialog");
 f.dialog.dismiss();check(f.saveState()==null,"explicit close does not reopen on recreation");
+f=new LibraryInteractionTest();f.entries.add(0,new LibraryStore.Entry("collection:one"));f.setBatchMode(true);f.select(0);
+check(f.selected.size()==3&&!f.selected.contains("collection:one"),"select all skips folder cards");
+f.tap(0);check(f.collection.equals("collection:one")&&!f.batchMode,"folder click navigates instead of reading");
+f.itemLongClick(0);check(f.managed.equals("collection:one"),"folder hold opens management");
 System.out.println("LibraryInteractionTest: "+checks+" checks passed (production handlers, host widgets)");
 }}
 '''
@@ -132,11 +137,11 @@ subprocess.run([str(jdk/'javac.exe'),'-encoding','UTF-8','-d',str(out),str(progr
 subprocess.run([str(jdk/'java.exe'),'-cp',str(out),'LibraryInteractionTest'],check=True)
 assert 'setOnItemClickListener((p,v,position,id)->itemClick(position))' in source
 assert 'setOnItemLongClickListener((p,v,position,id)->itemLongClick(position))' in source
-assert 'KeyEvent.KEYCODE_BACK&&batchMode&&!busy' in source
-assert 'KeyEvent.ACTION_UP)setBatchMode(false)' in source
+assert 'KeyEvent.KEYCODE_BACK&&!busy&&!loading&&(batchMode||!collection.isEmpty())' in source
+assert 'if(batchMode)setBatchMode(false);else navigate("")' in source
 assert 'if(!filter.equals(nextFilter)){selected.clear();filter=nextFilter;pendingViewState=new Bundle();}' in source
 assert 'resetCovers();acceptEntries(result);' in source
-assert 'row.bindChoice(batchMode,selected.contains(entry.uri))' in source
+assert 'row.bindChoice(batchMode&&!entry.isCollection(),selected.contains(entry.uri))' in source
 print('Library interaction listener, back, filter, refresh and recycled-row wiring verified')
 main_source=(root/'app/src/main/java/app/jmbatch/android/MainActivity.java').read_text(encoding='utf-8')
 assert 'libraryScreen.show(state.getBundle("library"))' in main_source

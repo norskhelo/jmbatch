@@ -1,4 +1,4 @@
-JM Batch 0.6.2 — Android 使用说明
+JM Batch 0.6.3 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.6.2 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-19）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.2/JMBatch-0.6.2-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.2/JMBatch-0.6.2-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.2/JMBatch-0.6.2-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.2/SHA256-release-android-0.6.2.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/JMBatch-0.6.3-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/JMBatch-0.6.3-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/JMBatch-0.6.3-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.23-0.6.3/SHA256-release-0.3.23-0.6.3.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,16 +28,20 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Android 0.6.2 — 备用 DNS 图片下载提速
+Windows 0.3.23 / Android 0.6.3 — 漫画库收藏夹
 
-• 已确认系统 DNS 全零并取得备用地址后，在有效期内直接使用备用路径，避免每张图片都先重试已知失败的系统连接。缓存到期重新检查；备用地址失效时重新尝试系统路径。
-• 优先使用最近连接成功的 IP，短暂避开连接失败的地址，减少每张图片重复等待失败线路。
-• 同一原始域名允许复用 HTTPS 长连接，减少重复 TCP/TLS 握手；不同域名、端口及证书校验配置仍隔离，保留原域名 Host、SNI、系统证书链及域名校验。
-• 将短连接尝试超时与图片读取超时分开。读取继续采用下载设置中的请求超时（默认 25 秒），避免弱网图片因几秒内没有数据而过早中断、重复下载。
-• 保留 DNS TTL、代理路径、取消、HTTP 错误和图片完整性校验，不清理已有下载或缓存。暂停并覆盖安装后，重新开始或重试原任务即可使用优化。
-• Android 0.6.2 / versionCode 602，保留原包名和签名；Windows 保持 0.3.22。Android 10/15 的合成 TLS 测试中，8 次同域名请求由 8 条连接降为 1 条；这不代表手机真实提速倍数。Redmi K70 Pro 移动网络效果待实测。
+更新内容
 
-验证范围
+• 漫画库现在也是默认收藏夹。旧漫画和新下载仍在漫画库根层显示；自建收藏夹直接出现在原漫画列表或四列平铺区域，与漫画共用位置。
+• 收藏夹卡片显示名称、漫画数量，并以夹内最近加入漫画的最多四张本地封面组成预览；空收藏夹和无法读取的封面显示占位。
+• 支持新建、重命名收藏夹；长按漫画或进入“批量处理”，勾选后点击“移入收藏夹”，也可选择“漫画库”移回默认位置。每本漫画归属一个收藏夹，分类不移动实际文件。
+• 点击收藏夹查看内容，点击漫画开始阅读；“返回漫画库”回到默认收藏夹。Android 返回键先退出批量处理，再返回漫画库；阅读返回或重建界面保留所在收藏夹。
+• “管理收藏夹”可重命名或删除收藏夹。删除前确认，夹内漫画回到漫画库，保留漫画文件、星标、书签和阅读位置。默认漫画库不能重命名或删除。
+• 原星标收藏继续保留。“仅显示收藏”可筛选星标漫画；根层搜索也能找到名称匹配或含匹配漫画的收藏夹。移动、扫描、下载记录刷新、修改星标和删除章节均保留分类。
+• 收藏夹与漫画记录一起原子保存，保存失败保留原状态；封面复用现有有界后台加载与本地缓存，不增加网站请求。
 
-• 1624 项宿主检查、96 组布局场景和 71 项 Android 框架用例通过，包括 14 项 TLS 专项，覆盖连接复用、跨域隔离、证书拒绝及独立读取超时。
-• 保留原包名、APK 签名和更新公钥，可覆盖安装并继续原任务；没有连接手机，尚未验证 Redmi K70 Pro 的实际移动网络吞吐。
+版本与验证
+
+• Windows 0.3.22 → 0.3.23；Android 0.6.2 → 0.6.3（versionCode 603），保留原 Android 包名、签名证书与更新公钥。
+• 验证旧记录兼容、创建/移动/重命名/删除、搜索与星标、保存失败回滚、封面预览上限和真实界面导航；执行双端回归、自检、构建及签名核验。
+• Android 使用 Android 10/15 框架和隔离演示数据验证，未连接真机。效果图使用演示漫画，不读取个人漫画。

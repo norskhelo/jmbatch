@@ -74,3 +74,14 @@ record-save failures, rename failure and old-file cleanup failure. The complete
 LibraryScreen test invokes the chapter picker and destructive confirmation.
 The batch-mode switch test advances a frame after showing the batch toolbar
 before simulating the next action, so consecutive actions use the laid-out UI.
+
+CollectionRuntimeTest covers legacy catalogue loading, persistent folder
+membership, rename/delete/move, save failure rollback, searches, stars, task and
+chapter replacement, bounded previews, and corrupt metadata on Android 10/15.
+On this Windows host, Java File.renameTo cannot replace an existing destination;
+Android 15 AtomicFile expects Linux replacement semantics. The test-only shadow
+bridges its private rename primitive with Files.move(REPLACE_EXISTING), leaving
+the framework write/sync/close/recovery logic intact. An independent AtomicFile
+replacement test checks this adapter. This is not an Android production change.
+The library dialog tests also exercise folder cards, batch selection exclusion,
+navigation, state restoration, moving back to the default library, and deletion.

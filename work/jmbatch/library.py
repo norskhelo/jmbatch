@@ -6,6 +6,7 @@ import os
 import re
 import time
 import shutil
+import uuid
 from pathlib import Path
 
 from core import atomic_json
@@ -15,6 +16,7 @@ class Library:
     def __init__(self, home):
         self.path = Path(home) / "library.json"
         self.entries = {}
+        self.collections = {}
         self.error = ""
         if self.path.exists():
             try:
@@ -22,14 +24,22 @@ class Library:
                 if data.get("version") != 1 or not isinstance(data["entries"], dict):
                     raise ValueError("目录格式无效")
                 self.entries = data["entries"]
+                self.collections = data.get("collections", {})
+                if not isinstance(self.collections, dict) or any(
+                        not isinstance(k, str) or not k.startswith("collection:") or
+                        not isinstance(v, str) or not v.strip() for k, v in self.collections.items()):
+                    raise ValueError("收藏夹记录无效")
                 for key, item in self.entries.items():
                     if key != self.key(item["path"]) or not isinstance(item["favorite"], bool):
                         raise ValueError("漫画记录无效")
                     for field in ("id", "title", "root", "format"):
                         if not isinstance(item[field], str):
                             raise ValueError("漫画记录无效")
+                    if item.get("collection", "") not in ("", *self.collections):
+                        raise ValueError("漫画收藏夹不存在")
             except Exception as exc:
                 self.entries = {}
+                self.collections = {}
                 self.error = f"无法读取漫画库，原记录已保留。为保护数据，本次无法修改记录：{exc}"
 
     @staticmethod
@@ -39,7 +49,7 @@ class Library:
     def save(self):
         if self.error:
             raise OSError(self.error)
-        atomic_json(self.path, {"version": 1, "entries": self.entries})
+        atomic_json(self.path, {"version": 1, "entries": self.entries, "collections": self.collections})
 
     def sync(self, tasks):
         if self.error:
@@ -54,6 +64,8 @@ class Library:
             item = dict(id=str(task.album_id), title=task.title, path=os.path.abspath(task.result),
                         root=os.path.abspath(task.settings["output"]), format=task.settings["format"],
                         favorite=previous.get("favorite", False), added=previous.get("added", time.time()))
+            if previous.get("collection"):
+                item["collection"] = previous["collection"]
             if item != previous:
                 self.entries[key] = item
                 changed = True
@@ -79,6 +91,71 @@ class Library:
         except Exception:
             item["favorite"] = old
             raise
+
+    def collection_name(self, key=""):
+        return self.collections[key] if key else "漫画库"
+
+    def _collection_name(self, name, except_key=None):
+        name = str(name).strip()
+        if not name or len(name) > 40 or any(ord(c) < 32 for c in name):
+            raise ValueError("收藏夹名称须为 1–40 个字符，不能包含换行")
+        if name.casefold() == "漫画库" or any(v.casefold() == name.casefold() for k, v in self.collections.items() if k != except_key):
+            raise ValueError("收藏夹名称已存在")
+        return name
+
+    def _save_collections(self, collections, entries):
+        old = self.collections, self.entries
+        self.collections, self.entries = collections, entries
+        try:
+            self.save()
+        except Exception:
+            self.collections, self.entries = old
+            raise
+
+    def create_collection(self, name):
+        key = "collection:" + uuid.uuid4().hex
+        self._save_collections(dict(self.collections, **{key: self._collection_name(name)}), self.entries)
+        return key
+
+    def rename_collection(self, key, name):
+        if key not in self.collections:
+            raise ValueError("收藏夹不存在")
+        self._save_collections(dict(self.collections, **{key: self._collection_name(name, key)}), self.entries)
+
+    def delete_collection(self, key):
+        if key not in self.collections:
+            raise ValueError("收藏夹不存在")
+        self._save_collections({k: v for k, v in self.collections.items() if k != key},
+                               {k: dict(v, collection="") if v.get("collection") == key else v for k, v in self.entries.items()})
+
+    def move_to_collection(self, keys, collection=""):
+        if collection and collection not in self.collections:
+            raise ValueError("收藏夹不存在")
+        keys = set(keys)
+        if not keys <= self.entries.keys():
+            raise ValueError("部分漫画记录已移除，请刷新")
+        self._save_collections(self.collections, {k: dict(v, collection=collection) if k in keys else v for k, v in self.entries.items()})
+
+    def browse(self, query="", favorites=False, collection=""):
+        """Folders and default comics share the root; each comic has one location."""
+        if collection and collection not in self.collections:
+            raise ValueError("收藏夹不存在")
+        matches = self.select(query, favorites)
+        result = []
+        if not collection:
+            members = {key: [] for key in self.collections}
+            for _, item in reversed(list(self.entries.items())):
+                if item.get("collection") in members:
+                    members[item["collection"]].append(item)
+            matching = {item.get("collection", "") for _, item in matches}
+            for key, name in self.collections.items():
+                if (query or favorites) and key not in matching and (favorites or query.strip().casefold() not in name.casefold()):
+                    continue
+                children = members[key]
+                result.append((key, dict(id=str(len(children)), title=name, format="collection", favorite=False,
+                                         path=tuple((v["path"], v["format"]) for v in children[:4]))))
+        result.extend((k, v) for k, v in matches if v.get("collection", "") == collection)
+        return result
 
     def set_favorites(self, keys, value):
         previous = self.entries.copy()
