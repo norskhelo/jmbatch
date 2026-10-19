@@ -103,7 +103,7 @@ class DisplayViewTest(unittest.TestCase):
         self.view._list_scrolled('0','0.01')
         self.assertEqual(positions[-1],self.view.canvas.yview())
 
-    def test_covers_fit_resized_cards_and_reuse_only_visible_images(self):
+    def test_covers_fill_resized_cards_and_reuse_only_visible_images(self):
         pictures = [ImageTk.PhotoImage(Image.new('RGB', size, color), master=self.root)
                     for size, color in (((72,96), 'red'), ((72,36), 'green'), ((24,96), 'blue'))]
         for n, picture in enumerate(pictures):
@@ -123,7 +123,7 @@ class DisplayViewTest(unittest.TestCase):
                 self.assertLessEqual(right, x+w-14)
                 self.assertGreaterEqual(top, y+14)
                 self.assertLessEqual(bottom, y+16+self.view.cover_height)
-                self.assertAlmostEqual((right-left)/(bottom-top), pictures[n].width()/pictures[n].height(), delta=.03)
+                self.assertEqual((right-left,bottom-top), (self.view.cover_width,self.view.cover_height))
             cached = dict(self.view.tile_images)
             self.view.item('0', values=('', '0', 'Refreshed', 'ZIP'))
             self.root.update()
@@ -146,3 +146,21 @@ class DisplayViewTest(unittest.TestCase):
             self.assertEqual(load_mode(home,'downloads'),'list')
             (home/'display.json').write_text('broken',encoding='utf-8')
             self.assertEqual(load_mode(home,'library'),'list')
+
+    def test_landscape_keeps_center_and_collection_keeps_all_panels(self):
+        image = Image.new('RGB', (240, 96), 'red')
+        image.paste('green', (84, 0, 156, 96))
+        image.paste('blue', (156, 0, 240, 96))
+        picture = ImageTk.PhotoImage(image, master=self.root)
+        self.view.item('0', image=picture)
+        self.view.item('1', image=picture, values=('', '1', 'Folder', '收藏夹'))
+        self.view.set_mode('tiles')
+        self.root.update()
+        painted = [i for i in self.view.canvas.find_all() if self.view.canvas.type(i) == 'image']
+        photos = {str(photo): ImageTk.getimage(photo) for photo in self.view.tile_images.values()}
+        comic, folder = [photos[self.view.canvas.itemcget(i, 'image')] for i in painted]
+        self.assertEqual(comic.getpixel((comic.width//2,comic.height//2))[:3], (0,128,0))
+        self.assertEqual(comic.size, (self.view.cover_width,self.view.cover_height))
+        self.assertGreater(folder.width/folder.height, 2)
+        self.assertEqual(folder.getpixel((0,folder.height//2))[:3], (255,0,0))
+        self.assertEqual(folder.getpixel((folder.width-1,folder.height//2))[:3], (0,0,255))

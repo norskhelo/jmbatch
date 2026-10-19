@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.25 / Android 0.6.5 — 平铺封面缩放修复\n\n修复内容\n\n• Windows 与 Android 的漫画库平铺封面区域随卡片宽度按 3:4 比例调整，修正窄屏四列布局下封面区域过高、上下留白过多的问题。\n• 封面按原图比例完整居中显示，横图、竖图和收藏夹预览均不会拉伸或裁切；Windows 缩略图随卡片一起缩放。\n• 保留列表封面尺寸、四列布局、点击阅读、批量选择和显示方式切换，并尽量保留浏览位置。\n• 继续复用本地缩略图；Windows 仅保留可见卡片的缩放副本，不增加网站请求，不修改漫画文件。\n\n版本与验证\n\n• Windows 0.3.24 → 0.3.25；Android 0.6.4 → 0.6.5（versionCode 605），保留原包名、APK 签名证书和更新公钥。\n• 修复已通过 Windows 15 项界面回归、Android 6 项框架用例和 32 项行绑定检查，覆盖封面比例、窄屏/横屏、大字号、批量选择和显示方式切换。\n• 本次安装包执行相关成品检查、构建和签名核验；Android 使用隔离框架测试，未做真机验证。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.26 / Android 0.6.6 — 首图自适应封面\n\n更新内容\n\n• 漫画库平铺继续使用漫画的第一张图片作为封面，按原图比例放大并铺满 3:4 封面区域，避免额外留白，不拉伸图像。\n• 竖向首图等比铺满；横向首图取中央部分，左右对称裁切。其他比例图片同样居中裁切至封面框。\n• 收藏夹仍完整显示多封面拼图，列表封面保持原有完整居中方式；切换显示方式及卡片复用时自动使用对应规则。\n• 继续复用本地缩略图，保留四列布局、批量选择和阅读交互，不增加网站请求，不修改原漫画文件。\n\n版本与验证\n\n• Windows 0.3.25 → 0.3.26；Android 0.6.5 → 0.6.6（versionCode 606），保留原包名、签名证书和更新公钥。\n• Windows 16 项相关界面测试、Android 5 项框架测试和 36 项行绑定检查通过，覆盖横竖图、窄屏、横屏、切换模式和收藏夹卡片复用。\n• 效果预览使用隔离演示漫画；Android 验证使用框架测试，未做真机验证。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

@@ -337,10 +337,9 @@ def run_tile_self_test(directory: Path):
                 x,y,w,h=view.bbox(str(n))
                 assert left>=x+14 and right<=x+w-14
                 assert top>=y+14 and bottom<=y+view.cover_height+16
-                original=pictures[n%3]
-                assert abs((right-left)/(bottom-top)-original.width()/original.height())<.03
+                assert (right-left,bottom-top)==(view.cover_width,view.cover_height)
             assert view.selection()==('0','1')
-        report['checks'].append('Four columns and uncropped proportional covers at 360/900/1400 widths')
+        report['checks'].append('Four columns and center-filled covers at 360/900/1400 widths')
         cached=dict(view.tile_images)
         view.item('0',values=('', '0', 'Refreshed title', 'ZIP'));root.update()
         assert view.tile_images==cached and len(view.tile_images)==3
@@ -354,7 +353,7 @@ def run_tile_self_test(directory: Path):
         view.set_mode('tiles');root.update()
         assert anchor in view.visible_keys()
         report['checks'].append('Mode switches preserve selection and visible comic without changing list covers')
-        assert VERSION in CURRENT_NOTES and '平铺封面缩放修复' in CURRENT_NOTES
+        assert VERSION in CURRENT_NOTES and '首图自适应封面' in CURRENT_NOTES
         report['checks'].append('Packaged version and offline release notes match the tile-cover release')
         report['ok']=True
     except Exception:

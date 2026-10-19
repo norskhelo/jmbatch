@@ -49,8 +49,8 @@ static class Color {static int rgb(int a,int b,int c){return 0;}}
 static class TextUtils {static class TruncateAt {static final int END=1;}}
 static class Bitmap {}
 static class ImageView extends View {
-    static class ScaleType {static final int FIT_CENTER=1;}Bitmap bitmap;
-    ImageView(Activity a){}void setScaleType(int v){}void setImageBitmap(Bitmap b){bitmap=b;}
+    static class ScaleType {static final int FIT_CENTER=1,CENTER_CROP=2;}Bitmap bitmap;int scaleType;
+    ImageView(Activity a){}void setScaleType(int v){scaleType=v;}void setImageBitmap(Bitmap b){bitmap=b;}
     void setContentDescription(String s){}
 }
 static class TextView extends View {
@@ -163,6 +163,7 @@ public static void main(String[] args){
     check(row!=previous&&row.tile,"switching to tiles replaces layout, not model");
     settled(row,true,"tile checked binding settled");
     check(row.image.bitmap!=null&&f.selected.contains("b"),"tile reuses cached cover and selection");
+    check(row.image.scaleType==ImageView.ScaleType.CENTER_CROP,"comic tile fills frame from center");
     previous=row;row=f.bind(2,row);check(row==previous,"same-mode tile recycling reused");
     settled(row,false,"recycled tile maps current comic selection");
     f.tiles=false;row=f.bind(1,row);check(!row.tile&&row!=previous,"switching back restores list row");
@@ -171,6 +172,10 @@ public static void main(String[] args){
     row=f.bind(3,row);check(row.text.drawable==null&&row.text.value.contains("收藏夹"),"folder card labelled and excluded from comic choices");
     f.coverWorker.complete();check(CollectionCover.calls==1,"folder preview uses folder loader");
     row=f.bind(3,row);check(row.image.bitmap!=null&&row.placeholder.visibility==View.GONE,"folder preview replaces placeholder");
+    f.tiles=true;row=f.bind(3,row);
+    check(row.image.scaleType==ImageView.ScaleType.FIT_CENTER,"collection tile keeps all panels visible");
+    row=f.bind(0,row);check(row.image.scaleType==ImageView.ScaleType.CENTER_CROP,"recycled collection becomes center-filled comic");
+    row=f.bind(3,row);check(row.image.scaleType==ImageView.ScaleType.FIT_CENTER,"recycled comic restores full collection preview");
     System.out.println("LibraryRowsTest: "+checks+" checks passed (production rows/adapter, host drawable states)");
 }
 }

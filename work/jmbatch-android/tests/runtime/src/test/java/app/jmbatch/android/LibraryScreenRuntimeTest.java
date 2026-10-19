@@ -154,7 +154,7 @@ public class LibraryScreenRuntimeTest {
     @Test @Config(qualifiers="w800dp-h360dp-mdpi")
     public void wideTiles() throws Exception {open(true,80);assertFourAcross();}
     @Test @Config(sdk={29,35})
-    public void coversFollowCardWidthWithoutCroppingAndSurviveModeSwitch() throws Exception {
+    public void coversFillCardFromCenterAndSurviveModeSwitch() throws Exception {
         open(true,12);
         android.view.View row=grid().getAdapter().getView(0,null,grid());
         android.widget.ImageView image=(android.widget.ImageView)field(row,"image");
@@ -169,8 +169,9 @@ public class LibraryScreenRuntimeTest {
                 assertEquals(Math.round(frame.getWidth()*4f/3f),frame.getHeight());
                 android.graphics.RectF bounds=new android.graphics.RectF(image.getDrawable().getBounds());
                 image.getImageMatrix().mapRect(bounds);
-                assertTrue(bounds.left>=-.01f&&bounds.top>=-.01f);
-                assertTrue(bounds.right<=image.getWidth()+.01f&&bounds.bottom<=image.getHeight()+.01f);
+                assertEquals(android.widget.ImageView.ScaleType.CENTER_CROP,image.getScaleType());
+                assertTrue(bounds.left<=.6f&&bounds.top<=.6f);
+                assertTrue(bounds.right>=image.getWidth()-.6f&&bounds.bottom>=image.getHeight()-.6f);
                 assertEquals(size[0]/(float)size[1],bounds.width()/bounds.height(),.01f);
                 assertEquals(image.getWidth()/2f,bounds.centerX(),.6f);
                 assertEquals(image.getHeight()/2f,bounds.centerY(),.6f);
@@ -179,6 +180,7 @@ public class LibraryScreenRuntimeTest {
         display(false);
         android.view.View listRow=grid().getAdapter().getView(0,row,grid());
         assertNotSame(row,listRow);
+        assertEquals(android.widget.ImageView.ScaleType.FIT_CENTER,((android.widget.ImageView)field(listRow,"image")).getScaleType());
         android.view.View frame=(android.view.View)((android.widget.ImageView)field(listRow,"image")).getParent();
         assertEquals(64,frame.getLayoutParams().width);assertEquals(86,frame.getLayoutParams().height);
         display(true);assertFourAcross();

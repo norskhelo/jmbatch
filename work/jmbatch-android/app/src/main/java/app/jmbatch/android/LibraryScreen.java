@@ -211,6 +211,7 @@ public final class LibraryScreen {
             row.text.setText((entry.favorite?"★ ":"")+title(entry)+"\n"+(entry.isCollection()?"收藏夹":entry.format.toUpperCase(Locale.ROOT))+" · "+entry.label);
             row.bindChoice(batchMode&&!entry.isCollection(),selected.contains(entry.uri));
             Cover cover=coverCache.get(entry.uri);Bitmap bitmap=cover==null?null:cover.bitmap;
+            row.image.setScaleType(row.tile&&!entry.isCollection()?ImageView.ScaleType.CENTER_CROP:ImageView.ScaleType.FIT_CENTER);
             row.image.setImageBitmap(bitmap);row.image.setContentDescription(entry.isCollection()?"收藏夹内漫画封面预览":bitmap==null?"暂无封面":"第一页封面");row.placeholder.setText(entry.isCollection()?"收藏夹":"暂无\n封面");row.placeholder.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
             if(cover==null&&!coverPending.contains(entry.uri)&&!coverWorker.isShutdown()){
                 final int ticket=coverGeneration;coverPending.add(entry.uri);
