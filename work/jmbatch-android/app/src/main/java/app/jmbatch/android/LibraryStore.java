@@ -75,6 +75,7 @@ public final class LibraryStore {
         }catch(Exception error){if(output!=null)file.failWrite(output);throw new IOException("保存漫画列表失败："+error.getMessage(),error);}
     }
     public synchronized void sync(List<Store.Task> tasks)throws IOException {
+        ChapterUpdates.record(context,tasks);
         writable();LinkedHashMap<String,Entry> next=new LinkedHashMap<>(entries);boolean changed=false;
         for(Store.Task task:tasks) {
             if(!task.status.equals("done")||task.resultUri.isEmpty())continue;

@@ -54,6 +54,8 @@ class Library:
     def sync(self, tasks):
         if self.error:
             raise OSError(self.error)
+        from chapter_updates import UpdateHistory
+        UpdateHistory(self.path.parent).record(tasks)
         previous_entries = self.entries.copy()
         changed = False
         for task in tasks:

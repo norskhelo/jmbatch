@@ -572,6 +572,10 @@ def main():
         index = sys.argv.index("--self-test-tiles")
         run_tile_self_test(Path(sys.argv[index + 1]).resolve())
         return
+    if "--self-test-chapter-updates" in sys.argv:
+        from chapter_update_checks import run
+        run(Path(sys.argv[sys.argv.index("--self-test-chapter-updates") + 1]).resolve())
+        return
     if "--self-test-chapter-view" in sys.argv:
         from chapter_view_checks import run
         run(Path(sys.argv[sys.argv.index("--self-test-chapter-view") + 1]).resolve())

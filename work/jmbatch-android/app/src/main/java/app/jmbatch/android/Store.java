@@ -136,6 +136,18 @@ public final class Store {
         settings = new Settings(options.json()); save(); return count;
     }
     public synchronized Task next() { for (Task t : tasks) if (t.status.equals("queued") && !activeKeys.contains(t.key)) return t; return null; }
+    public synchronized Task addChapterUpdate(String id,List<ChapterRules.Chapter> catalog,List<ChapterRules.Chapter> chapters,Settings options)throws IOException {
+        if(libraryBusy)throw new IOException("正在管理文件，请稍后下载。");
+        if(tasks.size()>=5000)throw new IOException("最多保留 5000 条记录，请先清理已完成记录。");
+        for(Task t:tasks)if(t.id.equals(id)&&!t.status.equals("done")&&!t.status.equals("cancelled"))
+            throw new IOException("该漫画已有未完成任务，请先继续、重试或取消原任务。");
+        if(!id.matches("[0-9]{1,10}"))throw new IOException("漫画编号无效");
+        try{ChapterRules.resolve(catalog,Collections.emptyList(),true);}catch(ChapterRules.ChoiceRequired impossible){throw new IllegalStateException(impossible);}
+        Set<String> ids=new HashSet<>();for(ChapterRules.Chapter c:chapters)ids.add(c.id);
+        Task task=new Task(id,options);task.chapterOptions=Collections.unmodifiableList(new ArrayList<>(catalog));
+        task.selectedChapters=ChapterRules.select(catalog,ids);task.phase="等待下载新章节";
+        tasks.add(task);try{save();}catch(IOException error){tasks.remove(task);throw error;}return task;
+    }
     public synchronized void resume() throws IOException { for (Task t : tasks) if (t.status.equals("paused")) { t.status = !t.chapterOptions.isEmpty() && t.selectedChapters.isEmpty() ? "selecting" : "queued"; t.phase = t.status.equals("selecting") ? "请选择下载章节" : "排队中"; } save(); }
     public synchronized void pauseQueued() throws IOException { for (Task t : tasks) if (t.status.equals("queued") || t.status.equals("selecting")) { t.status = "paused"; t.phase = "已暂停"; } save(); }
     public synchronized void pauseQueuedOnly() throws IOException { for(Task t:tasks)if(t.status.equals("queued")){t.status="paused";t.phase="已暂停";}save(); }

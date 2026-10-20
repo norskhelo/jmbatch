@@ -2,26 +2,32 @@
 
 支持 Windows 和 Android 的批量漫画下载工具。下载可选择 PDF、ZIP 或图片文件夹，三种成品可离线互相导出。
 
-当前正式版本：**Windows 0.3.28 / Android 0.6.10（versionCode 610）**。双端设置支持多章节合一或分章节观看，保留书签与阅读位置。安装包、更新日志与镜像入口见下方。
+当前正式版本：**Windows 0.3.29 / Android 0.6.11（versionCode 611）**。双端漫画库支持先检查新章节，再确认使用正常下载功能下载。安装包、更新日志与镜像入口见下方。
 
 
 ## 下载安装包（含国内镜像）
 
 GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
 
-当前正式版为 **Windows 0.3.28 / Android 0.6.10**（[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.28-0.6.10)、[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.28-0.6.10)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+当前正式版为 **Windows 0.3.29 / Android 0.6.11**（[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.29-0.6.11)、[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.29-0.6.11)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
 
 | 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
 | --- | --- | --- | --- |
-| Windows 0.3.28 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.3.28-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.3.28-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.3.28-Windows-x64.zip) |
-| Android 0.6.10 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.6.10-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.6.10-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.6.10-Android.apk) |
-| Windows 0.3.28 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/SHA256-release-0.3.28-0.6.10.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/SHA256-release-0.3.28-0.6.10.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/SHA256-release-0.3.28-0.6.10.txt) |
-| Android 0.6.10 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/SHA256-release-0.3.28-0.6.10.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/SHA256-release-0.3.28-0.6.10.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/SHA256-release-0.3.28-0.6.10.txt) |
+| Windows 0.3.29 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.3.29-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.3.29-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.3.29-Windows-x64.zip) |
+| Android 0.6.11 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.6.11-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.6.11-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.6.11-Android.apk) |
+| Windows 0.3.29 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/SHA256-release-0.3.29-0.6.11.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/SHA256-release-0.3.29-0.6.11.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/SHA256-release-0.3.29-0.6.11.txt) |
+| Android 0.6.11 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/SHA256-release-0.3.29-0.6.11.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/SHA256-release-0.3.29-0.6.11.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/SHA256-release-0.3.29-0.6.11.txt) |
 
 镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像同时用于手动下载及本版应用内更新文件下载的自动回退，版本查询仍使用 GitHub API，应用内更新仓库填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
 
 下载后可按校验文件核对 SHA-256。Windows 完整解压 ZIP 后运行；Android 下载 APK 后覆盖安装，保留原应用数据。
 
+
+## 检查漫画章节更新
+
+漫画库 → 批量处理（或长按）→ 选中一本 → 检查更新。Android 也可从“更多操作”进入。先只读取服务器章节目录，有新增章节再确认下载；新章节使用当前下载设置，作为独立漫画保存，原文件和阅读记录保留。暂不下载后，下次仍会提示；同一本已有未完成任务时请先继续、重试或取消原任务。
+
+检查使用本地保存的章节 ID，避免标题、顺序变化或旧的未选章节造成误报。缺少可用下载记录的导入漫画，首次只建立当前目录基线并提示，后续才可识别新章节。旧的全部章节下载记录按最后一个可匹配的已下载章节恢复旧目录前缀。
 
 ## 下载图片与系统相册
 

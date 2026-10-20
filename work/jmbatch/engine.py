@@ -102,6 +102,25 @@ class Engine:
         self.running = True
         self.save()
 
+    def add_chapter_update(self, album_id, catalog, chapters, settings):
+        if self.cleaning or any(t.album_id == album_id and t.status not in ("done", "cancelled") for t in self.tasks):
+            raise ValueError("该漫画已有未完成任务，请先继续、重试或取消原任务。")
+        from chapter_updates import validate_catalog
+        validate_catalog(catalog)
+        task = Task(album_id, dict(settings.validate().__dict__))
+        task.chapter_options = [dict(c) for c in catalog]
+        task.selected_chapters = select_chapters(catalog, [c["id"] for c in chapters])
+        task.phase = "等待下载新章节"
+        self.tasks.append(task)
+        try:
+            self.save()
+        except Exception:
+            self.tasks.remove(task)
+            raise
+        # Dispatch through the usual worker without resuming unrelated paused tasks.
+        self.running = True
+        return task
+
     def pause(self):
         self.running = False
         for state in list(self.active.values()):
@@ -268,6 +287,8 @@ class Engine:
             task.title = event["title"]
         elif kind == "chapter_plan":
             task.selected_chapters = event["chapters"]
+            if not task.chapter_options:
+                task.chapter_options = event.get("catalog", [])
             self.save()
         elif kind == "chapters":
             task.chapter_options = event["chapters"]

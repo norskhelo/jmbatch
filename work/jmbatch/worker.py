@@ -146,7 +146,7 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
                        for index, photo in enumerate(photos, 1)]
             chosen = resolve_chapters(catalog, task.get("selected_chapters"), settings.download_all_chapters)
             task["selected_chapters"] = chosen
-            emit({"type": "chapter_plan", "chapters": chosen})
+            emit({"type": "chapter_plan", "chapters": chosen, "catalog": catalog})
             available = {str(photo.id): photo for photo in photos}
             photos = [available[item["id"]] for item in chosen]
             details = MetadataCache(cache / 'chapters', cache_scope(album, cookie))

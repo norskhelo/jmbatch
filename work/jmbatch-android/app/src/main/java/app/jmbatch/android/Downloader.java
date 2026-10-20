@@ -65,17 +65,9 @@ public final class Downloader {
         task.phase = "正在连接并获取会话"; api.initialize(); control.check();
         task.phase = "读取漫画与章节信息";
         JSONObject album = api.detail("album", task.id); task.title = album.getString("name");
-        JSONArray series = album.optJSONArray("series"); List<JSONObject> chapters = new ArrayList<>();
-        if (series != null) for (int i = 0; i < series.length(); i++) chapters.add(series.getJSONObject(i));
-        if (chapters.isEmpty()) chapters.add(new JSONObject().put("id", task.id).put("sort", 1));
-        chapters.sort(Comparator.comparingInt(item -> item.optInt("sort", 1)));
-        List<ChapterRules.Chapter> catalog = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        for(JSONObject chapter:chapters){
-            String id=chapter.getString("id");
-            if(seen.add(id))catalog.add(new ChapterRules.Chapter(id,catalog.size()+1,chapter.optString("name","第 "+(catalog.size()+1)+" 章")));
-        }
+        List<ChapterRules.Chapter> catalog = ChapterSelection.catalog(album,task.id);
         List<ChapterRules.Chapter> chosen=ChapterRules.resolve(catalog,task.selectedChapters,task.settings.downloadAllChapters);
+        if(task.chapterOptions.isEmpty())task.chapterOptions=Collections.unmodifiableList(new ArrayList<>(catalog));
         task.selectedChapters=Collections.unmodifiableList(new ArrayList<>(chosen));store.save();control.check();
         StringBuilder stamp=new StringBuilder(album.optString("total_photos"));
         for(ChapterRules.Chapter c:catalog)stamp.append('\n').append(c.id).append(':').append(c.title.length()).append(':').append(c.title);

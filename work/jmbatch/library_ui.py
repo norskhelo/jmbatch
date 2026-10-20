@@ -117,7 +117,7 @@ class LibraryWindow:
         ttk.Label(footer, textvariable=self.status, width=1).grid(row=2, column=0, sticky="ew", pady=(3, 5))
         self.action_buttons = {}
         self.batch_rows = []
-        for row, pairs in enumerate(((("开始阅读", "open"), ("导出漫画", "export"), ("打开保存目录", "folder"), ("删除章节", "chapters")),
+        for row, pairs in enumerate(((("开始阅读", "open"), ("导出漫画", "export"), ("打开保存目录", "folder"), ("删除章节", "chapters"), ("检查更新", "updates")),
                       (("批量收藏", "favorite_on"), ("取消收藏", "favorite_off"), ("移入收藏夹", "collection"), ("批量删除文件", "delete"), ("仅移除记录", "forget"))), start=3):
             actions = ttk.Frame(footer)
             actions.grid(row=row, column=0, sticky="ew", pady=3)
@@ -486,7 +486,7 @@ class LibraryWindow:
         self.detail.set(f"当前显示 {len(self.tree.get_children())} 项" + (f"，已选 {len(selected)} 项" if self.batch_mode else ""))
         self.path_text.set(path)
         for action, button in self.action_buttons.items():
-            enabled = self.batch_mode and (len(selected) == 1 if action in ("open", "folder", "chapters") else bool(selected))
+            enabled = self.batch_mode and (len(selected) == 1 if action in ("open", "folder", "chapters", "updates") else bool(selected))
             if any(k not in self.library.entries for k in selected) and action != "open":
                 enabled = False
             button.configure(state="normal" if enabled else "disabled")
@@ -569,6 +569,10 @@ class LibraryWindow:
                     except Exception as exc:
                         self.messagebox.showerror("移动失败", str(exc), parent=self.window)
                 self.choose_collection("移入收藏夹", move, True)
+            elif action == "updates":
+                if len(selected) == 1:
+                    from chapter_updates import show
+                    show(self, selected[0])
             elif action == "chapters":
                 if len(selected) == 1:
                     from chapter_delete_ui import show

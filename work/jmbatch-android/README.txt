@@ -1,4 +1,4 @@
-JM Batch 0.6.10 — Android 使用说明
+JM Batch 0.6.11 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.6.10 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-20）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.6.10-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.6.10-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.6.10-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/SHA256-release-0.3.28-0.6.10.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.6.11-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.6.11-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.6.11-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/SHA256-release-0.3.29-0.6.11.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,17 +28,18 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.28 / Android 0.6.10 — 多章节观看模式
+Windows 0.3.29 / Android 0.6.11 — 漫画库检查章节更新
 
-更新内容
+发布日期：2026-10-20
 
-• 设置中新增“多章节观看模式”：1 多章节合一，保持原来的整本连续阅读；2 分章节观看，每次只显示当前章节。
-• 默认使用模式 1。选择模式 2 后，上下滚动、左右翻页和上一页/下一页都停留在本章范围；使用上一章、下一章或章节列表切换章节。
-• 设置保存后重新打开漫画生效。保留原有全书阅读位置、书签与收藏；总页码跳转和跨章书签自动打开目标章节，无需重新下载。
-• 图片文件夹和分章 ZIP 按已有章节划分；PDF、平铺 ZIP 和单章漫画仍作为一个章节。下载及导出格式保持原有规则。
+新增
+• 漫画库进入“批量处理”并选中一本漫画后，可点击“检查更新”；Android 的“更多操作”也提供入口。
+• 先联网读取章节目录，按章节 ID 对比已知章节；有新章节时显示数量和名称，再询问是否下载。检查阶段不下载漫画图片。
+• 确认后仅将新章节交给正常下载队列，使用当前下载设置，支持原有暂停、继续、失败重试及自动重连。新章节保存为独立漫画，原文件和阅读记录保留。
+• 暂不下载、取消检查或下载失败不会消耗更新提示；同一本存在未完成任务时阻止重复加入。
+• 已知章节记录在本地持久保存。兼容保留章节记录的旧任务；无可用记录的导入漫画首次建立当前目录基线，并明确提示，下次开始检查新增章节。
 
-版本与验证
-
-• Windows 0.3.27 → 0.3.28；Android 0.6.9 → 0.6.10（versionCode 610），保留 app.jmbatch.android 包名、原 APK 签名和更新公钥。
-• 验证设置持久化、旧设置兼容、章首/章末边界、滚动与翻页切换、跨章跳转、书签及阅读位置恢复，并回归阅读缓存稳定性和页面索引。
-• 完成双端构建、Windows 源码及冻结成品专项检查、Android 10/15 框架检查和签名/交付校验；未进行 Android 真机验证。
+兼容与验证
+• Windows 0.3.29；Android 0.6.11（versionCode 611），保留原包名、原 APK 签名和更新公钥。
+• 验证新章节识别、目录重排、旧选择与旧记录、确认/拒绝/取消、队列持久化和正常章节下载；执行双端构建、冻结程序检查及签名校验。
+• Android 使用 Android 10/15 框架和合成数据验证；未进行 Android 真机验证。
