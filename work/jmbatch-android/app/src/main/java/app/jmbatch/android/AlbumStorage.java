@@ -188,20 +188,29 @@ public final class AlbumStorage {
         Uri uri=Uri.parse(tree);Uri parent=DocumentsContract.buildDocumentUriUsingTree(uri,DocumentsContract.getTreeDocumentId(uri));
         for(Node n:children(context,parent))if(n.name.equals(name))throw new IOException("同名文件已存在，未覆盖："+name);
     }
-    private static void copyLocal(File source,File target,Check check)throws Exception {
+    private static void copyLocal(File source,File target,Check check,boolean albumRoot)throws Exception {
         check.run();if(Files.isSymbolicLink(source.toPath()))throw new IOException("来源包含链接");
         if(source.isDirectory()){
-            if(!target.mkdir())throw new IOException("无法创建图片目录");File[] files=source.listFiles();if(files==null)throw new IOException("来源不可读");
-            for(File f:files)copyLocal(f,new File(target,f.getName()),check);
+            if(!target.mkdir())throw new IOException("无法创建图片目录");
+            if(albumRoot)FolderSave.ensureNoMedia(target);
+            File[] files=source.listFiles();if(files==null)throw new IOException("来源不可读");
+            for(File f:files){
+                if(albumRoot&&f.getName().equals(FolderSave.NO_MEDIA)&&Files.isRegularFile(f.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
+                copyLocal(f,new File(target,f.getName()),check,false);
+            }
         }else{
             try(InputStream in=new FileInputStream(source);FileOutputStream out=new FileOutputStream(target)){copy(in,out,check);out.getFD().sync();}
             try(InputStream a=new FileInputStream(source);InputStream b=new FileInputStream(target)){if(source.length()!=target.length()||crc(a,check)!=crc(b,check))throw new IOException("图片保存校验失败");}
         }
     }
-    private static void copySaf(Context context,File source,Uri target,Check check)throws Exception {
+    private static void copySaf(Context context,File source,Uri target,Check check,boolean albumRoot)throws Exception {
         check.run();if(source.isDirectory()){
+            if(albumRoot)GalleryPrivacy.protect(context,target);
             File[] files=source.listFiles();if(files==null)throw new IOException("来源不可读");
-            for(File file:files){Uri child=DocumentsContract.createDocument(context.getContentResolver(),target,mime(file),file.getName());if(child==null)throw new IOException("无法创建图片文件");copySaf(context,file,child,check);}
+            for(File file:files){
+                if(albumRoot&&file.getName().equals(FolderSave.NO_MEDIA)&&Files.isRegularFile(file.toPath(),LinkOption.NOFOLLOW_LINKS))continue;
+                Uri child=DocumentsContract.createDocument(context.getContentResolver(),target,mime(file),file.getName());if(child==null)throw new IOException("无法创建图片文件");copySaf(context,file,child,check,false);
+            }
         }else{
             try(InputStream in=new FileInputStream(source);OutputStream out=context.getContentResolver().openOutputStream(target,"w")){if(out==null)throw new IOException("保存目录不可写");copy(in,out,check);}
             try(InputStream a=new FileInputStream(source);InputStream b=open(context,target)){if(crc(a,check)!=crc(b,check))throw new IOException("图片保存校验失败");}
@@ -220,6 +229,7 @@ public final class AlbumStorage {
         if(temporary==null)throw new IOException("无法创建临时输出");boolean committed=false;
         try{
             ownership.record(temporary);
+            GalleryPrivacy.protect(context,temporary);
             Map<String,Uri> directories=new HashMap<>();int done=0;long bytes=0;
             for(FolderSave.Entry entry:entries){
                 check.run();String[] parts=entry.path.split("/");Uri directory=temporary;
@@ -253,13 +263,13 @@ public final class AlbumStorage {
         if(tree.isEmpty()){
             File root=root(context);if(!root.isDirectory()&&!root.mkdirs()&&!root.isDirectory())throw new IOException("无法创建保存目录");
             File temporary=new File(root,tempName), result=new File(root,name);
-            try{copyLocal(source,temporary,check);check.run();absent(context,tree,name);Files.move(temporary.toPath(),result.toPath());return ExportProvider.uri(context,result);}
+            try{copyLocal(source,temporary,check,true);check.run();absent(context,tree,name);Files.move(temporary.toPath(),result.toPath());return ExportProvider.uri(context,result);}
             finally{if(temporary.exists())Downloader.deleteOwned(temporary,root);}
         }
         Uri treeUri=Uri.parse(tree),parent=DocumentsContract.buildDocumentUriUsingTree(treeUri,DocumentsContract.getTreeDocumentId(treeUri));
         Uri temporary=DocumentsContract.createDocument(context.getContentResolver(),parent,mime(source),tempName);if(temporary==null)throw new IOException("无法创建临时输出");boolean committed=false;
         try{
-            copySaf(context,source,temporary,check);check.run();absent(context,tree,name);
+            copySaf(context,source,temporary,check,true);check.run();absent(context,tree,name);
             Uri renamed=DocumentsContract.renameDocument(context.getContentResolver(),temporary,name);if(renamed==null)throw new IOException("所选目录不支持安全重命名");temporary=renamed;
             try(Cursor c=context.getContentResolver().query(renamed,new String[]{"_display_name"},null,null,null)){if(c==null||!c.moveToFirst()||!name.equals(c.getString(0)))throw new IOException("存储服务更改了输出名称");}
             committed=true;return renamed;
@@ -277,7 +287,7 @@ public final class AlbumStorage {
         for(Image image:album.images){String[] path=image.file.split("/");if(path.length==1)flat.add(path[0]);else allowed.computeIfAbsent(path[0],k->new HashSet<>()).add(path[1]);}
         for(Node node:listing.children(folder)){
             check.run();
-            if(node.name.equals(AlbumRules.MANIFEST)&&!node.directory)continue;
+            if((node.name.equals(AlbumRules.MANIFEST)||node.name.equals(FolderSave.NO_MEDIA))&&!node.directory)continue;
             if(!node.directory&&flat.contains(node.name))continue;
             if(!node.directory||!allowed.containsKey(node.name))throw new IOException("图片目录含额外文件，已停止删除");
             for(Node image:listing.children(node.uri)){check.run();if(image.directory||!allowed.get(node.name).contains(image.name))throw new IOException("章节内含额外文件，已停止删除");}

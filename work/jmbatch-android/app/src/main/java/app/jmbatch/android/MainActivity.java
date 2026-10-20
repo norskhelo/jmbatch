@@ -55,6 +55,7 @@ public final class MainActivity extends Activity {
         output=text(store.settings.outputLabel,14,INK);output.setPadding(0,dp(8),0,dp(6));target.addView(output);
         target.addView(new ActionRow(this,button("选择目录",v->chooseDirectory()),button("使用应用目录",v->{store.settings.outputUri="";store.settings.outputLabel="应用下载目录";save();output.setText(store.settings.outputLabel);})));
         target.addView(button("打开保存目录",v->new SavedDirectory(this,store.settings.outputUri,store.settings.outputLabel).openExternal()));
+        target.addView(text("漫画图片对系统相册隐藏，仍可在漫画库和文件管理器中查看。",11,MUTED));
         RadioGroup formats=new RadioGroup(this);formats.setOrientation(RadioGroup.HORIZONTAL);
         String[] labels={"PDF","ZIP","文件夹"},values={"pdf","zip","images"};
         for(int index=0;index<values.length;index++){
@@ -77,6 +78,7 @@ public final class MainActivity extends Activity {
         layout.addView(button("清除已结束任务记录",v->new AlertDialog.Builder(this).setTitle("清除已结束任务记录").setMessage("仅移除已完成和已取消的任务记录，保留已保存文件及缓存。移除后无法通过这些记录继续下载。").setNegativeButton("取消",null).setPositiveButton("移除",(d,w)->{clearHistory();}).show()));
         layout.addView(text("可在通知栏查看下载进度或暂停任务。应用被系统关闭后，重新打开即可继续下载。",11,MUTED));
         if(!store.note.isEmpty())toast(store.note);
+        GalleryPrivacy.start(this,store);
         if(state!=null&&state.getBundle("library")!=null){libraryScreen=new LibraryScreen(this,store);libraryScreen.show(state.getBundle("library"));}
     }
 
@@ -130,6 +132,7 @@ public final class MainActivity extends Activity {
         Iterator<Map.Entry<String,Row>> iterator=rows.entrySet().iterator();while(iterator.hasNext()){Map.Entry<String,Row> entry=iterator.next();if(!visible.contains(entry.getKey())){entry.getValue().cover.remove();queue.removeView(entry.getValue().card);iterator.remove();}}
         summary.setText("共 "+tasks.size()+" 本  ·  完成 "+completed+"  ·  失败 "+failed);
         global.setText(active==0?(store.running?"正在启动…":store.note.isEmpty()?(completed>0&&completed==tasks.size()?"下载完成":"暂无正在下载的任务"):store.note):"同时下载 "+active+" 本 · 总速度 "+DownloadDisplay.speed(speed));
+        if(!store.galleryNotice.isEmpty())global.append("\n"+store.galleryNotice);
         if(!store.cleanupNotice.isEmpty())global.append("\n最近清理："+store.cleanupNotice);
         start.setEnabled(!store.running);pause.setEnabled(store.running);more.setVisibility(tasks.size()>limit?View.VISIBLE:View.GONE);
         showChapterSelection();
@@ -243,6 +246,7 @@ public final class MainActivity extends Activity {
             String label=DocumentsContract.getTreeDocumentId(uri);Uri doc=DocumentsContract.buildDocumentUriUsingTree(uri,DocumentsContract.getTreeDocumentId(uri));
             try(Cursor cursor=getContentResolver().query(doc,new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME},null,null,null)){if(cursor!=null&&cursor.moveToFirst())label=cursor.getString(0)+"（"+label+"）";}
             store.settings.outputUri=uri.toString();store.settings.outputLabel=label;save();output.setText(label);
+            GalleryPrivacy.start(this,store);
         }catch(Exception error){showError("无法保留目录授权："+error.getMessage());}
     }
 

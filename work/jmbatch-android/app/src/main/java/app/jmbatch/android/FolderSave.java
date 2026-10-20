@@ -7,6 +7,18 @@ import java.util.zip.CRC32;
 
 /** One-copy image publication with write-time CRC and independent target readback. */
 public final class FolderSave {
+    public static final String NO_MEDIA = ".nomedia";
+    /** Create before any image is visible; never replace an existing file or follow a link. */
+    public static boolean ensureNoMedia(File directory) throws IOException {
+        if(Files.isSymbolicLink(directory.toPath())||!directory.isDirectory())
+            throw new IOException("无法设置相册隐藏：图片目录不可用");
+        File marker=new File(directory,NO_MEDIA);
+        if(Files.isSymbolicLink(marker.toPath()))throw new IOException("无法设置相册隐藏：标记为链接");
+        boolean created=marker.createNewFile();
+        if(!Files.isRegularFile(marker.toPath(),LinkOption.NOFOLLOW_LINKS))
+            throw new IOException("无法设置相册隐藏：标记不是文件");
+        return created;
+    }
     public interface Check { void run() throws Exception; }
     public interface Ownership { void record(File file) throws Exception; }
     public interface Progress { void update(String phase,int done,int total,long bytes,long totalBytes) throws Exception; }
@@ -87,6 +99,7 @@ public final class FolderSave {
         Files.createDirectory(temporary.toPath());
         try{
             ownership.record(temporary);
+            ensureNoMedia(temporary);
             int done=0;long bytes=0;
             for(Entry entry:entries){
                 check.run();File target=new File(temporary,entry.path);

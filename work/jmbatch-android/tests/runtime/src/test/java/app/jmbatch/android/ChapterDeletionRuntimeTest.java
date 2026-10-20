@@ -131,7 +131,8 @@ public class ChapterDeletionRuntimeTest {
         List<String> progress=new ArrayList<>();ChapterDeletion.delete(context,store,item,plan,Collections.singleton(2),()->false,progress::add);
         int sourceReads=0,targetReads=0,writes=0;
         for(Map.Entry<String,Integer> e:provider.reads.entrySet())if(e.getKey().endsWith(".jpg")){assertEquals(1,(int)e.getValue());if(e.getKey().startsWith(oldPrefix))sourceReads++;else targetReads++;}
-        for(int n:provider.writes.values())writes+=n;
+        for(Map.Entry<String,Integer> e:provider.writes.entrySet())if(e.getKey().endsWith(".jpg"))writes+=e.getValue();
+        assertEquals(1,provider.writes.entrySet().stream().filter(e->e.getKey().endsWith("/.nomedia")).mapToInt(Map.Entry::getValue).sum());
         assertEquals(4,sourceReads);assertEquals(4,targetReads);assertEquals(4,writes);
         assertFalse(new File(context.getCacheDir(),"chapter-delete").exists());
         assertTrue(progress.stream().anyMatch(t->t.contains("校验保留图片 4/4")));

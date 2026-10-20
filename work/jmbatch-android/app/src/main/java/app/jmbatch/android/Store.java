@@ -19,6 +19,7 @@ public final class Store {
     public volatile boolean libraryBusy;
     public volatile String note = "";
     public volatile String cleanupNotice = "";
+    public volatile String galleryNotice = "";
     private final AtomicFile file;
 
     public static final class Settings {

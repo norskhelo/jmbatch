@@ -19,6 +19,8 @@
       <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.13.0</version></plugin>
       <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.2</version>
         <configuration>
+          <!-- Android 15 ParcelFileDescriptor shadows access the host descriptor field. -->
+          <argLine>--add-opens=java.base/java.io=ALL-UNNAMED</argLine>
           <forkedProcessTimeoutInSeconds>120</forkedProcessTimeoutInSeconds>
           <additionalClasspathElements><additionalClasspathElement>${run.dir}/aar-classes</additionalClasspathElement></additionalClasspathElements>
           <systemPropertyVariables><robolectric.dependency.repo.url>https://repo.maven.apache.org/maven2</robolectric.dependency.repo.url><jm.test.classes>${run.dir}/target/test-classes</jm.test.classes></systemPropertyVariables>
