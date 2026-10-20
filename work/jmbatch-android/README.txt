@@ -1,4 +1,4 @@
-JM Batch 0.6.7 — Android 使用说明
+JM Batch 0.6.8 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -6,11 +6,11 @@ JM Batch 0.6.7 — Android 使用说明
 4. 文件夹和 ZIP 只含图片：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。导出和文件删除前请暂停下载并等待请求退出。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
-安装包下载（2026-10-19）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/JMBatch-0.6.4-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/JMBatch-0.6.4-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/JMBatch-0.6.4-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/SHA256-release-0.3.24-0.6.4.txt
+安装包下载（2026-10-20）
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.8/JMBatch-0.6.8-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.8/JMBatch-0.6.8-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.8/JMBatch-0.6.8-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.8/SHA256-release-android-0.6.8.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,16 +28,23 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.27 / Android 0.6.7 — 全部封面统一自适应
+Android 0.6.8 — 滚动阅读稳定性修复
 
-更新内容
+修复内容
 
-• Windows 与 Android 的全部封面统一使用漫画第一张图片，等比铺满各自封面框；竖图直接铺满，横图保留中央部分并左右对称裁切，不拉伸图像。
-• 规则覆盖下载列表、漫画库列表与平铺，以及收藏夹内每张小封面。收藏夹各小封面分别在自己的框内裁切，不遮挡相邻封面。
-• 继续复用现有封面缓存，无需清缓存或重新下载；保留占位、批量选择与阅读交互，不修改原漫画和正文阅读方式。
+• 修复上下滚动阅读时图片反复出现“正在加载”、页面高度来回变化和画面上下抖动的问题。预加载预算查询不再错误提升屏幕外图片的缓存优先级。
+• 已显示的有效图片在共享缓存被淘汰后继续显示；已知页面尺寸独立保存，回滚和行复用不再退回默认占位高度。
+• 仅在图片或文字实际改变时更新对应控件；离屏回收和关闭阅读器时释放行内图片引用。图片缓存仍为 32 MiB，按可见图片占用计算后续预加载预算。
+• 保留原漫画、下载、书签和阅读页码，支持沉浸模式、滚动与左右翻页切换；无需清理缓存或重新下载漫画。
 
 版本与验证
 
-• Windows 0.3.26 → 0.3.27；Android 0.6.6 → 0.6.7（versionCode 607），保留原包名、APK 签名证书和更新公钥。
-• 相关功能已通过 Windows 25 项检查、Android 20 项框架用例和 37 项行绑定检查，包含旧缓存复用、显示方式切换及收藏夹原生图形裁切。
-• 本次执行双端构建、原签名核验，以及 Windows 源码和打包成品的封面专项检查；Android 未做真机验证。
+• Android 0.6.7 → 0.6.8（versionCode 608），保留 app.jmbatch.android 包名、原 APK 签名和更新公钥，可覆盖安装。Windows 保持 0.3.27。
+• 通过 Android 10/15 的滚动稳定性、缓存压力、页高复用、快速回滚、模式切换与关闭回调测试，并验证阅读索引及分页相关回归。
+• 使用隔离合成图片对照旧版；真机触发受分辨率、图片比例与停留位置影响，本次未连接手机做视觉或帧时间实测。
+
+旧版复现条件
+
+• 0.6.7 上使用约 1440 像素宽的阅读区，准备竖图、横图、长图交替的漫画。先读到约第 9–11 页，再向前滚回。
+• 停在第 1 页下半部、第 2 页横图和第 3 页长图开头同时可见的位置，第 4 页留在屏幕外；停手后观察加载提示和页高是否仍循环变化。
+• 仓库 work/jmbatch-android/tests/runtime/READER_SCROLL_REPRO.txt 提供合成测试漫画生成方法与自动化复现命令；框架对照可重复触发，不保证所有手机手动必现。

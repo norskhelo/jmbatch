@@ -26,6 +26,8 @@ public final class ReaderActivity extends Activity {
     private final ReaderRequests requests=new ReaderRequests();
     private static final ExecutorService historyWorker=Executors.newSingleThreadExecutor();
     private final Map<Integer,String> errors=new HashMap<>();
+    // Geometry outlives decoded bitmaps, including row recycling and width changes.
+    private final Map<Integer,int[]> pageSizes=new HashMap<>();
     private final Set<Integer> retries=new HashSet<>();
     private boolean checking,checkScheduled,firstPageAttempted;
     private String checkStatus="";
@@ -56,6 +58,7 @@ public final class ReaderActivity extends Activity {
     private final Runnable savePosition=()->save();
 
     private int dp(int value){return (int)(value*getResources().getDisplayMetrics().density);}
+    private void text(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
     private Button button(String title,Runnable action){Button result=new ActionButton(this);result.setText(title);result.setTextSize(12);result.setOnClickListener(v->action.run());return result;}
     private void row(LinearLayout body,View...views){body.addView(new ActionRow(this,views));}
     private void message(String text){if(!closed)new AlertDialog.Builder(this).setMessage(text).setPositiveButton("关闭",null).show();}
@@ -135,11 +138,11 @@ public final class ReaderActivity extends Activity {
     }
     private void scheduleSave(){main.removeCallbacks(savePosition);main.postDelayed(savePosition,700);}
     private void update(){
-        favoriteButton.setText(entry.favorite?"★ 已收藏":"☆ 收藏");modeButton.setText(scroll?"滚动阅读":"左右翻页");markButton.setText(marks.contains(page)?"移除本页书签":"添加书签");
+        text(favoriteButton,entry.favorite?"★ 已收藏":"☆ 收藏");text(modeButton,scroll?"滚动阅读":"左右翻页");text(markButton,marks.contains(page)?"移除本页书签":"添加书签");
         if(!ready)return;
         int chapter=ReaderRules.chapter(starts,page);
-        chapterButton.setText("第 "+chapters[page]+" 章");
-        status.setText(statusText()+"\n"+(checkStatus.isEmpty()?"点按漫画隐藏或显示工具栏"+(!scroll?" · 左右滑动翻页":""):checkStatus));
+        text(chapterButton,"第 "+chapters[page]+" 章");
+        text(status,statusText()+"\n"+(checkStatus.isEmpty()?"点按漫画隐藏或显示工具栏"+(!scroll?" · 左右滑动翻页":""):checkStatus));
     }
     private String statusText(){
         int chapter=ReaderRules.chapter(starts,page),end=chapter+1<starts.size()?starts.get(chapter+1):chapters.length;
@@ -149,6 +152,7 @@ public final class ReaderActivity extends Activity {
         if(!ready||closed)return;
         viewportWidth=viewport.getWidth();viewportHeight=viewport.getHeight();
         main.removeCallbacks(loadingNotice);noticeTarget=-1;generation++;requests.clear();errors.clear();cache.evictAll();
+        releaseRows();
         if(pager!=null){pager.dispose();pager=null;}viewport.removeAllViews();
         if(scroll){
             list=new ListView(this);list.setDivider(null);list.setDividerHeight(0);list.setBackgroundColor(Color.rgb(32,37,44));
@@ -156,6 +160,7 @@ public final class ReaderActivity extends Activity {
                 public int getCount(){return chapters.length;}public Object getItem(int position){return position;}public long getItemId(int position){return position;}
                 public View getView(int position,View convert,ViewGroup parent){PageRow row=convert instanceof PageRow?(PageRow)convert:new PageRow();bind(row,position);return row;}
             };
+            list.setRecyclerListener(view->{if(view instanceof PageRow)((PageRow)view).release();});
             list.setAdapter(adapter);viewport.addView(list,new FrameLayout.LayoutParams(-1,-1));list.setSelection(page);
             updateChromeDescription();
             list.setOnScrollListener(new AbsListView.OnScrollListener(){
@@ -173,16 +178,30 @@ public final class ReaderActivity extends Activity {
     }
     private final class PageRow extends FrameLayout {
         final ImageView image;final TextView label;
+        Bitmap shown;
         PageRow(){super(ReaderActivity.this);image=new ImageView(ReaderActivity.this);image.setScaleType(ImageView.ScaleType.FIT_XY);label=new TextView(ReaderActivity.this);label.setTextColor(Color.LTGRAY);label.setGravity(Gravity.CENTER);label.setTextSize(12);addView(image,new FrameLayout.LayoutParams(-1,dp(300)));addView(label,new FrameLayout.LayoutParams(-1,-1));}
+        void release(){shown=null;setTag(null);image.setImageDrawable(null);}
+    }
+    private void releaseRows(){
+        if(list!=null)for(int i=0;i<list.getChildCount();i++){View row=list.getChildAt(i);if(row instanceof PageRow)((PageRow)row).release();}
+    }
+    private int pageHeight(int index,int width){
+        int[] size=pageSizes.get(index);
+        return size==null?Math.max(1,(int)(width*1.4)):Math.max(1,(int)((long)size[1]*width/size[0]));
     }
     private void bind(PageRow row,int index){
         ReaderRequests.Job job=job(index);int width=job.width;
-        String key=job.key;if(!key.equals(row.getTag())){row.setTag(key);row.image.setImageDrawable(null);}
-        Bitmap bitmap=cache.get(key);row.label.setText(errors.containsKey(index)?"本页读取失败，可继续翻页："+errors.get(index):"第 "+(index+1)+" 页 · 正在加载…");row.label.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
+        String key=job.key;if(!key.equals(row.getTag())){row.release();row.setTag(key);}
+        // A visible row still owns its valid image even if the shared LRU evicted it.
+        Bitmap bitmap=row.shown;
+        if(bitmap==null||bitmap.isRecycled())bitmap=cache.get(key);
+        if(bitmap!=null&&bitmap!=row.shown)pageSizes.put(index,new int[]{bitmap.getWidth(),bitmap.getHeight()});
+        if(bitmap==null)text(row.label,errors.containsKey(index)?"本页读取失败，可继续翻页："+errors.get(index):"第 "+(index+1)+" 页 · 正在加载…");
+        row.label.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
         // The row is exactly the fitted image height; notices overlay its placeholder.
-        FrameLayout.LayoutParams params=(FrameLayout.LayoutParams)row.image.getLayoutParams();int height=bitmap==null?(int)(width*1.4):Math.max(1,(int)((long)bitmap.getHeight()*width/bitmap.getWidth()));
+        FrameLayout.LayoutParams params=(FrameLayout.LayoutParams)row.image.getLayoutParams();int height=pageHeight(index,width);
         if(params.height!=height){params.height=height;row.image.setLayoutParams(params);}
-        if(bitmap!=null){row.image.setImageBitmap(bitmap);return;}
+        if(bitmap!=null){if(row.shown!=bitmap){row.shown=bitmap;row.image.setImageBitmap(bitmap);}return;}
         if(errors.containsKey(index)||closed)return;
         requests.offer(job);pump();
     }
@@ -214,7 +233,7 @@ public final class ReaderActivity extends Activity {
             main.post(()->{
                 requests.complete(job);
                 if(closed||job.generation!=generation){if(loaded!=null)loaded.recycle();pump();return;}
-                if(loaded!=null)cache.put(job.key,loaded);else errors.put(job.index,error);
+                if(loaded!=null){pageSizes.put(job.index,new int[]{loaded.getWidth(),loaded.getHeight()});cache.put(job.key,loaded);}else errors.put(job.index,error);
                 if(job.index==(pager!=null?pager.target():page))firstPageAttempted=true;
                 checkStatus=progress;update();
                 loadVisible();pump();
@@ -228,11 +247,15 @@ public final class ReaderActivity extends Activity {
             for(int i=0;i<count;i++){
                 int index=first+i;if(index>=chapters.length)break;
                 View row=list.getChildAt(i);if(row instanceof PageRow)bind((PageRow)row,index);
-                Bitmap image=cache.get(job(index).key);budget-=image==null?16_000_000:image.getByteCount();
+                Bitmap image=row instanceof PageRow?((PageRow)row).shown:null;
+                // Touch only visible cached pages; retained row images count toward the budget too.
+                cache.get(job(index).key);budget-=image==null?16_000_000:image.getByteCount();
             }
             // Current visible rows always win. Unknown images reserve the maximum decoded size.
+            Map<String,Bitmap> available=cache.snapshot();
             for(int i=first+count;count>0&&i<Math.min(chapters.length,first+count+4);i++){
-                ReaderRequests.Job next=job(i);Bitmap image=cache.get(next.key);long bytes=image==null?16_000_000:image.getByteCount();
+                // Budget inspection must not promote an offscreen page above visible pages in LRU order.
+                ReaderRequests.Job next=job(i);Bitmap image=available.get(next.key);long bytes=image==null?16_000_000:image.getByteCount();
                 if(bytes>budget)break;budget-=bytes;
                 if(image==null&&!errors.containsKey(i))requests.offer(next);
             }
@@ -303,6 +326,7 @@ public final class ReaderActivity extends Activity {
     @Override public void onBackPressed(){if(chrome!=null&&!chrome.controlsVisible()){chrome.show(true);updateChromeDescription();}else super.onBackPressed();}
     @Override protected void onDestroy(){
         closed=true;if(chrome!=null)chrome.dispose();main.removeCallbacks(savePosition);main.removeCallbacks(loadingNotice);main.removeCallbacks(refreshVisible);main.removeCallbacks(backgroundCheck);requests.clear();if(pager!=null)pager.dispose();
+        releaseRows();pageSizes.clear();
         worker.execute(()->{if(source!=null)source.close();});worker.shutdown();libraryWorker.shutdown();cache.evictAll();super.onDestroy();
     }
 }

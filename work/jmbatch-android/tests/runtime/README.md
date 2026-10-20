@@ -1,5 +1,12 @@
 # Android framework regression tests
 
+ReaderScrollRuntimeTest covers the production reader on Android 10/15 in touch
+mode: a cold open, forward/backward scrolling, stationary cache/layout stability,
+cache pressure above 32 MiB, geometry reuse, row recycling, chrome changes, mode
+switching and stale callbacks after close. READER_SCROLL_REPRO.txt describes the
+old-version proof and the harmless numbered-image fixture generator. The runner
+accepts --reader-source to use an old ReaderActivity only in the test snapshot.
+
 PermissionRuntimeTest checks the permissions/network screen on Android 10 and
 Android 15: no automatic network probe on entry, notification requests and
 denial handling, disabled notification channels, return-from-settings refresh,

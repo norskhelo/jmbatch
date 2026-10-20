@@ -1,0 +1,53 @@
+Android 0.6.7 滚动阅读抖动：复现与修复验证
+
+已确认的稳定复现方式是 Android 框架自动化；手动复现受阅读区像素宽度、图片比例、滚动停点和缓存时序影响，不能保证任意漫画、任意手机必现。Android 0.6.8 已修复，不应再通过下述操作触发。
+
+一、合成漫画及手机操作
+
+在 JM-Batch 根目录运行：
+  .\work\venv\Scripts\python.exe work/scripts/maintenance/make_reader_scroll_fixture.py
+
+生成：
+  outputs/reports/reader-scroll-fix-reproduction/JM999999999-Scroll-Repro-20261020.zip
+
+包内只有 42 张编号、横线和彩色背景 JPEG，无个人漫画，无网络内容。页尺寸按 1600×2400、2400×1200、1200×3600 循环排列，每张均有页码与 200 像素间隔标尺。999999999 只是本地测试文件名中的合成编号，不要将它作为下载编号提交。
+
+在已安装 0.6.7 的测试设备上：
+1. 将 ZIP 复制到 JM Batch 已授权的保存目录，漫画库点击扫描，然后打开它。也可解压成同名图片文件夹再扫描。无需联网下载或清理原漫画。
+2. 使用竖屏、上下滚动模式。优先选择 1440 像素宽的屏幕/显示分辨率，工具栏保持显示。本次框架复现阅读区为 1440×2569 px；1080 px 等其他尺寸可能不触发此缓存压力。
+3. 跳到第 2 页，等待图片载入；向后正常滚动到约第 9–11 页，再向前回滚。
+4. 停在第 1 页下半部、第 2 页横图完整、第 3 页长图开头同时可见的位置；第 4 页仍在屏幕外。接近框架停点时，第 1 页顶部在屏幕上方约 996 px，第 2 页顶部在阅读区 y≈1164 px，第 3 页顶部 y≈1884 px。
+5. 松手并保持不动。旧版可能持续出现加载字样，横图或长图高度不断变化，画面上下抖动。如果停到了第一张图片顶端而屏幕只见两页，可再向下滑一点使三页同屏；还未触发时重复第 3–4 步。
+
+观察标准：正常的首次载入占位不算失败。失败是手已离开屏幕，已显示过的图片仍反复回到“正在加载”，页面高度和相邻页位置持续来回变化。
+这条缓存问题无需移动网络、后台下载或清缓存。不要为了复现卸载应用或清除应用数据。
+
+二、开发环境稳定复现（与修复用完全相同的断言）
+
+测试只使用生成的图片，不操作真实手机。需要现有项目 JDK 17、Android SDK 35、Maven 和 Robolectric 缓存；Robolectric 需访问其用户目录缓存锁。
+
+1. 从旧版源码包提取：
+   JMBatch-Android/app/src/main/java/app/jmbatch/android/ReaderActivity.java
+   存到 work/tests/reader-scroll-baseline/ReaderActivity.java。
+   本项目已验证的旧包为 ../Android/0.6.7/JMBatch-0.6.7-Android-source.zip。
+
+2. 在 JM-Batch 根目录运行（PowerShell 单引号保留 #）：
+   .\work\venv\Scripts\python.exe work/scripts/maintenance/run_android_runtime_tests.py --run-id reader-scroll-old-version-proof --reader-source work/tests/reader-scroll-baseline/ReaderActivity.java --tests 'ReaderScrollRuntimeTest#coldResumeWithMoreVisiblePages'
+
+3. 旧版预期测试失败：
+   AssertionError: no repeated decode while stationary
+   这表示停止滚动后，缓存写入数仍在增长，并不是测试依赖安装失败或编译失败。已执行对照中最后 40 次观察写入数从 80 增至 120。
+
+4. 在修复源码运行：
+   .\work\venv\Scripts\python.exe work/scripts/maintenance/run_android_runtime_tests.py --run-id reader-scroll-fixed-proof --tests 'ReaderScrollRuntimeTest,ReaderAlbumRuntimeTest'
+   预期 19 项相关用例全部通过，停手后无重复解码/淘汰/布局变化、无加载闪烁、可见页高度和首行偏移稳定；包含 Android 10/15、缓存超预算、回收、缩放、沉浸模式、模式切换及关闭时过期回调。
+
+框架输入：触摸模式；480dp×1067dp、xxhdpi；从第 2 页恢复；100 次观察等待；每次 240px 向后滚动 80 次；静止 60 次；每次 -240px 向前滚动 80 次；再静止 60 次。每次等待已排队的解码并推进主线程 16ms，因此是确定性调度，不能用这些观察次数推算手机帧率或耗时。
+
+三、根因与修复
+
+旧版预加载先 cache.get 再检查预算，超预算离屏图也被提升为最近使用，反而挤掉可见图。绑定又把“缓存没有”当作“图片没显示”，恢复 width×1.4 的占位高度。两者与异步刷新构成循环。
+
+0.6.8 用不改变 LRU 顺序的预算查询；行内正确图片在共享缓存淘汰后继续显示；页面比例独立保存；无变化的图片、文字不再重复赋值；回收/关闭释放图片引用。未扩大全局 32 MiB 缓存。
+
+未连接物理手机；合成 ZIP 的手动操作属于可控复现材料，自动化测试才是本次已实际验证的稳定复现。

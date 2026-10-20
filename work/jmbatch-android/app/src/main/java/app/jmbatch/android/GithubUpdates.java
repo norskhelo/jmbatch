@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.27 / Android 0.6.7 — 全部封面统一自适应\n\n更新内容\n\n• Windows 与 Android 的全部封面统一使用漫画第一张图片，等比铺满各自封面框；竖图直接铺满，横图保留中央部分并左右对称裁切，不拉伸图像。\n• 规则覆盖下载列表、漫画库列表与平铺，以及收藏夹内每张小封面。收藏夹各小封面分别在自己的框内裁切，不遮挡相邻封面。\n• 继续复用现有封面缓存，无需清缓存或重新下载；保留占位、批量选择与阅读交互，不修改原漫画和正文阅读方式。\n\n版本与验证\n\n• Windows 0.3.26 → 0.3.27；Android 0.6.6 → 0.6.7（versionCode 607），保留原包名、APK 签名证书和更新公钥。\n• 相关功能已通过 Windows 25 项检查、Android 20 项框架用例和 37 项行绑定检查，包含旧缓存复用、显示方式切换及收藏夹原生图形裁切。\n• 本次执行双端构建、原签名核验，以及 Windows 源码和打包成品的封面专项检查；Android 未做真机验证。\n";
+    private static final String CURRENT_NOTES="Android 0.6.8 — 滚动阅读稳定性修复\n\n修复内容\n\n• 修复上下滚动阅读时图片反复出现“正在加载”、页面高度来回变化和画面上下抖动的问题。预加载预算查询不再错误提升屏幕外图片的缓存优先级。\n• 已显示的有效图片在共享缓存被淘汰后继续显示；已知页面尺寸独立保存，回滚和行复用不再退回默认占位高度。\n• 仅在图片或文字实际改变时更新对应控件；离屏回收和关闭阅读器时释放行内图片引用。图片缓存仍为 32 MiB，按可见图片占用计算后续预加载预算。\n• 保留原漫画、下载、书签和阅读页码，支持沉浸模式、滚动与左右翻页切换；无需清理缓存或重新下载漫画。\n\n版本与验证\n\n• Android 0.6.7 → 0.6.8（versionCode 608），保留 app.jmbatch.android 包名、原 APK 签名和更新公钥，可覆盖安装。Windows 保持 0.3.27。\n• 通过 Android 10/15 的滚动稳定性、缓存压力、页高复用、快速回滚、模式切换与关闭回调测试，并验证阅读索引及分页相关回归。\n• 使用隔离合成图片对照旧版；真机触发受分辨率、图片比例与停留位置影响，本次未连接手机做视觉或帧时间实测。\n\n旧版复现条件\n\n• 0.6.7 上使用约 1440 像素宽的阅读区，准备竖图、横图、长图交替的漫画。先读到约第 9–11 页，再向前滚回。\n• 停在第 1 页下半部、第 2 页横图和第 3 页长图开头同时可见的位置，第 4 页留在屏幕外；停手后观察加载提示和页高是否仍循环变化。\n• 仓库 work/jmbatch-android/tests/runtime/READER_SCROLL_REPRO.txt 提供合成测试漫画生成方法与自动化复现命令；框架对照可重复触发，不保证所有手机手动必现。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;
