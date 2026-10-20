@@ -20,11 +20,12 @@ public final class ReaderPager extends FrameLayout {
     private VelocityTracker velocity;
     private final int total,slop,minVelocity;
     private int page=-1,target,direction=1,pointer=-1;
+    private int first=0,end;
     private float downX,downY,offset;
     private boolean dragging,vertical,closed;
 
     public ReaderPager(Context context,int total,int initial,Listener listener){
-        super(context);this.total=total;target=initial;this.listener=listener;
+        super(context);this.total=total;end=total;target=initial;this.listener=listener;
         ViewConfiguration config=ViewConfiguration.get(context);
         slop=config.getScaledTouchSlop();minVelocity=config.getScaledMinimumFlingVelocity()*4;
         front=image(context);back=image(context);addView(front);addView(back);back.setVisibility(INVISIBLE);
@@ -35,13 +36,15 @@ public final class ReaderPager extends FrameLayout {
         image.setLayoutParams(new FrameLayout.LayoutParams(-1,-1));return image;
     }
     public int target(){return target;}
+    public void setRange(int first,int end){this.first=first;this.end=end;}
+    private int clamp(int index){return Math.max(first,Math.min(end-1,index));}
     public int displayed(){return page;}
     public int direction(){return direction;}
     public boolean busy(){return animator!=null||dragging||target!=page;}
     public void go(int requested){
         if(closed)return;
         cancelAnimation();releaseTouch();
-        int next=ReaderRules.clamp(requested,total);
+        int next=clamp(requested);
         if(next!=target)direction=next>target?1:-1;
         target=next;ready();listener.requested();
     }
@@ -101,7 +104,7 @@ public final class ReaderPager extends FrameLayout {
                 dragging=Math.abs(dx)>Math.abs(dy);vertical=!dragging;
             }
             if(dragging){
-                direction=dx<0?1:-1;incoming=listener.lookup(page+direction);
+                direction=dx<0?1:-1;int neighbor=page+direction;incoming=neighbor>=first&&neighbor<end?listener.lookup(neighbor):null;
                 back.setImageBitmap(incoming);back.setVisibility(incoming==null?INVISIBLE:VISIBLE);
                 float x=incoming==null?Math.max(-getWidth()*.12f,Math.min(getWidth()*.12f,dx*.22f)):Math.max(-getWidth(),Math.min(getWidth(),dx));
                 place(x,direction);
@@ -113,7 +116,7 @@ public final class ReaderPager extends FrameLayout {
                 velocity.computeCurrentVelocity(1000);float speed=velocity.getXVelocity(pointer);
                 int dir=dx<0?1:-1;
                 boolean commit=Math.abs(dx)>getWidth()*.22f||(Math.abs(dx)>slop*2&&Math.abs(speed)>minVelocity&&speed*dx>0);
-                target=commit?ReaderRules.clamp(page+dir,total):page;direction=dir;
+                target=commit?clamp(page+dir):page;direction=dir;
                 releaseTouch();settle(dir,commit&&target!=page&&incoming!=null);listener.requested();
             }else{
                 releaseTouch(); // ReaderViewport handles taps; all positions toggle controls.

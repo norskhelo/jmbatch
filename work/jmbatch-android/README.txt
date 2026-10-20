@@ -1,4 +1,4 @@
-JM Batch 0.6.9 — Android 使用说明
+JM Batch 0.6.10 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.6.9 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-20）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.9/JMBatch-0.6.9-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.9/JMBatch-0.6.9-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.9/JMBatch-0.6.9-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.9/SHA256-release-android-0.6.9.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.6.10-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.6.10-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.6.10-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/SHA256-release-0.3.28-0.6.10.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,23 +28,17 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Android 0.6.9 — 下载图片对系统相册隐藏
+Windows 0.3.28 / Android 0.6.10 — 多章节观看模式
 
 更新内容
 
-• 下载为图片文件夹、导出为图片文件夹时，先写入 Android 标准 .nomedia 标记，再保存图片，让系统媒体扫描忽略漫画文件夹及其子目录。
-• 启动应用后，后台为应用下载目录、当前及历史授权目录中可识别的旧漫画，以及漫画库和任务记录中的图片文件夹补上标记。已有图片、文件名、阅读进度和收藏保持不变。
-• 自选公共目录只标记漫画子文件夹，不给公共目录根层添加标记，不影响同目录的其他照片。
-• 保留应用内封面、阅读、格式导出、章节删除和取消清理。PDF、ZIP 的内容保持原有规则。
-• 存储服务不支持准确创建标记时，停止新图片写入并提示原因；旧下载无法访问或授权失效时显示提示，重新授权或下次启动后重试。
-
-使用说明
-
-• 覆盖安装后打开一次应用，等待后台处理旧下载。已被相册收录的图片可能需要等待系统媒体索引和相册缓存刷新，部分设备需重启后刷新；第三方相册是否遵循标记取决于其实现。
-• 这是相册扫描隐藏，不是加密；图片仍可通过应用内漫画库和文件管理器访问。请勿删除漫画文件夹里的 .nomedia 文件。
+• 设置中新增“多章节观看模式”：1 多章节合一，保持原来的整本连续阅读；2 分章节观看，每次只显示当前章节。
+• 默认使用模式 1。选择模式 2 后，上下滚动、左右翻页和上一页/下一页都停留在本章范围；使用上一章、下一章或章节列表切换章节。
+• 设置保存后重新打开漫画生效。保留原有全书阅读位置、书签与收藏；总页码跳转和跨章书签自动打开目标章节，无需重新下载。
+• 图片文件夹和分章 ZIP 按已有章节划分；PDF、平铺 ZIP 和单章漫画仍作为一个章节。下载及导出格式保持原有规则。
 
 版本与验证
 
-• Android 0.6.8 → 0.6.9（versionCode 609），保留 app.jmbatch.android 包名、原 APK 签名和更新公钥，可覆盖安装。Windows 保持 0.3.27。
-• 验证本地及 SAF 目录的标记先行、旧下载补标记、重复处理、失败重试、公共目录隔离、文件夹导出、阅读与章节删除关联流程；完整编译、原签名及更新清单校验。
-• 本次未连接 Android 真机；自动化框架测试不代表厂商相册缓存刷新效果已实测。
+• Windows 0.3.27 → 0.3.28；Android 0.6.9 → 0.6.10（versionCode 610），保留 app.jmbatch.android 包名、原 APK 签名和更新公钥。
+• 验证设置持久化、旧设置兼容、章首/章末边界、滚动与翻页切换、跨章跳转、书签及阅读位置恢复，并回归阅读缓存稳定性和页面索引。
+• 完成双端构建、Windows 源码及冻结成品专项检查、Android 10/15 框架检查和签名/交付校验；未进行 Android 真机验证。

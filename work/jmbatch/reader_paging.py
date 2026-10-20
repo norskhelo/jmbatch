@@ -12,6 +12,7 @@ class CanvasPager:
         self.photo = self.next_photo = None
         self.page = self.target = -1
         self.total = 0
+        self.first = 0
         self.direction = 1
         self.timer = self.loading_timer = None
         self.drag = None
@@ -37,8 +38,9 @@ class CanvasPager:
         self.canvas.itemconfigure(self.back, image='', state='hidden')
         self.place()
 
-    def activate(self, total, target):
+    def activate(self, total, target, first=0):
         self.enabled, self.total = True, total
+        self.first = first
         self.cancel()
         self.canvas.itemconfigure(self.front, state='normal' if self.photo else 'hidden')
         self.canvas.itemconfigure(self.notice, state='normal')
@@ -59,7 +61,7 @@ class CanvasPager:
     def go(self, target, animate=True):
         if self.closed or not self.enabled or not self.total:
             return
-        target = max(0, min(self.total - 1, target))
+        target = max(self.first, min(self.total - 1, target))
         self.cancel()
         self.drag = None
         if target != self.target:
@@ -147,7 +149,8 @@ class CanvasPager:
             return
         self.drag = (x, y, started, True)
         direction = 1 if dx < 0 else -1
-        photo = self.lookup(self.page + direction)
+        neighbor = self.page + direction
+        photo = self.lookup(neighbor) if self.first <= neighbor < self.total else None
         self.next_photo = photo
         self.canvas.itemconfigure(self.back, image=photo or '', state='normal' if photo else 'hidden')
         width = self.canvas.winfo_width()
@@ -166,7 +169,7 @@ class CanvasPager:
         direction = 1 if dx < 0 else -1
         velocity = abs(dx) / max(.01, time.monotonic() - started)
         commit = abs(dx) > self.canvas.winfo_width() * .22 or (abs(dx) > 35 and velocity > 550)
-        target = max(0, min(self.total - 1, self.page + direction))
+        target = max(self.first, min(self.total - 1, self.page + direction))
         self.target = target if commit else self.page
         self.direction = direction
         if commit and target != self.page and self.next_photo:

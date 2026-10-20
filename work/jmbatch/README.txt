@@ -1,4 +1,4 @@
-JM Batch 0.3.27 — Windows 使用说明
+JM Batch 0.3.28 — Windows 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -6,11 +6,11 @@ JM Batch 0.3.27 — Windows 使用说明
 4. 文件夹和 ZIP 只含图片：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。导出和文件删除前请暂停下载并等待请求退出。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
-安装包下载（2026-10-18）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/JMBatch-0.3.24-Windows-x64.zip
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/JMBatch-0.3.24-Windows-x64.zip
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/JMBatch-0.3.24-Windows-x64.zip
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-0.6.4/SHA256-release-0.3.24-0.6.4.txt
+安装包下载（2026-10-20）
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.3.28-Windows-x64.zip
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.3.28-Windows-x64.zip
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/JMBatch-0.3.28-Windows-x64.zip
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.28-0.6.10/SHA256-release-0.3.28-0.6.10.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,16 +28,17 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.24-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.27 / Android 0.6.7 — 全部封面统一自适应
+Windows 0.3.28 / Android 0.6.10 — 多章节观看模式
 
 更新内容
 
-• Windows 与 Android 的全部封面统一使用漫画第一张图片，等比铺满各自封面框；竖图直接铺满，横图保留中央部分并左右对称裁切，不拉伸图像。
-• 规则覆盖下载列表、漫画库列表与平铺，以及收藏夹内每张小封面。收藏夹各小封面分别在自己的框内裁切，不遮挡相邻封面。
-• 继续复用现有封面缓存，无需清缓存或重新下载；保留占位、批量选择与阅读交互，不修改原漫画和正文阅读方式。
+• 设置中新增“多章节观看模式”：1 多章节合一，保持原来的整本连续阅读；2 分章节观看，每次只显示当前章节。
+• 默认使用模式 1。选择模式 2 后，上下滚动、左右翻页和上一页/下一页都停留在本章范围；使用上一章、下一章或章节列表切换章节。
+• 设置保存后重新打开漫画生效。保留原有全书阅读位置、书签与收藏；总页码跳转和跨章书签自动打开目标章节，无需重新下载。
+• 图片文件夹和分章 ZIP 按已有章节划分；PDF、平铺 ZIP 和单章漫画仍作为一个章节。下载及导出格式保持原有规则。
 
 版本与验证
 
-• Windows 0.3.26 → 0.3.27；Android 0.6.6 → 0.6.7（versionCode 607），保留原包名、APK 签名证书和更新公钥。
-• 相关功能已通过 Windows 25 项检查、Android 20 项框架用例和 37 项行绑定检查，包含旧缓存复用、显示方式切换及收藏夹原生图形裁切。
-• 本次执行双端构建、原签名核验，以及 Windows 源码和打包成品的封面专项检查；Android 未做真机验证。
+• Windows 0.3.27 → 0.3.28；Android 0.6.9 → 0.6.10（versionCode 610），保留 app.jmbatch.android 包名、原 APK 签名和更新公钥。
+• 验证设置持久化、旧设置兼容、章首/章末边界、滚动与翻页切换、跨章跳转、书签及阅读位置恢复，并回归阅读缓存稳定性和页面索引。
+• 完成双端构建、Windows 源码及冻结成品专项检查、Android 10/15 框架检查和签名/交付校验；未进行 Android 真机验证。

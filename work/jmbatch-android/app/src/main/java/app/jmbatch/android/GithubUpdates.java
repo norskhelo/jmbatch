@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Android 0.6.9 — 下载图片对系统相册隐藏\n\n更新内容\n\n• 下载为图片文件夹、导出为图片文件夹时，先写入 Android 标准 .nomedia 标记，再保存图片，让系统媒体扫描忽略漫画文件夹及其子目录。\n• 启动应用后，后台为应用下载目录、当前及历史授权目录中可识别的旧漫画，以及漫画库和任务记录中的图片文件夹补上标记。已有图片、文件名、阅读进度和收藏保持不变。\n• 自选公共目录只标记漫画子文件夹，不给公共目录根层添加标记，不影响同目录的其他照片。\n• 保留应用内封面、阅读、格式导出、章节删除和取消清理。PDF、ZIP 的内容保持原有规则。\n• 存储服务不支持准确创建标记时，停止新图片写入并提示原因；旧下载无法访问或授权失效时显示提示，重新授权或下次启动后重试。\n\n使用说明\n\n• 覆盖安装后打开一次应用，等待后台处理旧下载。已被相册收录的图片可能需要等待系统媒体索引和相册缓存刷新，部分设备需重启后刷新；第三方相册是否遵循标记取决于其实现。\n• 这是相册扫描隐藏，不是加密；图片仍可通过应用内漫画库和文件管理器访问。请勿删除漫画文件夹里的 .nomedia 文件。\n\n版本与验证\n\n• Android 0.6.8 → 0.6.9（versionCode 609），保留 app.jmbatch.android 包名、原 APK 签名和更新公钥，可覆盖安装。Windows 保持 0.3.27。\n• 验证本地及 SAF 目录的标记先行、旧下载补标记、重复处理、失败重试、公共目录隔离、文件夹导出、阅读与章节删除关联流程；完整编译、原签名及更新清单校验。\n• 本次未连接 Android 真机；自动化框架测试不代表厂商相册缓存刷新效果已实测。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.28 / Android 0.6.10 — 多章节观看模式\n\n更新内容\n\n• 设置中新增“多章节观看模式”：1 多章节合一，保持原来的整本连续阅读；2 分章节观看，每次只显示当前章节。\n• 默认使用模式 1。选择模式 2 后，上下滚动、左右翻页和上一页/下一页都停留在本章范围；使用上一章、下一章或章节列表切换章节。\n• 设置保存后重新打开漫画生效。保留原有全书阅读位置、书签与收藏；总页码跳转和跨章书签自动打开目标章节，无需重新下载。\n• 图片文件夹和分章 ZIP 按已有章节划分；PDF、平铺 ZIP 和单章漫画仍作为一个章节。下载及导出格式保持原有规则。\n\n版本与验证\n\n• Windows 0.3.27 → 0.3.28；Android 0.6.9 → 0.6.10（versionCode 610），保留 app.jmbatch.android 包名、原 APK 签名和更新公钥。\n• 验证设置持久化、旧设置兼容、章首/章末边界、滚动与翻页切换、跨章跳转、书签及阅读位置恢复，并回归阅读缓存稳定性和页面索引。\n• 完成双端构建、Windows 源码及冻结成品专项检查、Android 10/15 框架检查和签名/交付校验；未进行 Android 真机验证。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

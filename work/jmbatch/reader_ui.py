@@ -23,6 +23,8 @@ class ReaderWindow:
         self.closed = False
         self.pages, self.chapters, self.starts = [], [], []
         self.current = 0
+        self.split_chapters = app.engine.settings.chapter_view_mode == 2
+        self.scope_start = self.scope_end = 0
         self.marks = set()
         self.mode = tk.StringVar(value="滚动阅读")
         self.generation = 0
@@ -168,6 +170,9 @@ class ReaderWindow:
             return
         self.viewport_size = (self.canvas.winfo_width(), self.canvas.winfo_height())
         target = self.pager.target if self.pager.enabled and not self.is_scroll() else self.current
+        chapter = bisect.bisect_right(self.starts, target) - 1
+        self.scope_start = self.starts[chapter] if self.split_chapters else 0
+        self.scope_end = (self.starts + [len(self.pages)])[chapter + 1] if self.split_chapters else len(self.pages)
         self.generation += 1
         self.images.clear()
         self.errors.clear()
@@ -179,13 +184,13 @@ class ReaderWindow:
         self.layout()
         if not self.is_scroll():
             self.canvas.delete('scroll')
-            self.pager.activate(len(self.pages), target)
+            self.pager.activate(self.scope_end, target, self.scope_start)
         self.go(target)
 
     def layout(self):
         self.offsets = [0]
-        for height in self.heights:
-            self.offsets.append(self.offsets[-1] + height)
+        for index, height in enumerate(self.heights):
+            self.offsets.append(self.offsets[-1] + (height if self.scope_start <= index < self.scope_end else 0))
         self.extent = self.offsets[-1] + max(0, self.canvas.winfo_height() - 50)
         self.canvas.configure(scrollregion=(0, 0, self.canvas.winfo_width(), self.extent if self.is_scroll() else self.canvas.winfo_height()))
 
@@ -196,7 +201,7 @@ class ReaderWindow:
     def scrolled(self, first, last):
         self.scrollbar.set(first, last)
         if self.pages and self.is_scroll():
-            self.current = max(0, min(len(self.pages) - 1, bisect.bisect_right(self.offsets, self.canvas.canvasy(0) + 40) - 1))
+            self.current = max(self.scope_start, min(self.scope_end - 1, bisect.bisect_right(self.offsets, self.canvas.canvasy(0) + 40) - 1))
             self.refresh_buttons()
             self.schedule_save()
             self.draw()
@@ -212,7 +217,8 @@ class ReaderWindow:
         return "break"
 
     def step(self, delta):
-        self.go((self.current if self.is_scroll() else self.pager.target) + delta)
+        self.go(max(self.scope_start, min(self.scope_end - 1,
+                (self.current if self.is_scroll() else self.pager.target) + delta)))
 
     def page_committed(self, index):
         self.current = index
@@ -223,6 +229,11 @@ class ReaderWindow:
         if not self.pages:
             return
         index = max(0, min(len(self.pages) - 1, index))
+        if not self.scope_start <= index < self.scope_end:
+            self.current = index
+            self.pager.hide()
+            self.relayout()
+            return
         if not self.is_scroll():
             self.canvas.yview_moveto(0)
             self.pager.go(index)
@@ -260,8 +271,8 @@ class ReaderWindow:
         width, height = self.canvas.winfo_width(), self.canvas.winfo_height()
         if self.is_scroll():
             top = self.canvas.canvasy(0)
-            first = max(0, bisect.bisect_right(self.offsets, top) - 1)
-            last = min(len(self.pages), bisect.bisect_right(self.offsets, top + height) + 1)
+            first = max(self.scope_start, bisect.bisect_right(self.offsets, top) - 1)
+            last = min(self.scope_end, bisect.bisect_right(self.offsets, top + height) + 1)
             visible = list(range(first, min(last, first + 6)))
         else:
             visible = [self.current]
@@ -295,7 +306,7 @@ class ReaderWindow:
             desired += [target + self.pager.direction, target - self.pager.direction]
         budget = 32 * 1024 * 1024
         estimate = min(4_000_000, min(1600, width) * min(8192, height)) * 4
-        desired = [i for i in desired if 0 <= i < len(self.pages)][:max(1, budget // max(1, estimate))]
+        desired = [i for i in desired if self.scope_start <= i < self.scope_end][:max(1, budget // max(1, estimate))]
         for index in desired:
             if index in self.images:
                 self.images.move_to_end(index)
@@ -375,7 +386,7 @@ class ReaderWindow:
             chapter = bisect.bisect_right(self.starts, self.current) - 1
             self.chapter_box.current(chapter)
             count = (self.starts + [len(self.pages)])[chapter + 1] - self.starts[chapter]
-            self.status.set(f"第 {self.pages[self.current]['chapter']} 章 · 本章 {self.current-self.starts[chapter]+1}/{count} 页 · 总页码 {self.current+1}/{len(self.pages)}" + (" · PDF 按一个章节显示" if self.library.entries.get(self.key, {}).get("format") == "pdf" else ""))
+            self.status.set(f"第 {self.pages[self.current]['chapter']} 章 · 本章 {self.current-self.starts[chapter]+1}/{count} 页 · 总页码 {self.current+1}/{len(self.pages)}" + (" · 分章节观看（章末请切换下一章）" if self.split_chapters else " · 多章节合一") + (" · PDF 按一个章节显示" if self.library.entries.get(self.key, {}).get("format") == "pdf" else ""))
             if self.window.focus_get() is not None and not isinstance(self.window.focus_get(), ttk.Entry):
                 self.jump.set(str(self.current + 1))
 

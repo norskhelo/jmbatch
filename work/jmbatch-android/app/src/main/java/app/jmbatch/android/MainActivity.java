@@ -258,6 +258,9 @@ public final class MainActivity extends Activity {
         for(int i=0;i<names.length;i++){form.addView(text(names[i],13,MUTED));fields[i]=edit("",true);fields[i].setText(Integer.toString(values[i]));form.addView(fields[i]);}
         CheckBox auto=new CheckBox(this);auto.setText("下载缓慢或无进度时自动重连");auto.setChecked(store.settings.autoReset);form.addView(auto);
         CheckBox allChapters=new CheckBox(this);allChapters.setText("默认下载全部章节（跳过章节选择）");allChapters.setChecked(store.settings.downloadAllChapters);form.addView(allChapters);
+        form.addView(text("多章节观看模式",13,MUTED));
+        Spinner chapterView=new Spinner(this);ArrayAdapter<String> chapterModes=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,new String[]{"1 多章节合一","2 分章节观看"});chapterModes.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);chapterView.setAdapter(chapterModes);chapterView.setSelection(store.settings.chapterViewMode-1);form.addView(chapterView);
+        form.addView(text("保存后重新打开漫画生效。分章节观看在章末停止，通过上一章、下一章或章节列表切换；书签及总页码跳转可跨章。",12,MUTED));
         form.addView(text("Cookie（可选，仅本次会话有效）",13,MUTED));EditText cookie=edit("key=value; key2=value2",false);cookie.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);cookie.setText(store.cookie);form.addView(cookie);
         form.addView(text("并行数越高，请求和内存占用越多；超时或限流时可适当调低。\n下载速度按实际接收的图片数据统计，包含重试流量。\n任务数保存后生效；调低时等待当前任务完成。\n其他设置用于新任务和手动重试，已有任务保留原保存位置和格式。",12,MUTED));
         form.addView(button("离线诊断",v->selfTest()));
@@ -268,6 +271,7 @@ public final class MainActivity extends Activity {
                 int[] nums=new int[fields.length];for(int i=0;i<fields.length;i++)nums[i]=Integer.parseInt(fields[i].getText().toString().trim());
                 Store.Settings options=new Store.Settings(store.settings.json());options.threads=nums[0];options.timeout=nums[1];options.retries=nums[2];options.slowKB=nums[3];options.window=nums[4];options.stall=nums[5];options.maxResets=nums[6];options.concurrentTasks=nums[7];options.chapterWorkers=nums[8];options.autoReset=auto.isChecked();options.keepImages=false;options.numericFilename=false;options.flatZip=false;options.validate();
                 options.downloadAllChapters=allChapters.isChecked();
+                options.chapterViewMode=chapterView.getSelectedItemPosition()+1;options.validate();
                 String secret=cookie.getText().toString().trim();if(secret.contains("\n")||secret.contains("\r")||(!secret.isEmpty()&&!secret.contains("=")))throw new IllegalArgumentException("Cookie 格式应为 key=value; key2=value2，不能包含换行");
                 store.settings=options;store.cookie=secret;store.save();toast("设置已保存");dialog.dismiss();
             }catch(Exception error){showError(error instanceof NumberFormatException?"请输入有效的整数，并确认数值在允许范围内。":error.getMessage());}

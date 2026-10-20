@@ -508,6 +508,11 @@ class App:
             ttk.Label(frame, text=hint, foreground=MUTED).grid(row=row, column=2, sticky="w")
         auto = tk.BooleanVar(value=self.engine.settings.auto_reset)
         all_chapters = tk.BooleanVar(value=self.engine.settings.download_all_chapters)
+        chapter_modes = ("1 多章节合一", "2 分章节观看")
+        chapter_view = ttk.Combobox(frame, state="readonly", values=chapter_modes, width=20)
+        chapter_view.current(self.engine.settings.chapter_view_mode - 1)
+        ttk.Label(frame, text="多章节观看模式").grid(row=12, column=0, sticky="w", pady=8)
+        chapter_view.grid(row=12, column=1, columnspan=2, sticky="w")
         ttk.Checkbutton(frame, text="默认下载全部章节（仅对未选择章节的任务生效）", variable=all_chapters).grid(row=11, column=0, columnspan=3, sticky="w")
         ttk.Checkbutton(frame, text="下载缓慢或无进度时自动重连", variable=auto).grid(row=10, column=0, columnspan=3, sticky="w", pady=(14, 5))
         ttk.Label(frame, text="Cookie（可选，仅本次会话有效，不写入配置或日志）").grid(row=13, column=0, columnspan=3, sticky="w", pady=(15, 6))
@@ -523,13 +528,14 @@ class App:
                         values[key] = int(variable.get())
                     except ValueError:
                         raise ValueError("请输入有效的整数，并确认数值在允许范围内。")
-                values.update(auto_reset=auto.get(), download_all_chapters=all_chapters.get())
+                values.update(auto_reset=auto.get(), download_all_chapters=all_chapters.get(),
+                              chapter_view_mode=chapter_view.current() + 1)
                 from worker import parse_cookies
                 parse_cookies(cookie.get().strip())
                 self.engine.settings = Settings(**values).validate()
                 self.engine.cookie = cookie.get().strip()
                 self.engine.save()
-                self.log("下载设置已保存。Cookie 仅在本次会话中使用。")
+                self.log("设置已保存。多章节观看模式在重新打开漫画后生效。Cookie 仅在本次会话中使用。")
                 dialog.destroy()
             except (ValueError, OSError) as exc:
                 messagebox.showerror("设置无效", str(exc), parent=dialog)
@@ -565,6 +571,10 @@ def main():
         from diagnostics import run_tile_self_test
         index = sys.argv.index("--self-test-tiles")
         run_tile_self_test(Path(sys.argv[index + 1]).resolve())
+        return
+    if "--self-test-chapter-view" in sys.argv:
+        from chapter_view_checks import run
+        run(Path(sys.argv[sys.argv.index("--self-test-chapter-view") + 1]).resolve())
         return
     if "--self-test" in sys.argv:
         from diagnostics import run_self_test

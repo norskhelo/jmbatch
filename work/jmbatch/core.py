@@ -12,7 +12,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-VERSION = "0.3.27"
+VERSION = "0.3.28"
 ZIP_LAYOUT_VERSION = 3
 MAX_TASKS = 2000
 
@@ -58,6 +58,7 @@ class Settings:
     numeric_filename: bool = False
     flat_zip: bool = False
     download_all_chapters: bool = False
+    chapter_view_mode: int = 1
 
     def validate(self):
         if self.format not in ("images", "pdf", "zip"):
@@ -65,6 +66,7 @@ class Settings:
         for name, low, high, label in [
             ("concurrent_tasks", 1, 4, "同时下载任务数"),
             ("chapter_workers", 1, 8, "章节读取并行数"),
+            ("chapter_view_mode", 1, 2, "多章节观看模式"),
             ("threads", 1, 16, "图片线程数"), ("timeout", 5, 120, "请求超时"),
             ("request_retries", 0, 5, "请求重试次数"), ("slow_kbps", 0, 10240, "慢速阈值"),
             ("slow_seconds", 15, 600, "慢速观察窗口"), ("stall_seconds", 30, 1800, "无进度超时"),

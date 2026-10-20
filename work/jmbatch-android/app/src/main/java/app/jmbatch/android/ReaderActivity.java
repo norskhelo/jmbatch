@@ -40,6 +40,8 @@ public final class ReaderActivity extends Activity {
     private int[] chapters,pageNumbers;
     private List<Integer> starts;
     private int page;
+    private boolean splitChapters;
+    private int scopeStart,scopeEnd;
     private volatile int generation;
     private boolean scroll=true,ready,stateWritable=true,favoriteBusy;
     private volatile boolean closed;
@@ -66,6 +68,7 @@ public final class ReaderActivity extends Activity {
         super.onCreate(saved);
         try{entry=new LibraryStore.Entry(new JSONObject(getIntent().getStringExtra("entry")));}catch(Exception error){finish();return;}
         history=getSharedPreferences("reader-history",MODE_PRIVATE);
+        splitChapters=Store.get(this).settings.chapterViewMode==2;
         LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);
         controls.setPadding(dp(6),dp(4),dp(6),dp(4));
         TextView title=new TextView(this);title.setText(entry.title);title.setTextSize(18);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);controls.addView(title);
@@ -146,10 +149,13 @@ public final class ReaderActivity extends Activity {
     }
     private String statusText(){
         int chapter=ReaderRules.chapter(starts,page),end=chapter+1<starts.size()?starts.get(chapter+1):chapters.length;
-        return "本章 "+(page-starts.get(chapter)+1)+"/"+(end-starts.get(chapter))+" 页 · 总页码 "+(page+1)+"/"+chapters.length+(entry.format.equals("pdf")?" · PDF 按一个章节显示":"");
+        return "本章 "+(page-starts.get(chapter)+1)+"/"+(end-starts.get(chapter))+" 页 · 总页码 "+(page+1)+"/"+chapters.length+(splitChapters?" · 分章节观看（章末请切换下一章）":" · 多章节合一")+(entry.format.equals("pdf")?" · PDF 按一个章节显示":"");
     }
     private void buildPages(){
         if(!ready||closed)return;
+        int chapter=ReaderRules.chapter(starts,page);
+        scopeStart=splitChapters?starts.get(chapter):0;
+        scopeEnd=splitChapters&&chapter+1<starts.size()?starts.get(chapter+1):chapters.length;
         viewportWidth=viewport.getWidth();viewportHeight=viewport.getHeight();
         main.removeCallbacks(loadingNotice);noticeTarget=-1;generation++;requests.clear();errors.clear();cache.evictAll();
         releaseRows();
@@ -157,22 +163,23 @@ public final class ReaderActivity extends Activity {
         if(scroll){
             list=new ListView(this);list.setDivider(null);list.setDividerHeight(0);list.setBackgroundColor(Color.rgb(32,37,44));
             adapter=new BaseAdapter(){
-                public int getCount(){return chapters.length;}public Object getItem(int position){return position;}public long getItemId(int position){return position;}
-                public View getView(int position,View convert,ViewGroup parent){PageRow row=convert instanceof PageRow?(PageRow)convert:new PageRow();bind(row,position);return row;}
+                public int getCount(){return scopeEnd-scopeStart;}public Object getItem(int position){return scopeStart+position;}public long getItemId(int position){return scopeStart+position;}
+                public View getView(int position,View convert,ViewGroup parent){PageRow row=convert instanceof PageRow?(PageRow)convert:new PageRow();bind(row,scopeStart+position);return row;}
             };
             list.setRecyclerListener(view->{if(view instanceof PageRow)((PageRow)view).release();});
-            list.setAdapter(adapter);viewport.addView(list,new FrameLayout.LayoutParams(-1,-1));list.setSelection(page);
+            list.setAdapter(adapter);viewport.addView(list,new FrameLayout.LayoutParams(-1,-1));list.setSelection(page-scopeStart);
             updateChromeDescription();
             list.setOnScrollListener(new AbsListView.OnScrollListener(){
                 public void onScrollStateChanged(AbsListView view,int state){if(state==SCROLL_STATE_IDLE)loadVisible();}
-                public void onScroll(AbsListView view,int first,int count,int total){if(count>0){page=first;update();scheduleSave();main.removeCallbacks(refreshVisible);main.post(refreshVisible);}}
+                public void onScroll(AbsListView view,int first,int count,int total){if(view==list&&count>0){page=scopeStart+first;update();scheduleSave();main.removeCallbacks(refreshVisible);main.post(refreshVisible);}}
             });
         }else{
             list=null;pager=new ReaderPager(this,chapters.length,page,new ReaderPager.Listener(){
-                public Bitmap lookup(int index){return index<0||index>=chapters.length?null:cache.get(job(index).key);}
+                public Bitmap lookup(int index){return index<scopeStart||index>=scopeEnd?null:cache.get(job(index).key);}
                 public void requested(){planPages();}
                 public void committed(int index){page=index;main.removeCallbacks(loadingNotice);update();scheduleSave();}
             });
+            pager.setRange(scopeStart,scopeEnd);
             viewport.addView(pager,new FrameLayout.LayoutParams(-1,-1));pager.post(()->{if(!closed&&pager!=null)pager.go(page);});
         }
     }
@@ -216,7 +223,7 @@ public final class ReaderActivity extends Activity {
         int direction=pager.direction();
         int[] desired=pager.busy()?new int[]{target}:new int[]{target,target+direction,target+2*direction,target+3*direction,target+4*direction,target-direction};
         int count=0;for(int index:desired){
-            if(index<0||index>=chapters.length)continue;if(count++>=limit)break;
+            if(index<scopeStart||index>=scopeEnd)continue;if(count++>=limit)break;
             ReaderRequests.Job candidate=job(index);if(cache.get(candidate.key)==null&&!errors.containsKey(index))jobs.add(candidate);
         }
         requests.replace(jobs);pump();
@@ -243,9 +250,9 @@ public final class ReaderActivity extends Activity {
     private void loadVisible(){
         if(closed||!ready)return;
         if(scroll&&list!=null){
-            requests.clear();int first=list.getFirstVisiblePosition(),count=list.getChildCount();long budget=32L*1024*1024;
+            requests.clear();int first=scopeStart+list.getFirstVisiblePosition(),count=list.getChildCount();long budget=32L*1024*1024;
             for(int i=0;i<count;i++){
-                int index=first+i;if(index>=chapters.length)break;
+                int index=first+i;if(index>=scopeEnd)break;
                 View row=list.getChildAt(i);if(row instanceof PageRow)bind((PageRow)row,index);
                 Bitmap image=row instanceof PageRow?((PageRow)row).shown:null;
                 // Touch only visible cached pages; retained row images count toward the budget too.
@@ -253,7 +260,7 @@ public final class ReaderActivity extends Activity {
             }
             // Current visible rows always win. Unknown images reserve the maximum decoded size.
             Map<String,Bitmap> available=cache.snapshot();
-            for(int i=first+count;count>0&&i<Math.min(chapters.length,first+count+4);i++){
+            for(int i=first+count;count>0&&i<Math.min(scopeEnd,first+count+4);i++){
                 // Budget inspection must not promote an offscreen page above visible pages in LRU order.
                 ReaderRequests.Job next=job(i);Bitmap image=available.get(next.key);long bytes=image==null?16_000_000:image.getByteCount();
                 if(bytes>budget)break;budget-=bytes;
@@ -284,15 +291,16 @@ public final class ReaderActivity extends Activity {
     private void go(int target){
         if(!ready)return;
         target=ReaderRules.clamp(target,chapters.length);
+        if(target<scopeStart||target>=scopeEnd){page=target;buildPages();update();scheduleSave();return;}
         if(errors.remove(target)!=null)retries.add(target);
         if(!scroll&&pager!=null){
             errors.remove(target);main.removeCallbacks(loadingNotice);update();pager.go(target);main.postDelayed(loadingNotice,180);return;
         }
         page=target;
-        if(list!=null)list.setSelection(page);
+        if(list!=null)list.setSelection(page-scopeStart);
         update();scheduleSave();
     }
-    private void step(int delta){go((!scroll&&pager!=null?pager.target():page)+delta);}
+    private void step(int delta){go(Math.max(scopeStart,Math.min(scopeEnd-1,(!scroll&&pager!=null?pager.target():page)+delta)));}
     private void chapterStep(int delta){if(ready)go(starts.get(ReaderRules.clamp(ReaderRules.chapter(starts,page)+delta,starts.size())));}
     private void chooseChapter(){
         if(!ready)return;
