@@ -1,4 +1,4 @@
-JM Batch 0.6.12 — Android 使用说明
+JM Batch 0.6.13 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.6.12 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-20）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.6.12-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.6.12-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.6.12-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/SHA256-release-0.3.30-0.6.12.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.13/JMBatch-0.6.13-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.13/JMBatch-0.6.13-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.13/JMBatch-0.6.13-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.13/SHA256-release-0.3.30-0.6.13.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,19 +28,18 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.30 / Android 0.6.12 — 书签跳转修复
+Android 0.6.13 — 书签首次跳转补充修复
 
 发布日期：2026-10-21
 
 修复内容
-• 修复左右翻页时首次跳转书签仍停在旧页的问题：目标图片尚在加载或翻页动画尚未结束时，轻点画面、收放工具栏和阅读区尺寸变化不再取消跳转目标。
-• 切换滚动阅读与左右翻页时保留最近请求的目标页；连续选择书签时以最后一次选择为准，旧页面加载结果不会取代新目标。
-• Android 滚动阅读跳转时停止原有惯性滚动并对齐页首。修复最后一页较短时列表向前回填、画面与目标页码不一致的问题；章节之间仍无额外间隙。
-• Windows 同步修复轻点取消待加载书签及模式切换丢失目标的问题，滚动定位精确到页首，保持原有滚轮速度。
-• 保留已有书签、阅读记录、收藏、漫画文件及下载设置，无需重新下载漫画。
+• 修复滚动阅读中跳转已发出、首帧布局前阅读区尺寸变化时，列表恢复旧页的问题。跳转目标保留到实际显示目标页并对齐页首；旧布局回调不会覆盖目标。
+• 书签、页码和章节弹窗中的跳转统一在弹窗关闭且阅读窗口恢复焦点后执行，避免在离场弹窗下面定位或启动翻页动画。适用于滚动阅读与左右翻页，同章及跨章跳转。
+• 连续跳转以最后一次选择为准；完成跳转后正常手动滚动，取消和删除书签不会触发跳转。
+• 保留现有书签、阅读记录、漫画文件、下载设置及原签名，可直接覆盖安装。Windows 保持 0.3.30。
 
 版本与验证
-• Windows 0.3.29 → 0.3.30；Android 0.6.11 → 0.6.12（versionCode 612），沿用原包名、APK 签名证书和更新公钥。
-• Android 10/15 框架的同组 20 项书签场景中，旧版有 6 项失败，修复后全部通过；另通过 18 项章节/滚动框架回归及 105 项翻页/工具栏宿主检查。
-• Windows 通过 26 项阅读相关测试及源码/冻结成品的实际窗口书签检查，完成双端构建与交付签名校验。
-• 未连接 Android 真机，框架验证不等同于特定手机实测。
+• Android 0.6.12 → 0.6.13（versionCode 613），原包名、APK 签名证书和更新公钥不变。
+• Android 10/15 共 62 项相关框架检查通过，覆盖真实弹窗触摸、窗口根焦点恢复、首帧布局、冷页加载、两种阅读模式、页码/章节跳转和手动滚动。
+• 新增布局交错场景在 0.6.12 的两个系统版本上均复现停在旧页，修复后通过。
+• 未连接 Android 真机；已验证上述布局缺陷和跳转时序保护，尚未确认用户手机上两种模式的全部现场原因。

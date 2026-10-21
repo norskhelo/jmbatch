@@ -40,6 +40,7 @@ public final class ReaderActivity extends Activity {
     private int[] chapters,pageNumbers;
     private List<Integer> starts;
     private int page;
+    private int dialogTarget=-1,scrollTarget=-1;
     private boolean splitChapters;
     private int scopeStart,scopeEnd;
     private volatile int generation;
@@ -167,14 +168,26 @@ public final class ReaderActivity extends Activity {
                 public View getView(int position,View convert,ViewGroup parent){PageRow row=convert instanceof PageRow?(PageRow)convert:new PageRow();bind(row,scopeStart+position);return row;}
             };
             list.setRecyclerListener(view->{if(view instanceof PageRow)((PageRow)view).release();});
-            list.setAdapter(adapter);viewport.addView(list,new FrameLayout.LayoutParams(-1,-1));list.setSelectionFromTop(page-scopeStart,0);
+            list.setAdapter(adapter);viewport.addView(list,new FrameLayout.LayoutParams(-1,-1));
+            final ListView opening=list;
+            // setSelectionFromTop is deferred. A size change before its layout can
+            // restore the old first row; keep the request until a drawn frame agrees.
+            opening.getViewTreeObserver().addOnPreDrawListener(()->{
+                if(closed||list!=opening||scrollTarget<0)return true;
+                View first=opening.getChildAt(0);
+                if(opening.getFirstVisiblePosition()==scrollTarget-scopeStart&&first!=null&&first.getTop()==opening.getPaddingTop()){
+                    page=scrollTarget;scrollTarget=-1;update();scheduleSave();return true;
+                }
+                opening.setSelectionFromTop(scrollTarget-scopeStart,0);return false;
+            });
+            scrollTarget=page;list.setSelectionFromTop(scrollTarget-scopeStart,0);
             updateChromeDescription();
             list.setOnScrollListener(new AbsListView.OnScrollListener(){
-                public void onScrollStateChanged(AbsListView view,int state){if(state==SCROLL_STATE_IDLE)loadVisible();}
-                public void onScroll(AbsListView view,int first,int count,int total){if(view==list&&count>0){page=scopeStart+first;update();scheduleSave();main.removeCallbacks(refreshVisible);main.post(refreshVisible);}}
+                public void onScrollStateChanged(AbsListView view,int state){if(view!=list)return;if(state==SCROLL_STATE_TOUCH_SCROLL)scrollTarget=-1;if(state==SCROLL_STATE_IDLE)loadVisible();}
+                public void onScroll(AbsListView view,int first,int count,int total){if(view==list&&count>0){if(scrollTarget<0){page=scopeStart+first;update();scheduleSave();}main.removeCallbacks(refreshVisible);main.post(refreshVisible);}}
             });
         }else{
-            list=null;pager=new ReaderPager(this,chapters.length,page,new ReaderPager.Listener(){
+            scrollTarget=-1;list=null;pager=new ReaderPager(this,chapters.length,page,new ReaderPager.Listener(){
                 public Bitmap lookup(int index){return index<scopeStart||index>=scopeEnd?null:cache.get(job(index).key);}
                 public void requested(){planPages();}
                 public void committed(int index){page=index;main.removeCallbacks(loadingNotice);update();scheduleSave();}
@@ -295,30 +308,46 @@ public final class ReaderActivity extends Activity {
         });}catch(RejectedExecutionException error){checking=false;}
     }
     private void go(int target){
-        if(!ready)return;
+        if(!ready||closed)return;
+        dialogTarget=-1;
         target=ReaderRules.clamp(target,chapters.length);
         if(target<scopeStart||target>=scopeEnd){page=target;buildPages();update();scheduleSave();return;}
         if(errors.remove(target)!=null)retries.add(target);
         if(!scroll&&pager!=null){
             errors.remove(target);main.removeCallbacks(loadingNotice);update();pager.go(target);main.postDelayed(loadingNotice,180);return;
         }
-        page=target;
+        page=target;scrollTarget=target;
         if(list!=null){list.smoothScrollBy(0,0);list.setSelectionFromTop(target-scopeStart,0);}
         update();scheduleSave();
+    }
+    private void jumpFromDialog(DialogInterface dialog,int target){
+        dialogTarget=ReaderRules.clamp(target,chapters.length);
+        // Android dismisses standard buttons after invoking their click callback.
+        // Wait for both dismissal and reader focus before changing list geometry
+        // or starting a page animation underneath the outgoing dialog.
+        ((Dialog)dialog).setOnDismissListener(ignored->postDialogJump());
+        dialog.dismiss();
+    }
+    private void postDialogJump(){
+        viewport.post(()->{if(!closed&&dialogTarget>=0&&hasWindowFocus())go(dialogTarget);});
+    }
+    @Override public void onWindowFocusChanged(boolean focused){
+        super.onWindowFocusChanged(focused);
+        if(focused&&dialogTarget>=0&&viewport!=null)postDialogJump();
     }
     private void step(int delta){go(Math.max(scopeStart,Math.min(scopeEnd-1,(!scroll&&pager!=null?pager.target():page)+delta)));}
     private void chapterStep(int delta){if(ready)go(starts.get(ReaderRules.clamp(ReaderRules.chapter(starts,page)+delta,starts.size())));}
     private void chooseChapter(){
         if(!ready)return;
         String[] labels=new String[starts.size()];for(int i=0;i<labels.length;i++)labels[i]="第 "+chapters[starts.get(i)]+" 章 · "+((i+1<starts.size()?starts.get(i+1):chapters.length)-starts.get(i))+" 页";
-        new AlertDialog.Builder(this).setTitle("选择章节").setSingleChoiceItems(labels,ReaderRules.chapter(starts,page),(dialog,index)->{dialog.dismiss();go(starts.get(index));}).setNegativeButton("关闭",null).show();
+        new AlertDialog.Builder(this).setTitle("选择章节").setSingleChoiceItems(labels,ReaderRules.chapter(starts,page),(dialog,index)->jumpFromDialog(dialog,starts.get(index))).setNegativeButton("关闭",null).show();
     }
     private void toggleMode(){if(ready){if(pager!=null)page=pager.target();scroll=!scroll;buildPages();update();save();}}
     private void jumpPage(){
         if(!ready)return;
         EditText input=new EditText(this);input.setInputType(InputType.TYPE_CLASS_NUMBER);input.setText(String.valueOf(page+1));input.selectAll();
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("跳转页码（1–"+chapters.length+"）").setView(input).setPositiveButton("跳转",null).setNegativeButton("取消",null).create();
-        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{int target=Integer.parseInt(input.getText().toString());if(target<1||target>chapters.length)throw new NumberFormatException();go(target-1);dialog.dismiss();}catch(NumberFormatException error){input.setError("请输入有效页码");}}));dialog.show();
+        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{int target=Integer.parseInt(input.getText().toString());if(target<1||target>chapters.length)throw new NumberFormatException();jumpFromDialog(dialog,target-1);}catch(NumberFormatException error){input.setError("请输入有效页码");}}));dialog.show();
     }
     private void favorite(){
         if(!ready||favoriteBusy)return;favoriteBusy=true;favoriteButton.setEnabled(false);
@@ -333,13 +362,13 @@ public final class ReaderActivity extends Activity {
         if(!ready)return;
         if(marks.isEmpty()){message("暂无书签，阅读时点击“添加书签”保存当前页。");return;}
         Integer[] pages=marks.toArray(new Integer[0]);String[] labels=new String[pages.length];for(int i=0;i<pages.length;i++)labels[i]="第 "+chapters[pages[i]]+" 章 · 第 "+pageNumbers[pages[i]]+" 页（总第 "+(pages[i]+1)+" 页）";
-        new AlertDialog.Builder(this).setTitle("书签").setItems(labels,(dialog,index)->new AlertDialog.Builder(this).setTitle(labels[index]).setPositiveButton("跳转",(d,w)->go(pages[index])).setNeutralButton("删除书签",(d,w)->{marks.remove(pages[index]);save();update();}).setNegativeButton("取消",null).show()).setNegativeButton("关闭",null).show();
+        new AlertDialog.Builder(this).setTitle("书签").setItems(labels,(dialog,index)->new AlertDialog.Builder(this).setTitle(labels[index]).setPositiveButton("跳转",(d,w)->jumpFromDialog(d,pages[index])).setNeutralButton("删除书签",(d,w)->{marks.remove(pages[index]);save();update();}).setNegativeButton("取消",null).show()).setNegativeButton("关闭",null).show();
     }
     @Override public boolean onKeyDown(int code,android.view.KeyEvent event){if(ready&&(code==KeyEvent.KEYCODE_DPAD_LEFT||code==KeyEvent.KEYCODE_PAGE_UP)){step(-1);return true;}if(ready&&(code==KeyEvent.KEYCODE_DPAD_RIGHT||code==KeyEvent.KEYCODE_PAGE_DOWN)){step(1);return true;}return super.onKeyDown(code,event);}
     @Override protected void onPause(){main.removeCallbacks(savePosition);save();super.onPause();}
     @Override public void onBackPressed(){if(chrome!=null&&!chrome.controlsVisible()){chrome.show(true);updateChromeDescription();}else super.onBackPressed();}
     @Override protected void onDestroy(){
-        closed=true;if(chrome!=null)chrome.dispose();main.removeCallbacks(savePosition);main.removeCallbacks(loadingNotice);main.removeCallbacks(refreshVisible);main.removeCallbacks(backgroundCheck);requests.clear();if(pager!=null)pager.dispose();
+        closed=true;dialogTarget=scrollTarget=-1;if(chrome!=null)chrome.dispose();main.removeCallbacks(savePosition);main.removeCallbacks(loadingNotice);main.removeCallbacks(refreshVisible);main.removeCallbacks(backgroundCheck);requests.clear();if(pager!=null)pager.dispose();
         releaseRows();pageSizes.clear();
         worker.execute(()->{if(source!=null)source.close();});worker.shutdown();libraryWorker.shutdown();cache.evictAll();super.onDestroy();
     }
