@@ -576,6 +576,10 @@ def main():
         from chapter_update_checks import run
         run(Path(sys.argv[sys.argv.index("--self-test-chapter-updates") + 1]).resolve())
         return
+    if "--self-test-bookmarks" in sys.argv:
+        from bookmark_checks import run
+        run(Path(sys.argv[sys.argv.index("--self-test-bookmarks") + 1]).resolve())
+        raise SystemExit(0)
     if "--self-test-chapter-view" in sys.argv:
         from chapter_view_checks import run
         run(Path(sys.argv[sys.argv.index("--self-test-chapter-view") + 1]).resolve())

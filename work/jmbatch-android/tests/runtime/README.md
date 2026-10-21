@@ -1,5 +1,12 @@
 # Android framework regression tests
 
+BookmarkRuntimeTest checks one-click cold/backward/cross-chapter bookmarks,
+mixed page heights, the last short page, an active fling, rapid replacement
+jumps, both reading modes and toolbar/viewport changes during a blocked decode.
+Its dialog helper waits for AlertDialog's asynchronous button message before
+issuing the next input. Use --reader-source together with --pager-source to
+run the same cases against an old reader only in an isolated source snapshot.
+
 ReaderScrollRuntimeTest covers the production reader on Android 10/15 in touch
 mode: a cold open, forward/backward scrolling, stationary cache/layout stability,
 cache pressure above 32 MiB, geometry reuse, row recycling, chrome changes, mode

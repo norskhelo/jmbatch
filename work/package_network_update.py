@@ -73,7 +73,11 @@ def main():
     parser.add_argument('--notes', type=Path, help='User-facing release notes for these versions')
     parser.add_argument('--tag', help='Tag to record in a freshly signed LOCAL manifest')
     parser.add_argument('--reuse-release', type=Path, help='Existing signed combined release directory')
+    parser.add_argument('--tracked-sources-only', action='store_true', help='Include only reviewed Git-tracked/staged source files, excluding unrelated local diagnostics')
     args = parser.parse_args()
+    tracked = None
+    if args.tracked_sources_only:
+        tracked = set(subprocess.check_output(['git', 'ls-files', '-z'], cwd=PROJECT).decode('utf-8').split('\0'))
     if args.reuse_release and args.tag:
         parser.error('--reuse-release and --tag are mutually exclusive')
     if not args.output and not (args.tag or args.reuse_release):
@@ -118,7 +122,10 @@ def main():
                     raise ValueError('Invalid Android package')
             shutil.copy2(apk, out / name)
         source_name = f'JMBatch-{number}-' + ('source.zip' if platform == 'windows' else 'Android-source.zip')
-        archive(source_files(platform), out / source_name)
+        sources = source_files(platform)
+        if tracked is not None:
+            sources = {name: path for name, path in sources.items() if path.relative_to(PROJECT).as_posix() in tracked}
+        archive(sources, out / source_name)
         readme = ('使用说明-' if platform == 'windows' else '安卓使用说明-') + number + '.txt'
         shutil.copy2(ROOT / ('jmbatch' if platform == 'windows' else 'jmbatch-android') / 'README.txt', out / readme)
         platform_files[platform] = [name, source_name, readme, notes_name]

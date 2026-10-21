@@ -136,7 +136,6 @@ class CanvasPager:
         if not self.enabled or self.page < 0:
             return
         self.cancel()
-        self.target = self.page
         self.drag = (event.x, event.y, time.monotonic(), False)
         self.requested()
 
@@ -147,6 +146,10 @@ class CanvasPager:
         dx, dy = event.x - x, event.y - y
         if not moved and (abs(dx) < 8 or abs(dx) <= abs(dy)):
             return
+        if not moved:
+            # Only an intentional page drag supersedes a pending bookmark.
+            self.target = self.page
+            self.requested()
         self.drag = (x, y, started, True)
         direction = 1 if dx < 0 else -1
         neighbor = self.page + direction

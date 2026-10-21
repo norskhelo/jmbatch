@@ -1,4 +1,4 @@
-JM Batch 0.6.11 — Android 使用说明
+JM Batch 0.6.12 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.6.11 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-20）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.6.11-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.6.11-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/JMBatch-0.6.11-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-0.6.11/SHA256-release-0.3.29-0.6.11.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.6.12-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.6.12-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.6.12-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/SHA256-release-0.3.30-0.6.12.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,18 +28,19 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.29-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.29 / Android 0.6.11 — 漫画库检查章节更新
+Windows 0.3.30 / Android 0.6.12 — 书签跳转修复
 
-发布日期：2026-10-20
+发布日期：2026-10-21
 
-新增
-• 漫画库进入“批量处理”并选中一本漫画后，可点击“检查更新”；Android 的“更多操作”也提供入口。
-• 先联网读取章节目录，按章节 ID 对比已知章节；有新章节时显示数量和名称，再询问是否下载。检查阶段不下载漫画图片。
-• 确认后仅将新章节交给正常下载队列，使用当前下载设置，支持原有暂停、继续、失败重试及自动重连。新章节保存为独立漫画，原文件和阅读记录保留。
-• 暂不下载、取消检查或下载失败不会消耗更新提示；同一本存在未完成任务时阻止重复加入。
-• 已知章节记录在本地持久保存。兼容保留章节记录的旧任务；无可用记录的导入漫画首次建立当前目录基线，并明确提示，下次开始检查新增章节。
+修复内容
+• 修复左右翻页时首次跳转书签仍停在旧页的问题：目标图片尚在加载或翻页动画尚未结束时，轻点画面、收放工具栏和阅读区尺寸变化不再取消跳转目标。
+• 切换滚动阅读与左右翻页时保留最近请求的目标页；连续选择书签时以最后一次选择为准，旧页面加载结果不会取代新目标。
+• Android 滚动阅读跳转时停止原有惯性滚动并对齐页首。修复最后一页较短时列表向前回填、画面与目标页码不一致的问题；章节之间仍无额外间隙。
+• Windows 同步修复轻点取消待加载书签及模式切换丢失目标的问题，滚动定位精确到页首，保持原有滚轮速度。
+• 保留已有书签、阅读记录、收藏、漫画文件及下载设置，无需重新下载漫画。
 
-兼容与验证
-• Windows 0.3.29；Android 0.6.11（versionCode 611），保留原包名、原 APK 签名和更新公钥。
-• 验证新章节识别、目录重排、旧选择与旧记录、确认/拒绝/取消、队列持久化和正常章节下载；执行双端构建、冻结程序检查及签名校验。
-• Android 使用 Android 10/15 框架和合成数据验证；未进行 Android 真机验证。
+版本与验证
+• Windows 0.3.29 → 0.3.30；Android 0.6.11 → 0.6.12（versionCode 612），沿用原包名、APK 签名证书和更新公钥。
+• Android 10/15 框架的同组 20 项书签场景中，旧版有 6 项失败，修复后全部通过；另通过 18 项章节/滚动框架回归及 105 项翻页/工具栏宿主检查。
+• Windows 通过 26 项阅读相关测试及源码/冻结成品的实际窗口书签检查，完成双端构建与交付签名校验。
+• 未连接 Android 真机，框架验证不等同于特定手机实测。

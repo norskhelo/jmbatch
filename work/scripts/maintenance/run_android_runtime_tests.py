@@ -16,6 +16,7 @@ parser.add_argument('--run-id', required=True)
 parser.add_argument('--library-source', type=Path, help='Optional pre-fix LibraryScreen.java for regression proof')
 parser.add_argument('--download-covers-source', type=Path, help='Optional pre-fix DownloadCovers.java for regression proof')
 parser.add_argument('--reader-source', type=Path, help='Optional pre-fix ReaderActivity.java for regression proof')
+parser.add_argument('--pager-source', type=Path, help='Optional pre-fix ReaderPager.java for regression proof')
 parser.add_argument('--tests', help='Optional Maven test selector for a focused rerun')
 args=parser.parse_args()
 if not args.run_id.replace('-', '').replace('_', '').isalnum():
@@ -40,6 +41,8 @@ if args.download_covers_source:
     shutil.copyfile(args.download_covers_source,source/'app/jmbatch/android/DownloadCovers.java')
 if args.reader_source:
     shutil.copyfile(args.reader_source,source/'app/jmbatch/android/ReaderActivity.java')
+if args.pager_source:
+    shutil.copyfile(args.pager_source,source/'app/jmbatch/android/ReaderPager.java')
 # The dialog uses framework resources only; unused app resources are compile constants.
 (source/'app/jmbatch/android/R.java').write_text('package app.jmbatch.android; public final class R { public static class style { public static final int AppTheme=android.R.style.Theme_Material_Light_NoActionBar; } public static class drawable {public static final int ic_launcher=android.R.drawable.ic_menu_gallery;} }',encoding='utf-8')
 env=os.environ.copy()

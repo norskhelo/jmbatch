@@ -60,6 +60,12 @@ class PagingTests(unittest.TestCase):
         self.pager.go(1); self.ui.advance(.05); self.pager.go(0); self.ui.advance(1)
         self.assertEqual(self.pager.page, 0); self.assertEqual(self.pager.dx, 0)
         self.assertEqual(self.commits, [0])
+    def test_tap_keeps_pending_bookmark(self):
+        self.pager.go(3)
+        self.pager.press(self.event(100)); self.pager.release(self.event(100))
+        self.assertEqual(self.pager.target, 3)
+        self.photos[3] = object(); self.pager.ready(); self.ui.advance(.3)
+        self.assertEqual(self.pager.page, 3)
     def test_drag_follows_pointer_then_commits(self):
         self.pager.press(self.event(600)); self.ui.advance(.1); self.pager.move(self.event(300))
         self.assertEqual(self.pager.dx, -300); self.assertEqual(self.pager.page, 0)

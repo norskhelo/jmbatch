@@ -167,7 +167,7 @@ public final class ReaderActivity extends Activity {
                 public View getView(int position,View convert,ViewGroup parent){PageRow row=convert instanceof PageRow?(PageRow)convert:new PageRow();bind(row,scopeStart+position);return row;}
             };
             list.setRecyclerListener(view->{if(view instanceof PageRow)((PageRow)view).release();});
-            list.setAdapter(adapter);viewport.addView(list,new FrameLayout.LayoutParams(-1,-1));list.setSelection(page-scopeStart);
+            list.setAdapter(adapter);viewport.addView(list,new FrameLayout.LayoutParams(-1,-1));list.setSelectionFromTop(page-scopeStart,0);
             updateChromeDescription();
             list.setOnScrollListener(new AbsListView.OnScrollListener(){
                 public void onScrollStateChanged(AbsListView view,int state){if(state==SCROLL_STATE_IDLE)loadVisible();}
@@ -180,7 +180,9 @@ public final class ReaderActivity extends Activity {
                 public void committed(int index){page=index;main.removeCallbacks(loadingNotice);update();scheduleSave();}
             });
             pager.setRange(scopeStart,scopeEnd);
-            viewport.addView(pager,new FrameLayout.LayoutParams(-1,-1));pager.post(()->{if(!closed&&pager!=null)pager.go(page);});
+            viewport.addView(pager,new FrameLayout.LayoutParams(-1,-1));
+            final ReaderPager opening=pager;
+            opening.post(()->{if(!closed&&pager==opening)opening.go(opening.target());});
         }
     }
     private final class PageRow extends FrameLayout {
@@ -205,8 +207,12 @@ public final class ReaderActivity extends Activity {
         if(bitmap!=null&&bitmap!=row.shown)pageSizes.put(index,new int[]{bitmap.getWidth(),bitmap.getHeight()});
         if(bitmap==null)text(row.label,errors.containsKey(index)?"本页读取失败，可继续翻页："+errors.get(index):"第 "+(index+1)+" 页 · 正在加载…");
         row.label.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
-        // The row is exactly the fitted image height; notices overlay its placeholder.
+        // Images keep their fitted height; notices overlay the placeholder.
         FrameLayout.LayoutParams params=(FrameLayout.LayoutParams)row.image.getLayoutParams();int height=pageHeight(index,width);
+        // Permit even a short final page to sit at the top after a bookmark jump.
+        // Space is only after the final image; adjacent pages still meet exactly.
+        int minimum=index==scopeEnd-1?viewportHeight:0;
+        if(row.getMinimumHeight()!=minimum)row.setMinimumHeight(minimum);
         if(params.height!=height){params.height=height;row.image.setLayoutParams(params);}
         if(bitmap!=null){if(row.shown!=bitmap){row.shown=bitmap;row.image.setImageBitmap(bitmap);}return;}
         if(errors.containsKey(index)||closed)return;
@@ -297,7 +303,7 @@ public final class ReaderActivity extends Activity {
             errors.remove(target);main.removeCallbacks(loadingNotice);update();pager.go(target);main.postDelayed(loadingNotice,180);return;
         }
         page=target;
-        if(list!=null)list.setSelection(page-scopeStart);
+        if(list!=null){list.smoothScrollBy(0,0);list.setSelectionFromTop(target-scopeStart,0);}
         update();scheduleSave();
     }
     private void step(int delta){go(Math.max(scopeStart,Math.min(scopeEnd-1,(!scroll&&pager!=null?pager.target():page)+delta)));}
@@ -307,7 +313,7 @@ public final class ReaderActivity extends Activity {
         String[] labels=new String[starts.size()];for(int i=0;i<labels.length;i++)labels[i]="第 "+chapters[starts.get(i)]+" 章 · "+((i+1<starts.size()?starts.get(i+1):chapters.length)-starts.get(i))+" 页";
         new AlertDialog.Builder(this).setTitle("选择章节").setSingleChoiceItems(labels,ReaderRules.chapter(starts,page),(dialog,index)->{dialog.dismiss();go(starts.get(index));}).setNegativeButton("关闭",null).show();
     }
-    private void toggleMode(){if(ready){scroll=!scroll;buildPages();update();save();}}
+    private void toggleMode(){if(ready){if(pager!=null)page=pager.target();scroll=!scroll;buildPages();update();save();}}
     private void jumpPage(){
         if(!ready)return;
         EditText input=new EditText(this);input.setInputType(InputType.TYPE_CLASS_NUMBER);input.setText(String.valueOf(page+1));input.selectAll();

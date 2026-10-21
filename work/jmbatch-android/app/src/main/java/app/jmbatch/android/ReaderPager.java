@@ -89,19 +89,22 @@ public final class ReaderPager extends FrameLayout {
         if(action==MotionEvent.ACTION_DOWN){
             cancelAnimation();releaseTouch();
             if(page<0)return true;
-            target=page;pointer=event.getPointerId(0);downX=event.getX();downY=event.getY();
+            // A tap only toggles reader controls; keep any outstanding bookmark.
+            pointer=event.getPointerId(0);downX=event.getX();downY=event.getY();
             velocity=VelocityTracker.obtain();velocity.addMovement(event);listener.requested();return true;
         }
         if(pointer==-1)return true;
         if(velocity!=null)velocity.addMovement(event);
         if(action==MotionEvent.ACTION_CANCEL||action==MotionEvent.ACTION_POINTER_DOWN||action==MotionEvent.ACTION_POINTER_UP){
-            target=page;releaseTouch();settle(direction,false);listener.requested();return true;
+            boolean moved=dragging;if(moved)target=page;
+            releaseTouch();if(moved)settle(direction,false);else ready();listener.requested();return true;
         }
         int index=event.findPointerIndex(pointer);if(index<0){releaseTouch();cancelAnimation();return true;}
         float dx=event.getX(index)-downX,dy=event.getY(index)-downY;
         if(action==MotionEvent.ACTION_MOVE){
             if(!dragging&&!vertical&&Math.max(Math.abs(dx),Math.abs(dy))>slop){
                 dragging=Math.abs(dx)>Math.abs(dy);vertical=!dragging;
+                if(dragging){target=page;listener.requested();}
             }
             if(dragging){
                 direction=dx<0?1:-1;int neighbor=page+direction;incoming=neighbor>=first&&neighbor<end?listener.lookup(neighbor):null;
@@ -131,7 +134,7 @@ public final class ReaderPager extends FrameLayout {
     public void dispose(){closed=true;releaseTouch();cancelAnimation();front.setImageDrawable(null);shown=null;}
     @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){
         super.onSizeChanged(w,h,oldw,oldh);cancelAnimation();releaseTouch();
-        if(page>=0)target=page;
+        // Layout/toolbar changes invalidate geometry, not the requested page.
         post(()->{if(!closed){ready();listener.requested();}});
     }
 }

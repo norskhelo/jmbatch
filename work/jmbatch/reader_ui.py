@@ -72,7 +72,7 @@ class ReaderWindow:
         self.mark_button.pack(side="right", padx=4)
         holder = ttk.Frame(outer)
         holder.pack(fill="both", expand=True)
-        self.canvas = tk.Canvas(holder, bg="#20252c", highlightthickness=0, yscrollincrement=30)
+        self.canvas = tk.Canvas(holder, bg="#20252c", highlightthickness=0, yscrollincrement=1)
         self.scrollbar = ttk.Scrollbar(holder, orient="vertical", command=self.scroll)
         self.canvas.pack(fill="both", expand=True)
         self.scrollbar.place(relx=1, x=0, y=0, anchor='ne', relheight=1)
@@ -169,7 +169,7 @@ class ReaderWindow:
         if not self.pages:
             return
         self.viewport_size = (self.canvas.winfo_width(), self.canvas.winfo_height())
-        target = self.pager.target if self.pager.enabled and not self.is_scroll() else self.current
+        target = self.pager.target if self.pager.enabled else self.current
         chapter = bisect.bisect_right(self.starts, target) - 1
         self.scope_start = self.starts[chapter] if self.split_chapters else 0
         self.scope_end = (self.starts + [len(self.pages)])[chapter + 1] if self.split_chapters else len(self.pages)
@@ -177,7 +177,7 @@ class ReaderWindow:
         self.images.clear()
         self.errors.clear()
         self.pending.clear()
-        self.heights = [max(200, min(1600, self.canvas.winfo_width() - 32)) * 1.4] * len(self.pages)
+        self.heights = [round(max(200, min(1600, self.canvas.winfo_width() - 32)) * 1.4)] * len(self.pages)
         if self.is_scroll():
             self.pager.hide()
         self.update_scrollbar()
@@ -191,17 +191,19 @@ class ReaderWindow:
         self.offsets = [0]
         for index, height in enumerate(self.heights):
             self.offsets.append(self.offsets[-1] + (height if self.scope_start <= index < self.scope_end else 0))
-        self.extent = self.offsets[-1] + max(0, self.canvas.winfo_height() - 50)
+        self.extent = max(self.offsets[-1], self.offsets[self.scope_end - 1] + self.canvas.winfo_height())
         self.canvas.configure(scrollregion=(0, 0, self.canvas.winfo_width(), self.extent if self.is_scroll() else self.canvas.winfo_height()))
 
     def scroll(self, *args):
+        if args[0] == 'scroll' and args[2] == 'units':
+            args = ('scroll', int(args[1]) * 30, 'units')
         self.canvas.yview(*args)
         self.draw()
 
     def scrolled(self, first, last):
         self.scrollbar.set(first, last)
         if self.pages and self.is_scroll():
-            self.current = max(self.scope_start, min(self.scope_end - 1, bisect.bisect_right(self.offsets, self.canvas.canvasy(0) + 40) - 1))
+            self.current = max(self.scope_start, min(self.scope_end - 1, bisect.bisect_right(self.offsets, self.canvas.canvasy(0)) - 1))
             self.refresh_buttons()
             self.schedule_save()
             self.draw()
