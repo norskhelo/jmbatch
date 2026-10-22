@@ -58,6 +58,7 @@ def source_files(platform):
     paths += [p for p in (source / 'app/src').rglob('*') if p.suffix in ('.java', '.xml', '.txt')]
     paths += list((source / 'tests').glob('*.java'))
     paths += list((source / 'tests').glob('test_*.py'))
+    paths.append(source / 'tests/run_network_tests.py')
     paths += [source / 'tests/runtime' / n for n in ('pom.xml', 'README.md', 'READER_SCROLL_REPRO.txt')]
     paths += list((source / 'tests/runtime/src/test/java').rglob('*.java'))
     paths += [source / 'tests/fixtures' / n for n in ('manifest.bin', 'manifest.sig')]

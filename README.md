@@ -23,8 +23,8 @@ Windows 客户端使用 **Python / Tkinter**，Android 客户端使用 **Java / 
 
 | 平台 | 当前正式版 | 下载 | 发布说明与校验 |
 | --- | --- | --- | --- |
-| Windows x64 | **0.3.30** | [完整 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip) | [发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.30-0.6.12) · [SHA-256](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/SHA256-release-0.3.30-0.6.12.txt) |
-| Android 8.0+ | **0.6.13** | [APK](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/JMBatch-0.6.13-Android.apk) | [发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-android-0.6.13) · [SHA-256](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/SHA256-release-android-0.6.13.txt) |
+| Windows x64 | **0.3.31** | [完整 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.3.31-Windows-x64.zip) | [发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.31-0.6.14) · [SHA-256](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/SHA256-release-0.3.31-0.6.14.txt) |
+| Android 8.0+ | **0.6.14** | [APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.6.14-Android.apk) | [发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.31-0.6.14) · [SHA-256](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/SHA256-release-0.3.31-0.6.14.txt) |
 
 两端版本独立发布，最新一条 Release 可能只更新其中一个平台。完整历史与附件见 [Releases](https://github.com/norskhelo/jmbatch/releases)，功能变更见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -37,8 +37,8 @@ Windows 客户端使用 **Python / Tkinter**，Android 客户端使用 **Java / 
 
 | 文件 | GHFast | GH-Proxy |
 | --- | --- | --- |
-| Windows 0.3.30 ZIP | [下载](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip) | [下载](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip) |
-| Android 0.6.13 APK | [下载](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/JMBatch-0.6.13-Android.apk) | [下载](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/JMBatch-0.6.13-Android.apk) |
+| Windows 0.3.31 ZIP | [下载](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.3.31-Windows-x64.zip) | [下载](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.3.31-Windows-x64.zip) |
+| Android 0.6.14 APK | [下载](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.6.14-Android.apk) | [下载](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.6.14-Android.apk) |
 
 镜像由第三方转发 GitHub Release 附件，可用性取决于线路与缓存。请使用上表的 GitHub 原始 SHA-256 文件核对下载内容；一个入口不可用时可切换另一个。
 

@@ -1,4 +1,4 @@
-JM Batch 0.3.30 — Windows 使用说明
+JM Batch 0.3.31 — Windows 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -6,11 +6,11 @@ JM Batch 0.3.30 — Windows 使用说明
 4. 文件夹和 ZIP 只含图片：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。导出和文件删除前请暂停下载并等待请求退出。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
-安装包下载（2026-10-20）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/SHA256-release-0.3.30-0.6.12.txt
+安装包下载（2026-10-22）
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.3.31-Windows-x64.zip
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.3.31-Windows-x64.zip
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.3.31-Windows-x64.zip
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/SHA256-release-0.3.31-0.6.14.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,19 +28,21 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.30 / Android 0.6.12 — 书签跳转修复
+Windows 0.3.31 / Android 0.6.14 — 备用 DNS 下载恢复与实时速度
 
-发布日期：2026-10-21
+发布日期：2026-10-22
+
+Windows 0.3.30 → 0.3.31；Android 0.6.13 → 0.6.14（versionCode 614）。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。
 
 修复内容
-• 修复左右翻页时首次跳转书签仍停在旧页的问题：目标图片尚在加载或翻页动画尚未结束时，轻点画面、收放工具栏和阅读区尺寸变化不再取消跳转目标。
-• 切换滚动阅读与左右翻页时保留最近请求的目标页；连续选择书签时以最后一次选择为准，旧页面加载结果不会取代新目标。
-• Android 滚动阅读跳转时停止原有惯性滚动并对齐页首。修复最后一页较短时列表向前回填、画面与目标页码不一致的问题；章节之间仍无额外间隙。
-• Windows 同步修复轻点取消待加载书签及模式切换丢失目标的问题，滚动定位精确到页首，保持原有滚轮速度。
-• 保留已有书签、阅读记录、收藏、漫画文件及下载设置，无需重新下载漫画。
+• Android 为备用 IP 的连接、握手和响应头设置独立的单次等待上限；响应头超时后尝试其他地址，正文继续使用用户设置的读取超时。
+• 图片正文超时、连接中断或内容不完整时记住失败 IP，暂时避让；成功完整读取后才更新优选地址。DNS 按 TTL 刷新时保留地址状态，包括旧请求稍后报告的失败；保留解析到的全部安全候选地址。
+• 短期记住已确认的系统 DNS 全零结果，避免短 TTL 刷新反复经过已知失败的系统连接；不擅自延长 DNS TTL，代理与 HTTPS 证书校验规则保持有效。
+• 慢速 CDN 探测不再长期占住探测机会，其他候选线路仍可被尝试。持续少量收包的图片连接按单请求读取耗时恢复，阈值按线程数分摊；图片处理、内存等待和写文件耗时不计入该慢速判断。
+• Android 下载监控区分实际网络等待和本地处理，避免处理队列满或落盘较慢时重连整个任务。
+• Windows 与 Android 统一显示实时有效速度：按最近约 1 秒内完成下载、图片处理并写入缓存的图片字节计算。网络和落盘不重复相加，不计缓存复用或失败重试，不再显示过去 10 秒的平滑速度；大图尚未完成时可能暂时为 0。
 
-版本与验证
-• Windows 0.3.29 → 0.3.30；Android 0.6.11 → 0.6.12（versionCode 612），沿用原包名、APK 签名证书和更新公钥。
-• Android 10/15 框架的同组 20 项书签场景中，旧版有 6 项失败，修复后全部通过；另通过 18 项章节/滚动框架回归及 105 项翻页/工具栏宿主检查。
-• Windows 通过 26 项阅读相关测试及源码/冻结成品的实际窗口书签检查，完成双端构建与交付签名校验。
-• 未连接 Android 真机，框架验证不等同于特定手机实测。
+验证范围
+• Android 10/15 共 20 项 HTTP/TLS 与下载监控框架检查通过，覆盖响应头超时取消、正文超时不被缩短、连接复用、证书校验及本地处理堵塞。
+• Android 专项宿主回归覆盖 DNS 刷新、正文失败换址、CDN 探测、流水线、取消、重试与速度显示；Windows 32 项相关测试通过。
+• 未连接 Android 真机；这些结果验证已确认的代码缺陷，不代表已实测用户移动网络上的吞吐或排除了运营商/CDN 路由差异。
