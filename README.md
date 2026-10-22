@@ -145,6 +145,8 @@ Windows 依赖 `jmcomic` 等 Python 库；Android 的协议与图片还原逻辑
 
 项目以自用为主，同时欢迎通过 [Issues](https://github.com/norskhelo/jmbatch/issues) 反馈问题、提出改进，或提交 [Pull Request](https://github.com/norskhelo/jmbatch/pulls)。文档纠错、复现用例、设备兼容性反馈和代码改进都可以参与。
 
+> 虽说欢迎参与，但还是不建议在这个项目上浪费时间
+
 1. 先搜索已有 Issue；较大的功能或结构调整，建议先描述使用场景和预期行为。
 2. Fork 仓库并创建分支，围绕一个明确问题提交改动。
 3. 为行为变更补充适当的回归验证，说明影响 Windows、Android 还是双端；涉及用户行为变化时同步更新 `CHANGELOG.md`。
