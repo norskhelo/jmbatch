@@ -1,141 +1,164 @@
 # JM Batch Downloader
 
-支持 Windows 和 Android 的批量漫画下载工具。下载可选择 PDF、ZIP 或图片文件夹，三种成品可离线互相导出。
+面向 Windows 和 Android 的批量漫画下载与离线阅读工具。支持按编号建立下载队列，将漫画保存为 PDF、ZIP 或图片文件夹，并在本地管理、阅读和转换格式。
 
-当前正式版本：**Windows 0.3.30 / Android 0.6.13（versionCode 613）**。Android 补充修复书签跳转时的首帧布局覆盖，并在弹窗关闭、阅读窗口恢复焦点后执行跳转。安装包、更新日志与镜像入口见下方。
+Windows 客户端使用 **Python / Tkinter**，Android 客户端使用 **Java / Android 原生 API**。两端独立实现，围绕下载队列、漫画库、阅读器和签名更新提供相近的使用体验。
 
+[下载安装](#下载安装) · [开发入门](#开发入门) · [源码导览](#源码导览) · [参与贡献](#参与贡献) · [更新日志](CHANGELOG.md)
 
-## 下载安装包（含国内镜像）
+## 核心功能
 
-GitHub 下载缓慢或无法打开时，可直接点击“国内镜像 1”或“国内镜像 2”，在浏览器中下载，无需登录 GitHub。一个入口不可用时可切换另一个。
+| 能力 | 说明 |
+| --- | --- |
+| 批量下载 | 支持多个编号、JM 前缀和连续区间，自动去重；可选择部分章节或全部章节。 |
+| 队列与恢复 | 多任务并行、暂停与继续、失败重试、缓存复用，以及备用 API / 图片线路。 |
+| 格式与导出 | 下载为 PDF、ZIP 或图片文件夹；支持离线互转和批量导出，保留源文件。 |
+| 漫画库 | 扫描本地内容、搜索、星标、收藏夹、列表 / 平铺显示及批量管理。 |
+| 离线阅读 | 滚动阅读与左右翻页、章节切换、页码跳转、书签和阅读位置恢复。 |
+| 更新 | 检查漫画新增章节；检查软件版本，并校验签名更新清单及安装包。 |
 
-当前正式版为 **Windows 0.3.30 / Android 0.6.13**（[Windows 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.30-0.6.12)、[Android 发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-android-0.6.13)）。完整附件及后续更新见 [Releases 页面](https://github.com/norskhelo/jmbatch/releases)。
+## 下载安装
 
-| 文件 | 国内镜像 1（GHFast） | 国内镜像 2（GH-Proxy） | GitHub 原始下载 |
+| 平台 | 当前正式版 | 下载 | 发布说明与校验 |
 | --- | --- | --- | --- |
-| Windows 0.3.30 · 完整 ZIP（64 位） | [下载 ZIP](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip) | [下载 ZIP](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip) | [下载 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip) |
-| Android 0.6.13 · APK（Android 8.0+） | [下载 APK](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/JMBatch-0.6.13-Android.apk) | [下载 APK](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/JMBatch-0.6.13-Android.apk) | [下载 APK](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/JMBatch-0.6.13-Android.apk) |
-| Windows 0.3.30 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/SHA256-release-0.3.30-0.6.12.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/SHA256-release-0.3.30-0.6.12.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/SHA256-release-0.3.30-0.6.12.txt) |
-| Android 0.6.13 SHA-256 校验文件 | [下载校验文件](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/SHA256-release-android-0.6.13.txt) | [下载校验文件](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/SHA256-release-android-0.6.13.txt) | [下载校验文件](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/SHA256-release-android-0.6.13.txt) |
+| Windows x64 | **0.3.30** | [完整 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip) | [发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.30-0.6.12) · [SHA-256](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/SHA256-release-0.3.30-0.6.12.txt) |
+| Android 8.0+ | **0.6.13** | [APK](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/JMBatch-0.6.13-Android.apk) | [发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-android-0.6.13) · [SHA-256](https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/SHA256-release-android-0.6.13.txt) |
 
-镜像由第三方转发 GitHub Release 的附件，无需向镜像站单独上传安装包。可用性受缓存、线路及地区网络影响，请按官方校验文件核对下载内容。镜像同时用于手动下载及本版应用内更新文件下载的自动回退，版本查询仍使用 GitHub API，应用内更新仓库填写 `norskhelo/jmbatch`。已安装更高版本的用户无需下载旧版降级。
+两端版本独立发布，最新一条 Release 可能只更新其中一个平台。完整历史与附件见 [Releases](https://github.com/norskhelo/jmbatch/releases)，功能变更见 [CHANGELOG.md](CHANGELOG.md)。
 
-下载后可按校验文件核对 SHA-256。Windows 完整解压 ZIP 后运行；Android 下载 APK 后覆盖安装，保留原应用数据。
+- **Windows**：完整解压 ZIP 后运行 `JMBatch.exe`，保留同目录的依赖文件。
+- **Android**：安装 APK；更新正式版时覆盖安装，以保留应用数据。重要漫画请另行备份，卸载应用可能删除其内部目录。
+- **软件更新**：在应用中点击“软件更新”，更新仓库使用 `norskhelo/jmbatch`；下载和安装需要手动确认。
 
+<details>
+<summary>GitHub 下载较慢时：备用镜像</summary>
 
-## 检查漫画章节更新
+| 文件 | GHFast | GH-Proxy |
+| --- | --- | --- |
+| Windows 0.3.30 ZIP | [下载](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip) | [下载](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.30-0.6.12/JMBatch-0.3.30-Windows-x64.zip) |
+| Android 0.6.13 APK | [下载](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/JMBatch-0.6.13-Android.apk) | [下载](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.13/JMBatch-0.6.13-Android.apk) |
 
-漫画库 → 批量处理（或长按）→ 选中一本 → 检查更新。Android 也可从“更多操作”进入。先只读取服务器章节目录，有新增章节再确认下载；新章节使用当前下载设置，作为独立漫画保存，原文件和阅读记录保留。暂不下载后，下次仍会提示；同一本已有未完成任务时请先继续、重试或取消原任务。
+镜像由第三方转发 GitHub Release 附件，可用性取决于线路与缓存。请使用上表的 GitHub 原始 SHA-256 文件核对下载内容；一个入口不可用时可切换另一个。
 
-检查使用本地保存的章节 ID，避免标题、顺序变化或旧的未选章节造成误报。缺少可用下载记录的导入漫画，首次只建立当前目录基线并提示，后续才可识别新章节。旧的全部章节下载记录按最后一个可匹配的已下载章节恢复旧目录前缀。
+</details>
 
-## 下载图片与系统相册
+## 快速使用
 
-Android 0.6.9 在漫画文件夹内自动保留 `.nomedia`，启动时为可访问的旧下载补标记。不会隐藏公共保存目录里的其他照片。旧相册缩略图需等待系统索引/缓存刷新；图片仍可在漫画库或文件管理器中访问，此功能不加密文件。
+1. 在下载设置中选择保存目录和 PDF / ZIP / 图片文件夹格式。
+2. 输入一个或多个编号，加入队列并开始；按提示选择章节，也可在设置中启用“默认下载全章节”。
+3. 下载完成后，在漫画库中打开阅读；需要转换格式或整理内容时，进入“批量处理”。
 
-## 收藏夹
+**暂停**保留续传数据；**取消未完成任务**会清理该任务的文件、缓存和队列记录。导出保留源文件，同名输出会跳过；只移除漫画库记录与删除实际文件是不同操作。
 
-漫画库是默认收藏夹，旧漫画和新下载默认显示在这里。点击“新建收藏夹”，收藏夹卡片就会与漫画共用原列表/平铺区域，显示最多四本夹内漫画的封面及总数量。长按漫画或进入“批量处理”，勾选后“移入收藏夹”；选择“漫画库”即可移回。分类不移动实际文件，每本漫画归属一个收藏夹，原星标收藏独立保留。
+<details>
+<summary>章节、收藏夹、格式与阅读说明</summary>
 
-点击收藏夹查看内容，通过“返回漫画库”返回。使用“管理收藏夹”重命名或删除；删除收藏夹仅将漫画归回默认库，保留文件、星标、书签和阅读位置。根层搜索可找到名称匹配或包含匹配漫画的收藏夹。
+- **检查新增章节**：漫画库 → 批量处理（或长按）→ 选中一本 → 检查更新。先读取章节目录，有新增章节后再确认下载；新增内容独立保存，原漫画和阅读记录保留。缺少下载记录的导入漫画首次检查只建立目录基线。
+- **收藏夹**：在漫画库中新建收藏夹，批量选择漫画后移入。分类不移动实际文件；删除收藏夹会将漫画归回默认库，保留文件、星标和阅读记录。
+- **格式结构**：单章节 ZIP / 图片文件夹按 `00001.jpg`、`00002.jpg` 排列；多章节按 `0001/00001.jpg`、`0002/00001.jpg` 分目录。请保留目录名称与图片顺序，便于扫描和导出。
+- **导出画质**：文件夹与 ZIP 互转、图片嵌入 PDF 不额外缩放；PDF 转图片需要渲染，可能损失画质，当前上限为 144 DPI、长边 8192 像素、每页约 1600 万像素。多章节 PDF 可合并导出或分章节导出。
+- **删除章节**：支持图片目录和分章 ZIP，至少保留一章；PDF、平铺 ZIP 和单章漫画使用整本删除。操作前暂停下载，Windows 还需关闭对应阅读窗口，并预留临时空间。
+- **阅读模式**：在下载设置中选择“多章节合一”或“分章节观看”，重新打开漫画后生效。两种模式共享书签和阅读位置；PDF、平铺 ZIP 和单章漫画按一个章节显示。
+- **阅读位置**：绑定文件路径或地址；移动文件或清除应用数据后不会自动迁移。Android 外部 ZIP 首次打开需要准备临时缓存。
+- **Android 相册**：漫画目录使用 `.nomedia` 减少系统相册收录，图片仍能在漫画库和文件管理器中访问；这不加密文件，旧缩略图可能需要等待系统缓存刷新。
 
-## 显示方式
+</details>
 
-下载页统一使用列表，旧版下载平铺设置不再生效。漫画库可选择“列表”或“平铺”，默认列表并记住选择；平铺固定每行 4 本，卡片宽度随窗口或屏幕调整。平铺封面区域按卡片宽度保持 3:4 比例，漫画首图等比铺满，横图居中裁切。此规则统一用于所有封面，包括收藏夹内每张小封面；各自只在自己的框内裁切。切换保留筛选、批量选择，并尽量保持当前浏览位置。封面继续复用缓存。
+## 开发入门
 
-## 下载与导出
+以下命令以 **Windows PowerShell** 为例，从仓库根目录执行。开发环境、依赖和生成物需要在本机准备。
 
-1. 选择保存目录和 PDF / ZIP / 文件夹格式，输入编号、多个编号或区间，加入队列并开始。
-2. PDF 下载为一本文件；文件夹与 ZIP 仅包含图片。单章节根目录直接是 `00001.jpg`、`00002.jpg`；多章节结构如下，ZIP 使用相同规则：
+```powershell
+git clone https://github.com/norskhelo/jmbatch.git
+cd jmbatch
+```
 
-       JM123456-标题-任务标识/
-         0001/00001.jpg
-         0001/00002.jpg
-         0002/00001.jpg
+### Windows 客户端
 
-3. 在任务详情点击“导出漫画”；也可在漫画库长按进入批量处理，勾选一本或多本 PDF、ZIP、图片文件夹，再点击“导出漫画”。多本共用格式与目录，逐本独立导出；单本失败继续，停止时保留已完成结果和全部源漫画。
-4. 选择 PDF / ZIP / 文件夹和导出目录；PDF / ZIP 可选纯编号命名；ZIP 结构自动按章节数确定。多章节 PDF 可统一导出一本，或分章节导出；分章文件名附带章节序号。
-5. 导出不删除源文件，可离线重复导出。同名输出会跳过该本并提示，不覆盖已有文件；批量导出继续处理其余漫画。
+准备 **Python 3.14 x64（含 Tkinter）**。初始化脚本会创建 `work/venv`，安装 [固定版本依赖](work/jmbatch/requirements.txt) 和 PyInstaller；首次安装需要联网。已有虚拟环境时请直接复用，脚本不会覆盖它。
 
-图片保存为下载处理后的原分辨率 JPG；文件夹和 ZIP 互转、图片嵌入 PDF 不额外缩放。PDF 转图片会按页面渲染，作为一个章节，可能损失画质；最高 144 DPI，长边最多 8192 像素，每页约 1600 万像素。上游图片的必要解码/还原沿用原实现，不保证与网站原始响应逐字节相同。请保留漫画文件夹名称和图片排序结构，便于重新扫描与导出。恢复与校验信息保存在应用内部，成品目录不附带信息文件；旧版带清单的图片目录仍可读取。
+```powershell
+# 首次初始化
+.\tools\setup_windows.ps1
 
-## 下载封面
+# 使用独立的开发配置目录，避免与日常使用的队列、设置混用
+$env:JM_BATCH_HOME = Join-Path $PWD 'work\tests\dev-home'
+.\work\venv\Scripts\python.exe .\work\jmbatch\app.py
+```
 
-下载列表会在首章第一页成功下载后自动显示封面，无需等待整本完成；暂停、继续和重启后可从缓存恢复。尚未就绪或无法读取时显示占位，完成后优先使用已保存的小尺寸封面，缺失时从 PDF、ZIP 或文件夹成品读取并缓存。漫画库首次成功读取后持久缓存封面，关闭重开及重启软件可复用；新下载漫画在清理临时图片前预生成，减少大文件重复读取。缓存总计最多 128 MiB / 4096 项，按可用文件元数据检查变化，损坏时重建，移除记录时清理。
+运行 Python 单元测试：
 
-## 删除章节
+```powershell
+Push-Location .\work\jmbatch
+try {
+    ..\venv\Scripts\python.exe -m unittest discover -s tests -v
+} finally {
+    Pop-Location
+}
+```
 
-在漫画库长按或进入“批量处理”，选中一本漫画后点击“删除章节”，勾选章节并再次确认。支持图片目录和分章 ZIP，至少保留一章；PDF、平铺 ZIP 或单章漫画请使用整本删除。先暂停下载，Windows 还须关闭本书阅读窗口。保留章节先保存校验，再替换漫画库记录并清理原文件，需要临时空间且文件名会更新；标题、收藏、保留页书签与阅读位置同步保留。提交前可停止；原文件清理失败时会提示位置。
+执行隔离检查并构建可执行程序：
 
-## 内置阅读器
+```powershell
+.\work\jmbatch\build.ps1
+```
 
-在“下载设置”中选择“多章节观看模式”：**1 多章节合一**（默认）整本连续阅读；**2 分章节观看**只显示当前章，章末通过上一章、下一章或章节列表切换。保存后重新打开漫画生效；两种模式共享阅读位置和书签，总页码跳转及书签可跨章。PDF、平铺 ZIP 和单章漫画仍作为一个章节。
+构建入口会检查依赖、运行单元测试与源码自检，再打包并执行打包后的自检。可执行程序位于 `work/builds/windows-<version>/dist/JMBatch/JMBatch.exe`，检查日志位于 `outputs/reports/<run-id>/`。
 
-Android 0.6.8 修复滚动时的缓存反复淘汰与加载闪烁，保留可见图片和已知页高。旧版复现步骤与合成测试漫画生成方法见 [阅读稳定性复现说明](work/jmbatch-android/tests/runtime/READER_SCROLL_REPRO.txt)。
+### Android 客户端
 
-Android 图片文件夹复用页面索引，先打开上次阅读页，优先检查后续 4 页并按内存预算预加载；其余页面后台分批检查，显示加载及检查进度。当前阅读请求优先，异常按页提示并允许再次跳转重试。缺失索引的旧目录首次打开需先建立索引。
+项目采用 Java 和 Android 原生 API，配置见 [app/build.gradle](work/jmbatch-android/app/build.gradle)：`minSdk 26`、`targetSdk 34`、`compileSdk 35`，Android Gradle Plugin 为 **8.7.3**。
 
-在任务列表或漫画库中打开漫画，即可使用内置阅读器。从漫画库进入阅读会保留原页面，返回继续原来的搜索、收藏筛选、滚动位置和批量选择；阅读中修改收藏会同步刷新，尽量保留当前可见漫画的位置。支持章节切换、本章/总页码、跳页、快捷收藏、书签列表及跳转；再次打开恢复上次页码和模式。上下滚动时相邻图片无间隔直接相接，页码显示在状态栏；原图自身的白边保留。滚动阅读与左右翻页可随时切换，轻点漫画隐藏或恢复工具栏，并有平滑过渡。Windows 使用滚轮、方向键或左右拖动，Android 使用上下滚动或左右滑动。Windows 按 Esc、Android 隐藏时按返回也可恢复工具栏。PDF 按一个章节显示。阅读记录绑定原文件路径/地址；移动文件或清除应用数据后不自动迁移。Android 外部 ZIP 首次打开需准备临时缓存，返回可取消，关闭后清理。
+本地调试使用 **JDK 17、Gradle 8.9、Android SDK Platform 35 和 SDK Build Tools 34.0.0**，版本依据 [AGP 8.7 兼容性说明](https://developer.android.com/build/releases/agp-8-7-0-release-notes)。配置好 `JAVA_HOME`、`ANDROID_HOME`，并将 Gradle 加入 `PATH`。仓库尚未附带 Gradle Wrapper，因此下例使用已安装的 `gradle`。
 
-## 更新日志
+```powershell
+gradle -p .\work\jmbatch-android assembleDebug
+```
 
-点击主界面“软件更新”立即联网检查，更新窗口与完整更新日志也可手动检查。关闭启动自动检查后仍可使用。检查采用已保存仓库；修改后先保存。检查失败保留本地更新日志，可再次点击重试。下载和安装更新需要手动确认。
+调试 APK 输出到 `work/jmbatch-android/app/build/outputs/apk/debug/app-debug.apk`。调试签名与正式版不同，不能直接覆盖正式版；建议使用模拟器或独立测试设备。
 
-更新日志随后台检查结果刷新；升级后保留本次升级起点和全部中间版本日志，重启或再次检查仍可查看。未来新版另列为“可用更新”。日志未取全时保留本版说明并明确提示，联网检查后补齐。
+[build.py](work/jmbatch-android/build.py) 是另一条用于 Windows 宿主检查和 APK 打包的构建路径，可通过 `--jdk`、`--sdk` 指定工具链，并要求已有 keystore。正式发布沿用维护者保管的原签名密钥，普通贡献者无需获取这些密钥。
 
-## 其他功能
+### 测试范围
 
-- 批量编号、JM 前缀、换行和连续区间；自动去重。
-- 进度百分比、预计完成时间、图片大小及自适应下载速度单位。
-- 同时下载 1–4 本（默认 2），每本 1–16 个图片线程（默认 8）；独立进度、取消和重连，总速度汇总。
-- 并行任务数保存后用于后续调度，调低不打断已运行任务；暂停会停止全部下载。
-- 可调线程、停滞重连、缓存复用和有上限的单页恢复。
-- 连接失败自动尝试备用 API / 图片线路，显示明确原因。
-- 漫画库点击直接阅读、长按进入批量处理；点击“完成”退出。Windows 支持 Esc，Android 支持返回；提供搜索、收藏、扫描和批量管理，兼容图片目录及 PDF / ZIP。
-- Windows 打开保存目录；Android 提供图片浏览、文件分享和系统文档入口。
-- 从当前版本之后至最新版的全部更新日志，支持完整离线缓存。
-- 签名更新清单、安装包摘要及 Android 签名身份验证。
+- **Windows**：单元测试位于 [work/jmbatch/tests](work/jmbatch/tests)，完整构建入口额外执行源码与打包自检。
+- **Android**：[宿主测试](work/jmbatch-android/tests) 由 `build.py` 调用；[框架回归测试](work/jmbatch-android/tests/runtime/README.md) 使用 Robolectric，覆盖阅读、漫画库、权限与存储等场景。
+- Android 框架测试的 [运行脚本](work/scripts/maintenance/run_android_runtime_tests.py) 当前使用 `work/android-tools/jdk-17.0.20.1+1` 和 `work/android-tools/android-35/android.jar` 固定路径；运行前需按脚本配置准备工具链。Maven 与测试依赖首次运行会联网下载。
+- 宿主测试和编译成功不能代替真机验证。涉及文件选择器、SAF 授权、厂商界面或网络行为的改动，请在 PR 中注明设备、系统版本和实际验证范围。
 
-已有 PDF / ZIP 记录和收藏保留。未完成任务继续下载和重试时保留原格式，并复用已验证缓存。删除图片目录会删除其中的原始图片，需要确认；只移除记录不会删除文件。导出和文件删除前请暂停下载队列。
+## 源码导览
 
-## 源码与构建
+| 目录 / 文件 | 用途与阅读入口 |
+| --- | --- |
+| [work/jmbatch](work/jmbatch) | Windows 客户端。`app.py` 为界面入口，`engine.py` 调度队列，`worker.py` 执行下载；`library*`、`reader*`、`updates.py` 分别处理漫画库、阅读和软件更新。 |
+| [work/jmbatch-android/app/src/main/java/app/jmbatch/android](work/jmbatch-android/app/src/main/java/app/jmbatch/android) | Android 客户端。`MainActivity.java` 为主界面，`DownloadService.java` / `Downloader.java` 处理下载，`JmApi.java` 负责上游请求，`ReaderActivity.java` 为阅读入口。 |
+| [tools/setup_windows.ps1](tools/setup_windows.ps1) | 初始化 Windows Python 开发环境。 |
+| [work/scripts/maintenance](work/scripts/maintenance) | 构建检查、回归测试与历史维护脚本；新贡献者可从 `check_development.py` 和 `run_android_runtime_tests.py` 开始。 |
+| [work/package_network_update.py](work/package_network_update.py) · [work/sign_update_release.py](work/sign_update_release.py) | 维护者使用的发布打包与更新清单签名工具。 |
+| [CHANGELOG.md](CHANGELOG.md) · [CONTRIBUTING.md](CONTRIBUTING.md) | 版本变更记录，以及版本号、发布附件和签名更新约定。 |
 
-- Windows：`work/jmbatch`，构建入口 `work/jmbatch/build.ps1`。
-- Android：`work/jmbatch-android`，构建入口 `work/jmbatch-android/build.py`；需要 JDK 17、Android SDK 35 与 build-tools。
-- 打包：`work/package_network_update.py`；正式签名需要独立保管的原密钥，不包含在仓库中。
-- 用户更新日志：[CHANGELOG.md](CHANGELOG.md)。
+Windows 依赖 `jmcomic` 等 Python 库；Android 的协议与图片还原逻辑参考 `jmcomic`，通过原生 API 实现，不内嵌 Python 运行时。两端的业务改动需要分别检查实现与行为。
 
-测试采用离线素材和宿主环境。Android 真机、厂商文件管理器、SAF 授权和真实网络下载未因编译通过而视为验收通过。
+## 参与贡献
 
-## 安装与更新
+欢迎通过 [Issues](https://github.com/norskhelo/jmbatch/issues) 反馈问题、提出改进，或提交 [Pull Request](https://github.com/norskhelo/jmbatch/pulls)。文档纠错、复现用例、设备兼容性反馈和代码改进都可以参与。
 
-通过上方“下载安装包（含国内镜像）”或 [Releases 页面](https://github.com/norskhelo/jmbatch/releases) 下载已发布版本的完整 Windows ZIP 或 Android APK。Windows 解压后运行；Android 支持 8.0 及以上。正常更新保留队列、设置与收藏，Android 请覆盖安装而非卸载重装。应用内部目录可能在卸载后被系统删除，重要图片请选择公共目录或另行备份。
+1. 先搜索已有 Issue；较大的功能或结构调整，建议先描述使用场景和预期行为。
+2. Fork 仓库并创建分支，围绕一个明确问题提交改动。
+3. 为行为变更补充适当的回归验证，说明影响 Windows、Android 还是双端；涉及用户行为变化时同步更新 `CHANGELOG.md`。
+4. 在 PR 中写明问题、改动后的行为、验证命令与结果，以及尚未验证的环境。
 
-应用内更新只接受项目原发布密钥签署的清单和对应安装包。新源码推送不等于发布了可供应用内下载的安装包。
+反馈 Bug 时，请提供：
 
-## 说明
+- 应用版本、操作系统版本；Android 问题附设备型号。
+- 最小复现步骤、预期行为和实际结果。
+- 与问题有关的报错、日志或截图，提交前移除账号、Cookie、令牌及私人路径。
+- 涉及文件问题时说明格式（PDF / ZIP / 图片文件夹）与保存位置类型，优先提供不含私人内容的合成样例。
 
-本工具为独立第三方项目，与内容平台无隶属关系。可用性受网络和上游服务影响。请仅下载有权获取和保存的内容，并遵守所在地法律和相关平台条款。反馈问题时请提供版本、系统和报错，避免公开账号、Cookie 等敏感信息。
+签名私钥、账号凭据、个人配置和下载内容不进入仓库。正式发布的版本、附件与签名约定见 [CONTRIBUTING.md](CONTRIBUTING.md)；源码提交和正式安装包发布是独立步骤。
 
-多章节下载：获取章节后选择要下载的章节，支持多选、全选和清空。设置中的“默认下载全章节”默认关闭，开启后新任务自动下载全部章节。关闭选择框会暂停该任务，点击开始可重新选择；已确认的选择在暂停、重启和重试后保留。仅选一章时 ZIP / 文件夹图片平铺，多章按原章节编号分目录。
+## 项目边界与第三方许可
 
-章节读取提速：每任务可配置 1–8 章并行读取，默认 4，独立于图片线程。新值用于新任务和手动重试，直接继续保留原设置。可试 6 或 8，超时或限流时调低。成功读取的章节在任务内部缓存 24 小时，暂停/重启/重试可复用；过期、损坏、Cookie 或目录信息变化会重新获取。进度显示复用章数；每次开始仍会联网确认漫画目录。旧任务首次使用新版需读取一次，缓存不会出现在导出的漫画中。
+本工具为独立第三方项目，与内容平台无隶属关系。请仅下载有权获取和保存的内容，遵守所在地法律及相关平台条款。下载可用性受网络和上游服务影响。
 
-Android 图片保存：一次复制到目标临时目录，复制时计算源 CRC，写后完整读回目标核验；默认目录保留刷盘。校验、保存/读回、核对目录、清理显示进度，减少重复复制和章节目录扫描。总百分比完成前上限 99.9%，请查看阶段张数和字节进度。
-
-Android 0.5.0 下载优化：网络接收与图片处理使用有界流水线；每任务预取中的原始图片不超过图片线程数加处理线程数（最多 20 张，每张响应最多 64 MiB）。图片处理根据 CPU 最多并行 4 张，并由所有任务共享位图内存预算；内存不足时等待，不降低图片分辨率。CDN 记住成功线路，故障退避，并有限比较备用线路；只省去可丢弃原始临时文件的强制刷盘，处理后缓存与最终保存仍校验并持久化。继续仅补缺失或损坏页；设置变化用于新任务或手动重试。宿主合成测试不能代表手机速度，未承诺达到网络测速上限。
-
-Android 0.5.1：默认调用原生系统文件管理应用，支持目录跳转时传入保存地址；仅有应用入口时打开主界面并提示手动定位，返回后可复制保存位置。文档管理保留为备用。未改变保存目录、移动已有文件或新增存储权限；荣耀 Play5 / Android 10 尚待真机确认。
-
-Android 0.5.2：移除上一版误用的华为云空间入口，改用原生文件应用选择机制；支持目录查看时传入保存目录及只读授权，仅支持首页时显示保存位置。默认目录及子目录使用可浏览的文档目录树。未连接荣耀 Play5 / Android 10，实际定位取决于设备支持。
-
-
-## 取消任务
-
-取消未完成任务会删除该任务文件、缓存和队列记录；暂停仍保留续传。清理在后台执行，失败时保留记录并提示重试，重开应用可继续取消清理。已完成任务不受影响。
-
-## 翻页体验
-
-左右翻页保留旧图直到新页就绪，按阅读方向预加载邻页。Windows 可鼠标拖动，Android 可跟手滑动；短拖和越界回弹。页码、书签和阅读位置在新页显示后提交。缓存有内存上限，目标页尚未就绪时显示加载提示。
-
-Android 0.5.9：按钮按实际字体尺寸调整高度和每行数量，同排等高；大字号或横屏下阅读器/漫画库操作区可以滚动，并保留内容区域。保持系统字体与字号缩放。1086 项既有宿主检查、96 组合成布局场景和原签名构建通过，尚未进行真机字体视觉验收。
+第三方依赖说明见 [Windows 许可目录](work/jmbatch/THIRD_PARTY_LICENSES) 和 [Android 第三方声明](work/jmbatch-android/THIRD_PARTY_NOTICES.txt)。当前仓库未提供项目级 `LICENSE` 文件；第三方依赖的许可记录不代表本项目整体采用相同许可证。
