@@ -230,7 +230,7 @@ public final class Downloader {
         control.check(); Files.move(decoded.toPath(), job.target.toPath(), StandardCopyOption.REPLACE_EXISTING);
         control.check();
         synchronized (task) { task.imageBytes += job.target.length(); task.done++; task.phase = "第 " + job.chapter + " 章 · 图片 " + job.page + "（已完成 " + task.done + "/" + task.total + "）"; }
-        control.lastData = SystemClock.elapsedRealtime();
+        control.saved(job.target.length());
     }
     private void clearTemporaryImage(ImageJob job) { temporaryImage(job, ".download").delete(); temporaryImage(job, ".partial").delete(); }
 

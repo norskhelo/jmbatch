@@ -21,9 +21,10 @@ public final class JmApiFallbackTest {
     static void check(boolean value){checks++;if(!value)throw new AssertionError("fallback transport check "+checks);}
     static class Connection extends HttpsURLConnection {
         final boolean dns;byte[] body;
+        final CountDownLatch disconnected=new CountDownLatch(1);
         Connection(URL url){super(url);dns=url.getHost().equals("dns.alidns.com")||url.getHost().equals("doh.pub");connections.add(this);}
         public void connect(){}public boolean usingProxy(){return false;}
-        public void disconnect(){if(dns&&mode.equals("cancel"))closed.countDown();}
+        public void disconnect(){disconnected.countDown();if(dns&&mode.equals("cancel"))closed.countDown();}
         public int getResponseCode()throws IOException {
             if(dns){
                 dnsCalls++;check(getRequestProperty("Cookie")==null&&getRequestProperty("token")==null&&getRequestProperty("Referer")==null);
@@ -48,6 +49,11 @@ public final class JmApiFallbackTest {
                 throw new ConnectException("refused");
             }
             if(mode.equals("recover-system"))throw new ConnectException("network changed");
+            if(mode.equals("header-timeout")&&url.getHost().equals("93.184.216.34")){
+                try{if(!disconnected.await(8,TimeUnit.SECONDS))throw new IOException("header deadline never cancelled request");}
+                catch(InterruptedException e){Thread.currentThread().interrupt();throw new IOException(e);}
+                throw new SocketException("connection cancelled");
+            }
             if(mode.equals("fallback-tls"))throw new SSLHandshakeException("certificate rejected");
             return mode.equals("fallback-denied")?403:200;
         }
@@ -55,7 +61,10 @@ public final class JmApiFallbackTest {
         public String getContentEncoding(){return null;}
         public long getContentLengthLong(){return mode.equals("short")?8:2;}
         public Map<String,List<String>> getHeaderFields(){return Collections.emptyMap();}
-        public InputStream getInputStream(){return new ByteArrayInputStream(dns?body:new byte[]{79,75});}
+        public InputStream getInputStream(){
+            if(!dns&&mode.equals("body-timeout")&&url.getHost().equals("93.184.216.34"))return new InputStream(){public int read()throws IOException{throw new SocketTimeoutException("body timeout");}};
+            return new ByteArrayInputStream(dns?body:new byte[]{79,75});
+        }
         public String getCipherSuite(){return "TLS_TEST";}
         public Certificate[] getLocalCertificates(){return null;}
         public Certificate[] getServerCertificates(){return new Certificate[0];}
@@ -95,11 +104,19 @@ public final class JmApiFallbackTest {
         api=api("fallback-denied");rejected(api,NetworkRoutes.HttpFailure.class);check(ipCalls==1);
         api=api("first-ip");check(request(api).equals("OK"));check(ipCalls==2);
         check(request(api).equals("OK"));check(ipCalls==3&&originCalls==1&&dnsCalls==2);
-        time.addAndGet(60001);check(request(api).equals("OK"));check(originCalls==2&&dnsCalls==4&&ipCalls==5);
-        api=api("ok");request(api);mode="recover-system";check(request(api).equals("OK"));check(originCalls==2&&dnsCalls==2&&ipCalls==3);
-        check(request(api).equals("OK"));check(originCalls==3&&ipCalls==3);
+        time.addAndGet(60001);check(request(api).equals("OK"));check(originCalls==2&&dnsCalls==4&&ipCalls==4);
+        api=api("ok");request(api);mode="recover-system";time.addAndGet(60000);check(request(api).equals("OK"));check(originCalls==2&&dnsCalls==2&&ipCalls==1);
+        check(request(api).equals("OK"));check(originCalls==3&&ipCalls==1);
         api=api("ok");request(api);mode="fallback-tls";rejected(api,SSLHandshakeException.class);check(originCalls==1&&dnsCalls==2&&ipCalls==2);
         api=api("short");rejected(api,EOFException.class);check(ipCalls==1);
+        api=api("ok");request(api);mode="body-timeout";rejected(api,SocketTimeoutException.class);
+        check(request(api).equals("OK"));check(ipCalls==3&&originCalls==1&&dnsCalls==2);
+        check(connections.get(connections.size()-1).getURL().getHost().contains(":"));
+        // Body failure survives the next TTL generation and does not query DNS again immediately.
+        check(request(api).equals("OK"));check(ipCalls==4&&dnsCalls==2);
+        api=api("ok");request(api);mode="header-timeout";long headerStart=System.nanoTime();
+        check(request(api).equals("OK"));check(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-headerStart)<7000);
+        check(ipCalls==3&&originCalls==1&&dnsCalls==2);check(request(api).equals("OK"));check(ipCalls==4);
         api=api("bad-dns");rejected(api,FallbackDns.Failure.class);check(dnsCalls==4&&ipCalls==0);
         ProxySelector previous=ProxySelector.getDefault();
         JmApi cachedProxy=api("ok");request(cachedProxy);

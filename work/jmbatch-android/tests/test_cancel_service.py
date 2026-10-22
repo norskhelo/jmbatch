@@ -47,7 +47,7 @@ public class DocumentsContract {public static boolean deleteDocument(ContentReso
 'app/jmbatch/android/Core.java':'package app.jmbatch.android;public class Core {public static String error(Throwable e,String cookie){return e.toString();}}',
 'app/jmbatch/android/ChapterRules.java':'package app.jmbatch.android;import java.util.*;public class ChapterRules {public static class ChoiceRequired extends Exception {public List<Object> chapters=new ArrayList<>();}}',
 'app/jmbatch/android/LibraryStore.java':'''package app.jmbatch.android;import android.content.*;import java.util.*;public class LibraryStore {public static int synced;public static LibraryStore get(Context c){return new LibraryStore();}public void sync(List<Store.Task> t){synced++;}}''',
-'app/jmbatch/android/JmApi.java':'''package app.jmbatch.android;import java.util.concurrent.atomic.*;import java.util.function.*;public class JmApi {public static class Control {public volatile String stop="",stage="download";public volatile long lastData=android.os.SystemClock.elapsedRealtime();public AtomicLong bytes=new AtomicLong();public Consumer<String> routeMessage;public void cancel(String s){stop=s;}}}''',
+'app/jmbatch/android/JmApi.java':'''package app.jmbatch.android;import java.util.concurrent.atomic.*;import java.util.function.*;public class JmApi {public static class Control {public volatile String stop="",stage="download";public volatile long lastData=android.os.SystemClock.elapsedRealtime();public AtomicLong bytes=new AtomicLong(),savedBytes=new AtomicLong();public boolean networkStalled(long n,long t){return false;}public Consumer<String> routeMessage;public void cancel(String s){stop=s;}}}''',
 'app/jmbatch/android/AlbumStorage.java':'''package app.jmbatch.android;import android.content.*;import android.net.*;import java.io.*;
 public class AlbumStorage {public static File root(Context c){return new File(Context.home,"exports");}public static File local(Context c,Uri u)throws IOException {if(u.toString().startsWith("saf:"))return null;File f=new File(u.toString());if(!f.getCanonicalPath().startsWith(root(c).getCanonicalPath()+File.separator))throw new IOException("outside");return f;}public static void forget(Context c,Uri u){} }''',
 'app/jmbatch/android/Store.java':'''package app.jmbatch.android;import android.content.*;import java.io.*;import java.util.*;import java.util.concurrent.*;
@@ -104,7 +104,7 @@ public class CancelServiceTest {
 paths=[]
 for name,source in sources.items():
     p=work/'stubs'/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(source,encoding='utf-8');paths.append(p)
-paths += [root/'app/src/main/java/app/jmbatch/android'/f'{name}.java' for name in ('DownloadService','DownloadPool','CacheCleanup','CancelledTaskCleanup','DownloadDisplay','WorkerDrain')]
+paths += [root/'app/src/main/java/app/jmbatch/android'/f'{name}.java' for name in ('DownloadService','DownloadPool','CacheCleanup','CancelledTaskCleanup','DownloadDisplay','WorkerDrain','RealtimeSpeed')]
 out=work/'classes';out.mkdir(exist_ok=True)
 subprocess.run([str(jdk/'bin/javac.exe'),'-encoding','UTF-8','-d',str(out),*map(str,paths)],check=True)
 subprocess.run([str(jdk/'bin/java.exe'),'-cp',str(out),'app.jmbatch.android.CancelServiceTest',str(work/'data')],check=True)

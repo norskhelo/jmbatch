@@ -43,6 +43,14 @@ public class ImageRoutesTest {
         }
         for(int i=0;i<16;i++)try(ImageRoutes.Plan p=slow.plan(0)){check(p.hosts.get(0).equals("b.example"));}
         try(ImageRoutes.Plan p=slow.plan(1)){check(!p.hosts.get(0).equals("b.example"));}
+        ImageRoutes stalled=new ImageRoutes(hosts,()->now[0]);stalled.success("a.example",100000,100);
+        for(int i=0;i<7;i++)stalled.plan(0).close();
+        ImageRoutes.Plan oldProbe=stalled.plan(0);check(oldProbe.hosts.get(0).equals("b.example"));
+        now[0]+=31000;for(int i=0;i<7;i++)stalled.plan(0).close();
+        ImageRoutes.Plan newProbe=stalled.plan(0);check(newProbe.hosts.get(0).equals("c.example"));
+        oldProbe.close();
+        for(int i=0;i<16;i++)try(ImageRoutes.Plan p=stalled.plan(0)){check(p.hosts.get(0).equals("a.example"));}
+        newProbe.close();
         System.out.println("ImageRoutesTest: "+checks+" checks passed");
     }
 }

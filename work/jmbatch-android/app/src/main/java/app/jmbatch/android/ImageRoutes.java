@@ -12,8 +12,7 @@ public final class ImageRoutes {
     private final Map<String, Health> health = new LinkedHashMap<>();
     private final Clock clock;
     private int requests, probeIndex;
-    private boolean probing;
-    private long nextProbe;
+    private long nextProbe, probeUntil, probeGeneration;
     public ImageRoutes(List<String> hosts, Clock clock) {
         this.hosts = new ArrayList<>(new LinkedHashSet<>(hosts)); this.clock = clock;
         if (this.hosts.isEmpty()) throw new IllegalArgumentException();
@@ -24,14 +23,15 @@ public final class ImageRoutes {
         for (String host : hosts) if (health.get(host).until <= now) order.add(host);
         if (order.isEmpty()) order.add(Collections.min(hosts, Comparator.comparingLong(h -> health.get(h).until)));
         order.sort((a,b) -> Double.compare(health.get(b).rate, health.get(a).rate));
-        boolean probe = false; requests++;
+        long probe = 0; requests++;
         if (recoveryRound > 0) Collections.rotate(order, -recoveryRound);
-        else if (!probing && requests % 8 == 0 && now >= nextProbe && order.size() > 1) {
+        else if (now >= probeUntil && requests % 8 == 0 && now >= nextProbe && order.size() > 1) {
             String primary = order.get(0);
             for (int i = 0; i < hosts.size(); i++) {
                 String candidate = hosts.get(probeIndex); probeIndex = (probeIndex + 1) % hosts.size();
                 if (!candidate.equals(primary) && order.contains(candidate)) {
-                    order.remove(candidate); order.add(0, candidate); probe = probing = true; break;
+                    order.remove(candidate); order.add(0, candidate); probe = ++probeGeneration;
+                    probeUntil = now + 30000; nextProbe = now + 15000; break;
                 }
             }
         }
@@ -53,11 +53,12 @@ public final class ImageRoutes {
     }
     public final class Plan implements AutoCloseable {
         public final List<String> hosts;
-        private boolean probe;
-        private Plan(List<String> hosts, boolean probe) { this.hosts = Collections.unmodifiableList(hosts); this.probe = probe; }
+        private long probe;
+        private Plan(List<String> hosts, long probe) { this.hosts = Collections.unmodifiableList(hosts); this.probe = probe; }
         public void close() {
             synchronized (ImageRoutes.this) {
-                if (probe) { probing = false; nextProbe = clock.now() + 15000; probe = false; }
+                if (probe != 0 && probe == probeGeneration) { probeUntil = 0; nextProbe = clock.now() + 15000; }
+                probe = 0;
             }
         }
     }

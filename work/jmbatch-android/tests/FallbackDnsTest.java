@@ -75,6 +75,15 @@ public final class FallbackDnsTest {
         ExecutorService pool=Executors.newFixedThreadPool(16);List<Future<?>> futures=new ArrayList<>();
         try{for(int i=0;i<16;i++)futures.add(pool.submit(()->{try{parallel.resolve("parallel.test",(url,deadline)->{parallelCalls.incrementAndGet();Thread.sleep(30);return reply(url,30);},()->{},s->{});}catch(Exception e){throw new RuntimeException(e);}}));for(Future<?> future:futures)future.get(5,TimeUnit.SECONDS);}finally{pool.shutdownNow();}
         check(parallelCalls.get()==2);
+        AtomicLong ttlClock=new AtomicLong(1000);FallbackDns shortTtl=new FallbackDns(h->new InetAddress[]{InetAddress.getByAddress(new byte[4])},ttlClock::get);
+        check(shortTtl.confirmedZero("short.test",new ConnectException()));
+        FallbackDns.Result old=shortTtl.resolve("short.test",(u,d)->reply(u,1),()->{},s->{});
+        InetAddress good=old.addresses.get(1),badIp=old.addresses.get(0);old.connected(good);
+        ttlClock.addAndGet(1100);check(shortTtl.cached("short.test")==null);check(shortTtl.knownZero("short.test"));
+        FallbackDns.Result fresh=shortTtl.resolve("short.test",(u,d)->reply(u,1),()->{},s->{});
+        check(fresh.routes(ttlClock.get()).get(0).equals(good));
+        old.failed(badIp,ttlClock.get());check(fresh.routes(ttlClock.get()).equals(Collections.singletonList(good)));
+        ttlClock.addAndGet(60000);check(!shortTtl.knownZero("short.test"));
         ProxySelector previous=ProxySelector.getDefault();
         try{ProxySelector.setDefault(new ProxySelector(){public List<Proxy> select(URI uri){return Collections.singletonList(new Proxy(Proxy.Type.HTTP,new InetSocketAddress("127.0.0.1",8080)));}public void connectFailed(URI u,SocketAddress a,IOException e){}});check(!FallbackDns.permitsDirect(new URL("https://api.test")));}
         finally{ProxySelector.setDefault(previous);}

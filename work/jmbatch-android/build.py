@@ -88,14 +88,16 @@ if not args.build_only:
     # Exercise production HTTP/CDN code without Android runtime, sockets or user data.
     transport=testroot/'transport-host';transport.mkdir(exist_ok=True)
     stubs=transport/'stubs';stubs.mkdir(exist_ok=True)
-    (stubs/'Store.java').write_text('package app.jmbatch.android; public final class Store { public static class Settings { public int retries=2,timeout=25; } }',encoding='utf-8')
+    (stubs/'Store.java').write_text('package app.jmbatch.android; public final class Store { public static class Settings { public int retries=2,timeout=25,threads=8,slowKB=30,window=90; public boolean autoReset=true; } }',encoding='utf-8')
     (stubs/'SystemClock.java').write_text('package android.os; public final class SystemClock { public static long elapsedRealtime(){return System.nanoTime()/1000000;} }',encoding='utf-8')
-    run(javac,'-encoding','UTF-8','-cp',str(testout)+os.pathsep+str(platform),'-d',transport,stubs/'Store.java',stubs/'SystemClock.java',ROOT/'app/src/main/java/app/jmbatch/android/JmApi.java',ROOT/'tests/JmApiTransportTest.java')
+    run(javac,'-encoding','UTF-8','-cp',str(testout)+os.pathsep+str(platform),'-d',transport,stubs/'Store.java',stubs/'SystemClock.java',ROOT/'app/src/main/java/app/jmbatch/android/TransferWatch.java',ROOT/'app/src/main/java/app/jmbatch/android/JmApi.java',ROOT/'tests/JmApiTransportTest.java')
     run(java,'-cp',str(transport)+os.pathsep+str(testout)+os.pathsep+str(platform),'app.jmbatch.android.JmApiTransportTest',transport/'data')
     run(javac,'-encoding','UTF-8','-cp',str(transport)+os.pathsep+str(testout)+os.pathsep+str(platform),'-d',transport,ROOT/'tests/JmApiFallbackTest.java')
     run(java,'-cp',str(transport)+os.pathsep+str(testout)+os.pathsep+str(platform),'app.jmbatch.android.JmApiFallbackTest')
     run(javac,'-encoding','UTF-8','-cp',str(transport)+os.pathsep+str(testout)+os.pathsep+str(platform),'-d',transport,ROOT/'app/src/main/java/app/jmbatch/android/DownloadPool.java',ROOT/'tests/JmApiCancellationTest.java')
     run(java,'-cp',str(transport)+os.pathsep+str(testout)+os.pathsep+str(platform),'app.jmbatch.android.JmApiCancellationTest',transport/'cancellation')
+    run(javac,'-encoding','UTF-8','-cp',transport,'-d',transport,ROOT/'app/src/main/java/app/jmbatch/android/RealtimeSpeed.java',ROOT/'tests/TransferWatchTest.java')
+    run(java,'-cp',transport,'app.jmbatch.android.TransferWatchTest')
 
     run(javac,'-encoding','UTF-8','-d',testout,ROOT/'app/src/main/java/app/jmbatch/android/DownloadDisplay.java',ROOT/'tests/DownloadDisplayTest.java')
     run(java,'-cp',testout,'DownloadDisplayTest')

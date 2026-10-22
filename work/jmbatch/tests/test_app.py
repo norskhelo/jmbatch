@@ -43,6 +43,17 @@ class ParseTests(unittest.TestCase):
         disabled = SpeedWatch(Settings(auto_reset=False), 0)
         self.assertIsNone(disabled.sample(9999, 0)[1])
 
+    def test_realtime_completed_rate_has_no_ten_second_tail(self):
+        watch = SpeedWatch(Settings(auto_reset=False), 0)
+        self.assertEqual(watch.sample(1, 4096)[0], 4096)
+        self.assertEqual(watch.sample(1.2, 4096)[0], 4096)
+        self.assertEqual(watch.sample(2, 4096)[0], 0)
+        self.assertEqual(watch.sample(4, 8192)[0], 2048)
+        self.assertEqual(watch.sample(5, 8192)[0], 0)
+        retry = SpeedWatch(Settings(auto_reset=False), 5, 8192)
+        self.assertEqual(retry.sample(6, 8192)[0], 0)
+        self.assertEqual(retry.sample(7, 12288)[0], 4096)
+
 
 class IntegrationTests(unittest.TestCase):
     def setUp(self):

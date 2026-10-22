@@ -131,7 +131,7 @@ public final class MainActivity extends Activity {
         }
         Iterator<Map.Entry<String,Row>> iterator=rows.entrySet().iterator();while(iterator.hasNext()){Map.Entry<String,Row> entry=iterator.next();if(!visible.contains(entry.getKey())){entry.getValue().cover.remove();queue.removeView(entry.getValue().card);iterator.remove();}}
         summary.setText("共 "+tasks.size()+" 本  ·  完成 "+completed+"  ·  失败 "+failed);
-        global.setText(active==0?(store.running?"正在启动…":store.note.isEmpty()?(completed>0&&completed==tasks.size()?"下载完成":"暂无正在下载的任务"):store.note):"同时下载 "+active+" 本 · 总速度 "+DownloadDisplay.speed(speed));
+        global.setText(active==0?(store.running?"正在启动…":store.note.isEmpty()?(completed>0&&completed==tasks.size()?"下载完成":"暂无正在下载的任务"):store.note):"同时下载 "+active+" 本 · 总实时速度 "+DownloadDisplay.speed(speed));
         if(!store.galleryNotice.isEmpty())global.append("\n"+store.galleryNotice);
         if(!store.cleanupNotice.isEmpty())global.append("\n最近清理："+store.cleanupNotice);
         start.setEnabled(!store.running);pause.setEnabled(store.running);more.setVisibility(tasks.size()>limit?View.VISIBLE:View.GONE);
@@ -262,7 +262,7 @@ public final class MainActivity extends Activity {
         Spinner chapterView=new Spinner(this);ArrayAdapter<String> chapterModes=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,new String[]{"1 多章节合一","2 分章节观看"});chapterModes.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);chapterView.setAdapter(chapterModes);chapterView.setSelection(store.settings.chapterViewMode-1);form.addView(chapterView);
         form.addView(text("保存后重新打开漫画生效。分章节观看在章末停止，通过上一章、下一章或章节列表切换；书签及总页码跳转可跨章。",12,MUTED));
         form.addView(text("Cookie（可选，仅本次会话有效）",13,MUTED));EditText cookie=edit("key=value; key2=value2",false);cookie.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);cookie.setText(store.cookie);form.addView(cookie);
-        form.addView(text("并行数越高，请求和内存占用越多；超时或限流时可适当调低。\n下载速度按实际接收的图片数据统计，包含重试流量。\n任务数保存后生效；调低时等待当前任务完成。\n其他设置用于新任务和手动重试，已有任务保留原保存位置和格式。",12,MUTED));
+        form.addView(text("并行数越高，请求和内存占用越多；超时或限流时可适当调低。\n实时速度按每秒完成下载、处理并写入缓存的图片字节统计；大图未完成时可能为 0，缓存复用和失败重试不计入。\n慢速检测针对单个图片连接，阈值按图片线程数分摊；本地处理等待不触发网络重连。\n任务数保存后生效；调低时等待当前任务完成。\n其他设置用于新任务和手动重试，已有任务保留原保存位置和格式。",12,MUTED));
         form.addView(button("离线诊断",v->selfTest()));
         form.addView(button("使用说明",v->new AlertDialog.Builder(this).setTitle("使用说明").setMessage("1. 选择保存位置和下载格式，添加编号或连续编号。\n2. 点击“开始下载”，可在通知栏查看进度或暂停。\n3. 下载后在任务详情或漫画库选择“导出漫画”，再选择 PDF、ZIP、命名方式与保存目录。\n4. 多章节 PDF 可统一导出或分章节导出，导出始终保留原始图片。\n5. 下载失败时保留完整缓存，可查看失败原因后点击“重试”。\n6. 应用目录在卸载后会被删除，重要图片请选公共目录或导出备份。\n7. 导出和文件管理前请暂停下载，系统目录授权失效时需重新选择目录。").setPositiveButton("确定",null).show()));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("下载设置").setView(scroll).setNegativeButton("取消",null).setPositiveButton("保存",null).create();

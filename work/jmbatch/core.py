@@ -159,12 +159,15 @@ def explain_error(exc: Exception, cookie: str = "") -> str:
 
 class SpeedWatch:
     """Rates use completed image bytes, not network-layer transfer bytes."""
-    def __init__(self, settings: Settings, now: float):
+    def __init__(self, settings: Settings, now: float, received: int = 0):
         self.settings = settings
         self.start = now
         self.last_progress = now
-        self.samples = deque([(now, 0)])
-        self.last_bytes = 0
+        self.samples = deque([(now, received)])
+        self.last_bytes = received
+        self.rate_time = now
+        self.rate_bytes = received
+        self.speed = 0.0
 
     def sample(self, now: float, received: int) -> tuple[float, str | None]:
         if received > self.last_bytes:
@@ -174,8 +177,11 @@ class SpeedWatch:
         window = self.settings.slow_seconds
         while len(self.samples) > 2 and self.samples[1][0] <= now - window:
             self.samples.popleft()
-        recent = next((s for s in self.samples if s[0] >= now - 10), self.samples[0])
-        speed = max(0, received - recent[1]) / max(1, now - recent[0])
+        elapsed = now - self.rate_time
+        if elapsed >= 1:
+            self.speed = max(0, received - self.rate_bytes) / elapsed
+            self.rate_time, self.rate_bytes = now, received
+        speed = self.speed
         if not self.settings.auto_reset:
             return speed, None
         if now - self.last_progress >= self.settings.stall_seconds:

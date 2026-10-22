@@ -129,8 +129,7 @@ public final class DownloadService extends Service {
         volatile String stop="";
         JmApi.Control watched;
         String watchedStage="";
-        long phaseStart;
-        final Deque<long[]> samples=new ArrayDeque<>();
+        final RealtimeSpeed speed=new RealtimeSpeed();
         DownloadJob(Store.Task task){this.task=task;}
         public synchronized void cancel(String reason){
             if(stop.isEmpty()||reason.equals("CANCEL"))stop=reason;
@@ -190,24 +189,20 @@ public final class DownloadService extends Service {
         synchronized void monitor(long now){
             JmApi.Control active=control;if(active==null)return;
             long bytes=active.bytes.get();task.bytes=bytes;
+            long saved=active.savedBytes.get();
             if(watched!=active||!watchedStage.equals(active.stage)){
-                watched=active;watchedStage=active.stage;phaseStart=now;samples.clear();samples.add(new long[]{now,bytes});
+                watched=active;watchedStage=active.stage;speed.reset(now,saved);
             }
-            samples.addLast(new long[]{now,bytes});
-            while(samples.size()>2){Iterator<long[]> it=samples.iterator();it.next();long[] second=it.next();if(second[0]<=now-task.settings.window*1000L)samples.removeFirst();else break;}
-            long[] recent=samples.peekFirst();for(long[] sample:samples)if(sample[0]>=now-10000){recent=sample;break;}
-            task.speed=task.status.equals("running")&&active.stop.isEmpty()&&active.stage.equals("download")?Math.max(0,bytes-recent[1])*1000/Math.max(1000,now-recent[0]):0;
+            task.speed=task.status.equals("running")&&active.stop.isEmpty()&&(active.stage.equals("download")||active.stage.equals("page_retry"))?speed.sample(now,saved):0;
             if(!stop.isEmpty())return;
-            if(active.stage.equals("page_retry")&&active.stop.isEmpty()&&now-active.lastData>=Math.max(task.settings.stall,task.settings.timeout*(task.settings.retries+1)*2)*1000L)
+            if(active.stage.equals("page_retry")&&active.stop.isEmpty()&&active.networkStalled(now,Math.max(task.settings.stall,task.settings.timeout*(task.settings.retries+1)*2)*1000L))
                 active.cancel("单页重试超时；已保留其他图片，请重试任务");
             if(task.status.equals("running")&&active.stop.isEmpty()&&task.settings.autoReset&&(active.stage.equals("metadata")||active.stage.equals("download"))){
                 String reason="";
-                if(now-active.lastData>=task.settings.stall*1000L)reason="连续 "+task.settings.stall+" 秒没有接收数据或取得进度";
-                else if(active.stage.equals("download")&&task.settings.slowKB>0&&now-phaseStart>=(task.settings.window+30)*1000L){
-                    long[] oldest=samples.peekFirst();long duration=now-oldest[0];
-                    if(duration>=task.settings.window*1000L&&Math.max(0,bytes-oldest[1])*1000/Math.max(1,duration)<task.settings.slowKB*1024L)
-                        reason="最近 "+task.settings.window+" 秒平均速度低于 "+task.settings.slowKB+" KB/s";
-                }
+                // Slow image reads recover inside their own request. Local queue,
+                // bitmap/memory and fsync waits must never reset healthy downloads.
+                if(active.stage.equals("metadata")?now-active.lastData>=task.settings.stall*1000L:active.networkStalled(now,task.settings.stall*1000L))
+                    reason="连续 "+task.settings.stall+" 秒没有接收数据或取得进度";
                 if(!reason.isEmpty()){task.phase="正在关闭旧连接："+reason;active.cancel("RESET:"+reason);}
             }
         }
@@ -226,7 +221,7 @@ public final class DownloadService extends Service {
         PendingIntent pause=PendingIntent.getService(this,1,new Intent(this,DownloadService.class).setAction(PAUSE),PendingIntent.FLAG_UPDATE_CURRENT|immutable);
         List<DownloadJob> jobs=pool.snapshot();long speed=0;StringBuilder detail=new StringBuilder();
         for(DownloadJob job:jobs){Store.Task task=job.task;speed+=task.speed;detail.append("JM").append(task.id).append(" · ").append(task.progressText()).append(" · ").append(DownloadDisplay.speed(task.speed)).append("\n").append(task.etaText()).append("\n");}
-        String summary=jobs.isEmpty()?"正在启动队列":"同时下载 "+jobs.size()+" 本 · 总速度 "+DownloadDisplay.speed(speed);
+        String summary=jobs.isEmpty()?"正在启动队列":"同时下载 "+jobs.size()+" 本 · 总实时速度 "+DownloadDisplay.speed(speed);
         return new Notification.Builder(this,CHANNEL).setSmallIcon(R.drawable.ic_launcher).setContentTitle("JM Batch 正在下载")
             .setContentText(summary).setStyle(new Notification.BigTextStyle().bigText(summary+"\n"+detail))
             .setContentIntent(open).setOngoing(true).setOnlyAlertOnce(true).setVisibility(Notification.VISIBILITY_PRIVATE)

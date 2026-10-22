@@ -168,7 +168,7 @@ class App:
         stats.grid(row=4, column=0, sticky="ew", pady=(0, 9))
         self.summary = tk.StringVar(value="暂无任务，请添加下载编号")
         ttk.Label(stats, textvariable=self.summary, foreground=MUTED).pack(side="left")
-        self.speed_text = tk.StringVar(value="保存速度  —")
+        self.speed_text = tk.StringVar(value="实时速度  —")
         ttk.Label(stats, textvariable=self.speed_text, foreground=ACCENT).pack(side="right")
 
         table = ttk.Frame(outer)
@@ -436,7 +436,7 @@ class App:
         self.start_button.configure(state="disabled" if self.engine.running else "normal")
         self.pause_button.configure(state="normal" if self.engine.running or selecting else "disabled")
         if current:
-            self.speed_text.set(f"同时下载 {len(active)} 本 · 总保存速度  " + format_speed(sum(s.task.speed for s in active)))
+            self.speed_text.set(f"同时下载 {len(active)} 本 · 总实时速度  " + format_speed(sum(s.task.speed for s in active)))
             estimate = eta_text(current.status, state.phase, current.done, current.total, current.cached,
                                 time.monotonic() - state.download_started, current.speed)
             if current.settings["format"] == "images":
@@ -445,7 +445,7 @@ class App:
                                    + size_text(current.done, current.total, current.image_bytes, current.result_bytes, current.status) + "\n" + estimate)
             self.progressbar["value"] = percent(current.done, current.total, current.status)
         else:
-            self.speed_text.set("保存速度  —")
+            self.speed_text.set("实时速度  —")
             latest = next((t for t in reversed(tasks) if t.status == "done"), None)
             self.progress_text.set(f"{selecting} 本等待选择下载章节" if selecting else "队列已暂停，点击“开始下载”继续" if waiting and not self.engine.running else
                                    (f"JM{latest.album_id} · 下载完成 · 100.0%\n" + size_text(latest.done, latest.total, latest.image_bytes, latest.result_bytes, latest.status) if latest else "暂无正在下载的任务"))
@@ -518,7 +518,7 @@ class App:
         ttk.Label(frame, text="Cookie（可选，仅本次会话有效，不写入配置或日志）").grid(row=13, column=0, columnspan=3, sticky="w", pady=(15, 6))
         cookie = tk.StringVar(value=self.engine.cookie)
         ttk.Entry(frame, textvariable=cookie, show="●", width=65).grid(row=14, column=0, columnspan=3, sticky="ew")
-        ttk.Label(frame, text="并行数越高，请求越多；遇到超时或限流时可适当调低。\n保存速度按已完成图片统计，大图下载期间可能暂时显示为 0。\n自动重连会重新建立下载连接，导出期间不执行。\n任务数保存后生效；调低时等待当前任务完成。\n其他设置用于新任务和手动重试，运行中任务保留原设置。", foreground=MUTED, justify="left").grid(row=15, column=0, columnspan=3, sticky="w", pady=15)
+        ttk.Label(frame, text="并行数越高，请求越多；遇到超时或限流时可适当调低。\n实时速度按每秒完成下载、处理并写入缓存的图片字节统计。大图未完成时可能为 0，不叠加网络和磁盘字节。\n自动重连会重新建立下载连接，导出期间不执行。\n任务数保存后生效；调低时等待当前任务完成。\n其他设置用于新任务和手动重试，运行中任务保留原设置。", foreground=MUTED, justify="left").grid(row=15, column=0, columnspan=3, sticky="w", pady=15)
 
         def save():
             try:

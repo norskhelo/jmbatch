@@ -306,7 +306,7 @@ class Engine:
             task.phase = event["message"]
             if state.phase in ("download", "page_retry"):
                 task.total = event["total"]
-                state.watch = SpeedWatch(Settings(**task.settings), now)
+                state.watch = SpeedWatch(Settings(**task.settings), now, state.bytes)
                 if state.phase == "download":
                     state.download_started = now
         elif kind == "progress":
@@ -368,7 +368,7 @@ class Engine:
                     code = state.process.exitcode
                     self._fail(state, f"下载进程意外退出（退出码 {code}）。可能是依赖、系统资源或安全软件拦截；已保留缓存，可重试。")
             elif state.phase == "page_retry":
-                task.speed = 0
+                task.speed, _ = state.watch.sample(now, state.bytes)
                 if now - state.watch.last_progress >= max(state.watch.settings.stall_seconds, state.watch.settings.timeout * (state.watch.settings.request_retries + 1) * 2):
                     self._fail(state, "单页重试超时；已保留其他图片，请查看失败页后重试任务。")
             elif state.phase in ("metadata", "download"):
