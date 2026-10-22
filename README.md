@@ -2,6 +2,8 @@
 
 面向 Windows 和 Android 的批量漫画下载与离线阅读工具。支持按编号建立下载队列，将漫画保存为 PDF、ZIP 或图片文件夹，并在本地管理、阅读和转换格式。
 
+> **项目定位**：以个人自用为主，开发与维护基本依靠 AI 辅助完成，功能取舍优先围绕个人使用需求。
+
 Windows 客户端使用 **Python / Tkinter**，Android 客户端使用 **Java / Android 原生 API**。两端独立实现，围绕下载队列、漫画库、阅读器和签名更新提供相近的使用体验。
 
 [下载安装](#下载安装) · [开发入门](#开发入门) · [源码导览](#源码导览) · [参与贡献](#参与贡献) · [更新日志](CHANGELOG.md)
@@ -141,7 +143,7 @@ Windows 依赖 `jmcomic` 等 Python 库；Android 的协议与图片还原逻辑
 
 ## 参与贡献
 
-欢迎通过 [Issues](https://github.com/norskhelo/jmbatch/issues) 反馈问题、提出改进，或提交 [Pull Request](https://github.com/norskhelo/jmbatch/pulls)。文档纠错、复现用例、设备兼容性反馈和代码改进都可以参与。
+项目以自用为主，同时欢迎通过 [Issues](https://github.com/norskhelo/jmbatch/issues) 反馈问题、提出改进，或提交 [Pull Request](https://github.com/norskhelo/jmbatch/pulls)。文档纠错、复现用例、设备兼容性反馈和代码改进都可以参与。
 
 1. 先搜索已有 Issue；较大的功能或结构调整，建议先描述使用场景和预期行为。
 2. Fork 仓库并创建分支，围绕一个明确问题提交改动。
