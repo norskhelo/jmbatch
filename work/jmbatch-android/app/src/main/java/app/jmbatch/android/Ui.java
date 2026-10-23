@@ -18,6 +18,7 @@ public final class Ui {
     }
     private static final java.util.WeakHashMap<Activity,Dialog> surfaces=new java.util.WeakHashMap<>();
     static void surface(Activity activity,Dialog dialog){surfaces.put(activity,dialog);dialog.setOnDismissListener(d->surfaces.remove(activity));}
+    static void surface(Activity activity,Dialog dialog,Runnable after){surfaces.put(activity,dialog);dialog.setOnDismissListener(d->{surfaces.remove(activity);after.run();});}
     private static ViewGroup decor(Activity activity){Dialog dialog=surfaces.get(activity);return (ViewGroup)(dialog!=null&&dialog.isShowing()?dialog.getWindow():activity.getWindow()).getDecorView();}
     public static final int BG=Color.rgb(245,245,247), INK=Color.rgb(29,31,38), MUTED=Color.rgb(116,119,128),
         LINE=Color.rgb(218,220,225), ACCENT=Color.rgb(115,117,124), BLUE=Color.rgb(51,99,189);
@@ -28,8 +29,22 @@ public final class Ui {
     }
     public static LinearLayout column(Context c){LinearLayout v=new LinearLayout(c);v.setOrientation(LinearLayout.VERTICAL);return v;}
     public static TextView text(Context c,String value,int size){TextView v=new TextView(c);v.setText(value);v.setTextSize(size);v.setTextColor(INK);v.setLineSpacing(dp(c,2),1);return v;}
+    public static void setText(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
     public static TextView heading(Context c,String value){TextView v=text(c,value,21);v.setTypeface(null,Typeface.BOLD);v.setPadding(0,dp(c,10),0,dp(c,12));return v;}
     public static Button button(Context c,String title,Runnable action){Button b=new ActionButton(c);b.setText(title);b.setTextSize(14);b.setOnClickListener(v->action.run());return b;}
+    public static Button iconButton(Context c,String kind,String title,Runnable action){Button b=button(c,title,action);b.setContentDescription(title.isEmpty()?"分享":title);b.setCompoundDrawablePadding(dp(c,6));android.text.SpannableString symbol=new android.text.SpannableString("\ufffc"+(title.isEmpty()?"":"  "+title));symbol.setSpan(new android.text.style.ImageSpan(icon(c,kind)),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);b.setText(symbol);return b;}
+    public static Drawable icon(Context c,String kind){
+        Drawable d=new Drawable(){
+            final Paint p=new Paint(3);
+            public void draw(Canvas original){Canvas canvas=original;canvas.save();canvas.translate(getBounds().left,getBounds().top);canvas.scale(getBounds().width()/24f,getBounds().height()/24f);p.setColor(INK);p.setStrokeWidth(1.6f);p.setStyle(Paint.Style.STROKE);p.setStrokeJoin(Paint.Join.ROUND);p.setStrokeCap(Paint.Cap.ROUND);Path path=new Path();
+                if(kind.equals("trash")){path.moveTo(6,8);path.lineTo(7,21);path.lineTo(18,21);path.lineTo(19,8);path.moveTo(4,6);path.lineTo(21,6);path.moveTo(9,6);path.lineTo(9,3);path.lineTo(16,3);path.lineTo(16,6);path.moveTo(10,10);path.lineTo(10,18);path.moveTo(15,10);path.lineTo(15,18);}
+                else if(kind.equals("folder")){path.moveTo(3,20);path.lineTo(3,6);path.lineTo(10,6);path.lineTo(12,9);path.lineTo(22,9);path.lineTo(22,20);path.close();path.moveTo(12,11);path.lineTo(12,18);path.moveTo(8.5f,14.5f);path.lineTo(15.5f,14.5f);}
+                else{path.moveTo(6,11);path.lineTo(6,21);path.lineTo(19,21);path.lineTo(19,11);path.moveTo(12.5f,16);path.lineTo(12.5f,3);path.moveTo(8,8);path.lineTo(12.5f,3);path.lineTo(17,8);}
+                canvas.drawPath(path,p);canvas.restore();
+            }
+            public void setAlpha(int alpha){p.setAlpha(alpha);}public void setColorFilter(ColorFilter filter){p.setColorFilter(filter);}public int getOpacity(){return PixelFormat.TRANSLUCENT;}
+        };d.setBounds(0,0,dp(c,20),dp(c,20));return d;
+    }
     public static void primary(Button b){b.setTextColor(Color.WHITE);b.setBackgroundTintList(null);b.setBackground(shape(b.getContext(),ACCENT,9,false));}
     public static EditText input(Context c,String hint,boolean number){EditText e=new EditText(c);e.setTextColor(INK);e.setTextSize(14);e.setHintTextColor(MUTED);e.setHint(hint);e.setPadding(dp(c,12),dp(c,12),dp(c,12),dp(c,12));e.setBackground(shape(c,BG,8,true));e.setSingleLine(number);if(number)e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);return e;}
     public static void gap(LinearLayout parent,int height){View gap=new View(parent.getContext());parent.addView(gap,new LinearLayout.LayoutParams(1,dp(parent.getContext(),height)));}
@@ -37,22 +52,27 @@ public final class Ui {
     public static AlertDialog modal(Activity a,View content,boolean blur){
         LinearLayout panel=column(a);int p=dp(a,20);panel.setPadding(p,p,p,p);panel.setBackground(shape(a,Color.WHITE,16,false));panel.addView(content);
         Modal d=new Modal(a);d.setView(panel);d.setOnShowListener(x->{
-            d.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            d.getWindow().setBackgroundDrawableResource(android.R.color.transparent);d.getWindow().setDimAmount(.22f);
             int width=Math.min(dp(a,480),a.getResources().getDisplayMetrics().widthPixels-dp(a,36));d.getWindow().setLayout(width,-2);
         });
         if(blur){ViewGroup decor=decor(a);
             if(decor.getWidth()>0&&decor.getHeight()>0){
-                Bitmap bitmap=Bitmap.createBitmap(Math.max(1,decor.getWidth()/14),Math.max(1,decor.getHeight()/14),Bitmap.Config.ARGB_8888);
-                Canvas canvas=new Canvas(bitmap);canvas.scale(bitmap.getWidth()/(float)decor.getWidth(),bitmap.getHeight()/(float)decor.getHeight());decor.draw(canvas);
-                ImageView cover=new ImageView(a);cover.setScaleType(ImageView.ScaleType.FIT_XY);cover.setImageBitmap(bitmap);cover.setColorFilter(Color.argb(65,100,100,110),PorterDuff.Mode.SRC_ATOP);decor.addView(cover,new ViewGroup.LayoutParams(-1,-1));
+                Bitmap bitmap=blurred(decor);
+                ImageView cover=new ImageView(a);cover.setScaleType(ImageView.ScaleType.FIT_XY);cover.setImageBitmap(bitmap);cover.setColorFilter(Color.argb(20,100,100,110),PorterDuff.Mode.SRC_ATOP);decor.addView(cover,new ViewGroup.LayoutParams(-1,-1));
                 d.cleanup=()->{decor.removeView(cover);cover.setImageDrawable(null);bitmap.recycle();};
             }
         }
         return d;
     }
+    static Bitmap blurred(View view){
+        int w=Math.max(1,view.getWidth()/4),h=Math.max(1,view.getHeight()/4);Bitmap bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(bitmap);canvas.drawColor(Color.WHITE);canvas.scale(w/(float)view.getWidth(),h/(float)view.getHeight());view.draw(canvas);
+        int[] pixels=new int[w*h],temp=new int[w*h];bitmap.getPixels(pixels,0,w,0,0,w,h);
+        for(int pass=0;pass<2;pass++){for(int y=0;y<h;y++)for(int x=0;x<w;x++){int r=0,g=0,b=0;for(int k=-2;k<=2;k++){int at=pass==0?y*w+Math.max(0,Math.min(w-1,x+k)):Math.max(0,Math.min(h-1,y+k))*w+x;int p=pixels[at];r+=(p>>16)&255;g+=(p>>8)&255;b+=p&255;}temp[y*w+x]=0xff000000|((r/5)<<16)|((g/5)<<8)|(b/5);}int[] swap=pixels;pixels=temp;temp=swap;}
+        bitmap.setPixels(pixels,0,w,0,0,w,h);return bitmap;
+    }
     public static AlertDialog confirm(Activity a,String title,Runnable yes){return confirm(a,title,null,yes);}
     public static AlertDialog confirm(Activity a,String title,View extra,Runnable yes){
-        LinearLayout body=column(a);TextView label=text(a,title,17);label.setGravity(Gravity.CENTER);body.addView(label);gap(body,18);if(extra!=null){body.addView(extra);gap(body,14);}
+        LinearLayout body=column(a);gap(body,12);TextView label=text(a,title,17);label.setGravity(Gravity.CENTER);body.addView(label);gap(body,24);if(extra!=null){body.addView(extra);gap(body,14);}
         AlertDialog dialog=modal(a,body,true);Button accept=button(a,"确认",()->{dialog.dismiss();yes.run();});primary(accept);
         body.addView(pair(a,accept,button(a,"取消",dialog::dismiss)));dialog.show();return dialog;
     }

@@ -52,7 +52,7 @@ class DisplayView(ttk.Treeview):
         self.tile_images = {}
         self.extent = None
         self.scroll_callback = None
-        self.tile_font = font.Font(self, family='Microsoft YaHei UI', size=10)
+        self.tile_font = font.Font(self, family='Microsoft YaHei UI', size=11)
         self.canvas.configure(yscrollcommand=self._scrolled)
         self.canvas.bind('<Configure>', self._resize)
         self.canvas.bind('<MouseWheel>', self._wheel)
@@ -301,7 +301,7 @@ class DisplayView(ttk.Treeview):
             x, y = (n % self.columns)*self.cell_width+5, (n//self.columns)*self.cell_height+5
             width = self.cell_width-10
             chosen = key in selected
-            self.canvas.create_rectangle(x,y,x+width,y+self.cell_height-10,fill='#eeeef1' if chosen else 'white',
+            __import__('ui_common').rounded(self.canvas,x,y,width,self.cell_height-10,8,fill='#eeeef1' if chosen else 'white',
                 outline='#73757c' if chosen or key == self.focus() else '#dadce1', width=2 if chosen else 1)
             data = super().item(key)
             picture = data['image']
@@ -327,13 +327,14 @@ class DisplayView(ttk.Treeview):
                 subtitle = '' if fmt == '收藏夹' else f'编号 {number}'
                 if favorite:
                     self.canvas.create_text(x+width-16,y+12,anchor='ne',text='★',fill='#d6a039',font=('Segoe UI',22))
-                text = self._lines(title,width-20,2)+'\n'+self._lines(subtitle,width-20,1)
+                text = self._lines(title,width-20,2)
             else:
                 number,title,status,progress,size,fmt,resets = values
                 text = self._lines(title or number,width-20,2)+'\n'+self._lines(f'{number} · {fmt}',width-20,1)
                 text += '\n'+status+'\n'+self._lines(progress,width-20,1)+'\n'+self._lines(size,width-20,1)
             text_top = self.cover_height+20 if self.kind == 'library' else 115
             self.canvas.create_text(x+10,y+text_top,anchor='nw',text=text,font=self.tile_font,fill='#1d1f26')
+            if self.kind=='library':self.canvas.create_text(x+10,y+text_top+(text.count('\n')+1)*self.tile_font.metrics('linespace')+3,anchor='nw',text=self._lines(subtitle,width-20,1),font=self.tile_font,fill='#747780')
             if chosen:
                 self.canvas.create_text(x+width-10,y+8,anchor='ne',text='✓',fill='#73757c',font=self.tile_font)
         self.tile_images = painted_images

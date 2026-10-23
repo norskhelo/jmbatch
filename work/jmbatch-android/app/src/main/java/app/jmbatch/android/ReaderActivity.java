@@ -80,9 +80,9 @@ public final class ReaderActivity extends Activity {
         TextView title=Ui.text(this,entry.title,18);title.setTypeface(null,Typeface.BOLD);title.setSingleLine(true);title.setGravity(Gravity.CENTER);title.setEllipsize(android.text.TextUtils.TruncateAt.END);controls.addView(title);Ui.gap(controls,12);
         chapterButton=button("章节列表",this::chooseChapter);favoriteButton=button("收藏",this::favorite);modeButton=button("滚动阅读",this::toggleMode);row(controls,chapterButton,favoriteButton);
         markButton=button("书签",this::showBookmarkInput);Ui.gap(controls,8);row(controls,markButton,button("跳转",this::jumpPage));
-        viewport=new ReaderViewport(this);viewport.setBackgroundColor(Ui.BG);viewport.setOnClickListener(v->{if(ready&&!closed){chrome.toggle();updateChromeDescription();}});
+        viewport=new ReaderViewport(this);viewport.setBackgroundColor(Color.WHITE);viewport.setOnClickListener(v->{if(ready&&!closed){chrome.toggle();updateChromeDescription();}});
         LinearLayout navigation=Ui.column(this);navigation.setBackgroundColor(Color.WHITE);navigation.setPadding(dp(12),dp(4),dp(12),dp(10));
-        status=Ui.text(this,"正在读取漫画…",12);status.setGravity(Gravity.CENTER);status.setTextColor(Ui.MUTED);status.setLines(2);navigation.addView(status);
+        status=Ui.text(this,"正在读取漫画…",12);status.setGravity(Gravity.CENTER);status.setTextColor(Ui.MUTED);status.setLines(2);
         pageNavigation=Ui.pair(this,button("上一页",()->step(-1)),button("下一页",()->step(1)));navigation.addView(pageNavigation);
         chrome=new ReaderChrome(this,new ControlScroll(this,controls),new ControlScroll(this,navigation),viewport,()->{
             if(closed)return;
@@ -348,14 +348,14 @@ public final class ReaderActivity extends Activity {
     private void showBookmarkInput(){
         if(!ready)return;if(bookmarkPanel!=null&&bookmarkPanel.isShowing()){bookmarkPanel.dismiss();return;}
         LinearLayout body=Ui.column(this);int pad=dp(14);body.setPadding(pad,pad,pad,pad);body.setBackground(Ui.shape(this,Color.WHITE,12,true));EditText name=Ui.input(this,"请输入名称",false);name.setSingleLine(true);body.addView(name);Ui.gap(body,12);
-        bookmarkPanel=new PopupWindow(body,Math.min(dp(310),getResources().getDisplayMetrics().widthPixels-dp(28)),-2,true);bookmarkPanel.setBackgroundDrawable(Ui.shape(this,Color.WHITE,12,true));bookmarkPanel.setElevation(dp(8));bookmarkPanel.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        LinearLayout popup=Ui.column(this);View pointer=new View(this){@Override protected void onDraw(android.graphics.Canvas c){android.graphics.Paint p=new android.graphics.Paint(3);android.graphics.Path path=new android.graphics.Path();path.moveTo(dp(22),dp(9));path.lineTo(dp(31),0);path.lineTo(dp(40),dp(9));p.setColor(Color.WHITE);c.drawPath(path,p);p.setColor(Ui.LINE);p.setStyle(android.graphics.Paint.Style.STROKE);p.setStrokeWidth(dp(1));c.drawPath(path,p);}};popup.addView(pointer,new LinearLayout.LayoutParams(-1,dp(9)));popup.addView(body);bookmarkPanel=new PopupWindow(popup,Math.min(dp(310),getResources().getDisplayMetrics().widthPixels-dp(28)),-2,true);bookmarkPanel.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));bookmarkPanel.setElevation(dp(8));bookmarkPanel.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         Button add=button("添加",()->{String value=name.getText().toString().trim();if(value.isEmpty()){name.setError("请输入名称");return;}if(value.length()>80){name.setError("名称最多 80 个字符");return;}marks.add(page);bookmarkNames.put(page,value);save();bookmarkPanel.dismiss();Ui.notice(this,"书签已添加");});Ui.primary(add);body.addView(Ui.pair(this,add,button("取消",()->bookmarkPanel.dismiss())));bookmarkPanel.showAsDropDown(markButton,0,dp(6));
     }
     private void jumpPage(){
         if(!ready)return;if(bookmarkPanel!=null)bookmarkPanel.dismiss();
         LinearLayout body=Ui.column(this);EditText input=Ui.input(this,"请输入页码",true);body.addView(input);Ui.gap(body,12);LinearLayout items=Ui.column(this);ScrollView scrollView=new ScrollView(this);scrollView.addView(items);body.addView(scrollView,new LinearLayout.LayoutParams(-1,dp(190)));
         final AlertDialog[] targetDialog={null};
-        for(int mark:marks){Button item=button(bookmarkNames.getOrDefault(mark,"第 "+(mark+1)+" 页"),()->jumpFromDialog(targetDialog[0],mark));item.setOnLongClickListener(v->{marks.remove(mark);bookmarkNames.remove(mark);save();items.removeView(item);return true;});item.setGravity(Gravity.LEFT|Gravity.CENTER_VERTICAL);items.addView(item);Ui.gap(items,6);}if(marks.isEmpty())items.addView(Ui.text(this,"暂无书签",14));Ui.gap(body,16);
+        for(int mark:marks){Button item=button(bookmarkNames.getOrDefault(mark,"第 "+(mark+1)+" 页"),()->jumpFromDialog(targetDialog[0],mark));item.setOnLongClickListener(v->{marks.remove(mark);bookmarkNames.remove(mark);save();items.removeView(item);return true;});item.setGravity(Gravity.LEFT|Gravity.CENTER_VERTICAL);item.setBackground(Ui.shape(this,Ui.BG,6,false));items.addView(item);Ui.gap(items,6);}Ui.gap(body,16);
         AlertDialog dialog=Ui.modal(this,body,true);targetDialog[0]=dialog;Button jump=button("跳转",()->{try{int target=Integer.parseInt(input.getText().toString());if(target<1||target>chapters.length)throw new NumberFormatException();jumpFromDialog(dialog,target-1);}catch(NumberFormatException error){input.setError("请输入 1–"+chapters.length+" 的页码");}});Ui.primary(jump);body.addView(Ui.pair(this,jump,button("取消",dialog::dismiss)));dialog.show();
     }
     private void favorite(){

@@ -12,6 +12,7 @@ class DownloadList(DisplayView):
         self.app=app
         super().__init__(parent,kind='download',**kwargs)
         self.canvas.configure(bg='white')
+        self.tile_font.configure(size=12)
         self.press_job=None;self.pressed=None;self.held=False
         self.bind('<ButtonPress-1>',self.press)
         self.bind('<ButtonRelease-1>',self.release)
@@ -27,26 +28,36 @@ class DownloadList(DisplayView):
         self.paint_timer=None
         if self.mode!='tiles':return
         self._extent();self.canvas.delete('all');keys=self.get_children();chosen=set(self.selection())
-        tasks={t.key:t for t in self.app.engine.tasks};width=self.canvas.winfo_width()
+        tasks={t.key:t for t in self.app.engine.tasks};width=self.canvas.winfo_width();pictures={}
         for key in self.visible_keys():
             task=tasks.get(key)
             if not task:continue
             y=keys.index(key)*self.cell_height;data=self.item(key)
-            rounded(self.canvas,3,y+3,width-8,132,14,fill='#f0f0f3' if self.app.selecting and key in chosen else 'white',outline=LINE)
-            if data['image']:self.canvas.create_image(46,y+64,image=data['image'][0])
+            if self.app.selecting and key in chosen:rounded(self.canvas,3,y+3,width-8,132,10,fill='#f0f0f3',outline='')
+            if keys.index(key):self.canvas.create_line(4,y+1,width-8,y+1,fill=LINE)
+            if data['image']:
+                from PIL import ImageTk,Image
+                name=data['image'][0];picture=getattr(self,'row_images',{}).get(name)
+                if picture is None:
+                    source=tk.PhotoImage(master=self);self.tk.call(str(source),'copy',name);picture=ImageTk.PhotoImage(ImageTk.getimage(source).resize((80,100),Image.Resampling.LANCZOS),master=self)
+                pictures[name]=picture;self.canvas.create_image(44,y+66,image=picture)
             title=self._lines(task.title if task.title else 'JM'+task.album_id,max(40,width-172),1)
-            self.canvas.create_text(92,y+16,text=title,anchor='nw',font=('Microsoft YaHei UI',12,'bold'),fill=INK)
+            self.canvas.create_text(108,y+16,text=title,anchor='nw',font=('Microsoft YaHei UI',12,'bold'),fill=INK)
             self.canvas.create_text(width-28,y+18,text='⋯',anchor='ne',font=('Segoe UI',19),fill=MUTED)
-            status=str(data['values'][2]);progress=str(data['values'][3])
-            self.canvas.create_text(92,y+48,text=f'{status}  ·  {progress}',anchor='nw',fill=MUTED,font=self.tile_font)
-            x1,x2=92,max(110,width-54);rounded(self.canvas,x1,y+75,x2-x1,7,3,fill=LINE,outline='')
+            status=str(data['values'][2]);progress=f'{task.done}/{task.total}' if task.total else ''
+            self.canvas.create_text(108,y+48,text=f'{status}'+('  ·  '+progress if task.status!='done' and progress else ''),anchor='nw',fill=MUTED,font=self.tile_font)
+            edge=width-(44 if self.app.selecting else 12)
+            self.canvas.create_text(edge,y+48,text=f'{percent(task.done,task.total,task.status):.0f}%',anchor='ne',fill=MUTED,font=self.tile_font)
+            x1,x2=108,max(110,edge);rounded(self.canvas,x1,y+75,x2-x1,9,4,fill=LINE,outline='')
             amount=percent(task.done,task.total,task.status)/100
-            if amount:rounded(self.canvas,x1,y+75,max(1,(x2-x1)*amount),7,3,fill=ACCENT,outline='')
-            detail=size_text(task.done,task.total,task.image_bytes,task.result_bytes,task.status)
+            if amount:rounded(self.canvas,x1,y+75,max(1,(x2-x1)*amount),9,4,fill=ACCENT,outline='')
+            from download_display import format_size
+            total=task.result_bytes if task.status=='done' and task.result_bytes else round(task.image_bytes*task.total/task.done) if task.done and task.total else 0
+            detail=f'{format_size(task.result_bytes if task.status=="done" and task.result_bytes else task.image_bytes)} / {format_size(total) if total else "—"}'
             if task.status in ('running','resetting'):detail+=' · '+format_speed(task.speed)
-            self.canvas.create_text(92,y+96,text=self._lines(detail,max(40,width-150),1),anchor='nw',fill=MUTED,font=self.tile_font)
+            self.canvas.create_text(108,y+96,text=self._lines(detail,max(40,width-150),1),anchor='nw',fill=MUTED,font=self.tile_font)
             if self.app.selecting and key in chosen:self.canvas.create_text(width-23,y+73,text='✓',font=('Segoe UI',18,'bold'),fill=ACCENT)
-        if not keys:self.canvas.create_text(width/2,95,text='还没有下载任务\n点击右下角 ＋ 添加漫画',justify='center',fill=MUTED,font=('Microsoft YaHei UI',12))
+        self.row_images=pictures
 
     def cancel_press(self,event=None):
         if self.press_job:self.after_cancel(self.press_job)
@@ -86,52 +97,71 @@ class DownloadList(DisplayView):
 def build(app):
     install_styles(app.root)
     app.selecting=False;app.previous_states={};app.library_visible=False
-    app.root.minsize(760,640);app.root.geometry('1000x850')
-    outer=ttk.Frame(app.root,padding=22,style='Page.TFrame');outer.pack(fill='both',expand=True)
+    height=min(940,app.root.winfo_screenheight()-100);app.root.minsize(480,640);app.root.geometry(f'{int(height*.735)}x{height}')
+    outer=ttk.Frame(app.root,padding=12,style='Page.TFrame');outer.pack(fill='both',expand=True)
     header=ttk.Frame(outer,style='Page.TFrame');header.pack(fill='x',pady=(0,16))
     brand=ttk.Frame(header,style='Page.TFrame');brand.pack(side='left');ttk.Label(brand,text='JM Batch',font=('Segoe UI',26,'bold'),style='Page.TLabel').pack(anchor='w');ttk.Label(brand,text=f'ver {VERSION}',foreground=MUTED,style='Page.TLabel').pack(anchor='w')
-    ttk.Button(header,text='⚙ 设置',command=app.settings_dialog).pack(side='right')
+    ttk.Button(header,text='⚙ 设置',command=app.settings_dialog).pack(side='right',anchor='s')
     app.update_button=ttk.Button(header);app.cleanup_button=ttk.Button(header)
     app.output_var=tk.StringVar(value=app.engine.settings.output);app.format_var=tk.StringVar(value=app.engine.settings.format)
     app.range_start=tk.StringVar();app.range_end=tk.StringVar()
     app.pages=ttk.Frame(outer);app.pages.pack(fill='both',expand=True)
-    app.home_panel=ttk.Frame(app.pages);app.home_panel.place(x=0,y=0,relwidth=1,relheight=1)
-    preview=Panel(app.home_panel,height=160);preview.pack(fill='x',pady=(0,12));ttk.Button(preview.body,text='漫画库  ↑',command=app.show_library).pack(anchor='w');app.preview_strip=ttk.Frame(preview.body);app.preview_strip.pack(fill='both',expand=True,pady=(10,0));ttk.Label(app.preview_strip,text='下载的漫画会显示在这里',foreground=MUTED).pack(expand=True)
-    app.download_panel=Panel(app.home_panel);app.download_panel.pack(fill='both',expand=True);body=app.download_panel.body
+    app.pages.bind('<Configure>',lambda e:align_page_exchange(app))
+    app.root.bind('<Configure>',lambda e:align_page_exchange(app) if e.widget==app.root else None,add='+')
+    app.page_offset=int(height*.23)
+    app.download_panel=Panel(app.pages,connected_top=True);body=app.download_panel.body
     ttk.Label(body,text='下载页面',font=('Microsoft YaHei UI',20,'bold')).pack(anchor='w',pady=(0,12))
-    bar=ttk.Frame(body);bar.pack(fill='x')
-    app.start_button=ttk.Button(bar,text='开始全部',style='Accent.TButton',command=lambda:app.pause() if app.engine.running else app.start());app.start_button.pack(side='left')
-    ttk.Button(bar,text='清除下载记录',command=lambda:clear_history(app)).pack(side='left',padx=10)
+    bar=app.download_toolbar=ttk.Frame(body);bar.pack(fill='x')
+    app.start_button=ttk.Button(bar,text='开始全部',style='Accent.TButton',command=lambda:app.pause() if app.engine.running else app.start());app.start_button.pack(side='left',ipadx=20)
+    icon_button(bar,'trash','清除下载记录',lambda:clear_history(app)).pack(side='left',padx=10)
     app.pause_button=ttk.Button(bar);app.cancel_button=ttk.Button(bar)
-    stats=ttk.Frame(body);stats.pack(fill='x',pady=12);app.summary=tk.StringVar();app.speed_text=tk.StringVar();ttk.Label(stats,textvariable=app.summary,foreground=MUTED).pack(side='left');ttk.Label(stats,textvariable=app.speed_text,foreground=MUTED).pack(side='right')
-    holder=ttk.Frame(body);holder.pack(fill='both',expand=True)
+    app.summary=tk.StringVar();app.speed_text=tk.StringVar()
+    list_panel=Panel(body,padding=22);list_panel.configure(bg='white');list_panel.pack(fill='both',expand=True,pady=(18,12));ttk.Label(list_panel.body,text='下载列表',font=('Microsoft YaHei UI',14,'bold')).pack(anchor='w',pady=(0,12))
+    footer=ttk.Frame(list_panel.body);footer.pack(side='bottom',fill='x',pady=(8,14));ttk.Label(footer,text='点击任务停止 · 长按批量操作',foreground=MUTED,anchor='center').pack(fill='x',ipady=16)
+    holder=ttk.Frame(list_panel.body);holder.pack(fill='both',expand=True)
     columns=('id','title','status','progress','size','format','resets');app.tree=DownloadList(holder,app,columns=columns,show='tree headings',selectmode='none')
     from download_covers import DownloadCovers
     app.download_covers=DownloadCovers(app.tree,app.home)
-    scroll=ttk.Scrollbar(holder,command=app.tree.yview);scroll.pack(side='right',fill='y');app.tree.configure(yscrollcommand=scroll.set);app.tree.pack(fill='both',expand=True);app.tree.set_mode('tiles')
-    fab=tk.Canvas(app.download_panel,width=62,height=62,bg='white',highlightthickness=0,takefocus=True,cursor='hand2')
+    scroll=ttk.Scrollbar(holder,command=app.tree.yview)
+    def scrolled(first,last):
+        scroll.set(first,last)
+        if float(first)>0 or float(last)<1:scroll.pack(side='right',fill='y')
+        else:scroll.pack_forget()
+    app.tree.configure(yscrollcommand=scrolled);app.tree.pack(fill='both',expand=True);app.tree.set_mode('tiles')
+    fab=tk.Canvas(list_panel,width=62,height=62,bg='white',highlightthickness=0,takefocus=True,cursor='hand2')
     fab.create_oval(2,2,60,60,fill=ACCENT,outline=ACCENT);fab.create_text(31,30,text='＋',font=('Segoe UI',28),fill='white')
     fab.place(relx=1,rely=1,x=-26,y=-25,anchor='se');fab.bind('<Button-1>',lambda e:add_dialog(app));fab.bind('<Return>',lambda e:add_dialog(app));fab.bind('<space>',lambda e:add_dialog(app))
-    app.task_sheet=ttk.Frame(app.download_panel,padding=24,style='Card.TFrame');app.selection_count=tk.StringVar();ttk.Label(app.task_sheet,textvariable=app.selection_count,anchor='center',font=('Microsoft YaHei UI',12,'bold')).pack(fill='x')
-    actions(app.task_sheet,'删除任务','返回',lambda:remove_selected(app),lambda:exit_selection(app))
+    app.task_sheet=Panel(app.download_panel,padding=20,height=160);app.selection_count=tk.StringVar();ttk.Label(app.task_sheet.body,textvariable=app.selection_count,anchor='center',font=('Microsoft YaHei UI',12,'bold')).pack(fill='x')
+    actions(app.task_sheet.body,'删除任务','返回',lambda:remove_selected(app),lambda:exit_selection(app))
     # Keep existing diagnostic widgets as a model, accessed from the task menu.
     hidden=ttk.Frame(app.root);app.input=tk.Text(hidden);app.details=app._text_panel(hidden,4);app.logs=app._text_panel(hidden,4);app.progress_text=tk.StringVar();app.progressbar=ttk.Progressbar(hidden)
-    app.root.bind('<Escape>',lambda e:hide_library(app) if app.library_visible else exit_selection(app))
-    refresh_preview(app)
+    app.root.bind('<Escape>',lambda e:'break' if getattr(app,'page_exchange',None) is not None else hide_library(app) if app.library_visible else exit_selection(app))
+    from library_ui import LibraryWindow
+    app.library_window=LibraryWindow(app,app.pages)
+    app.page_exchange=None;app.page_animation=None
+    app.seam_canvas=tk.Canvas(app.pages,highlightthickness=0,bg='white',cursor='hand2')
+    app.seam_canvas.bind('<ButtonRelease-1>',lambda e:show_library(app) if not app.library_visible else hide_library(app,back=False))
+    bind_page_switch(app,app.download_panel,False)
+    bind_page_switch(app,app.library_window.window,True)
+    app.root.after_idle(lambda:layout_live_pages(app))
+
 
 
 def add_dialog(app):
     window,body=modal(app.root,width=540)
-    entry=tk.Text(body,height=3,wrap='word',bg=BG,fg=INK,relief='solid',bd=1,padx=12,pady=12,font=('Microsoft YaHei UI',11));entry.pack(fill='x');placeholder(entry,'请输入数字编号，多个编号请用空格隔开')
-    row=ttk.Frame(body);row.pack(fill='x',pady=(18,0))
+    entry=Input(body,multiline=True,height=96);entry.pack(fill='x',pady=(10,8));placeholder(entry,'请输入数字编号，多个编号请用空格隔开')
+    row=ttk.Frame(body);row.pack(fill='x',pady=(18,18))
     for label,value in [('pdf','pdf'),('zip','zip'),('文件夹','images')]:ttk.Radiobutton(row,text=label,value=value,variable=app.format_var).pack(side='left',expand=True)
     def accept():
         if app._add(entry.get('1.0','end')):window.destroy();app.engine.running=True;app.engine.tick();app.render()
-    actions(body,'添加','返回',accept,window.destroy)
+    buttons=actions(body,'添加','返回',accept,window.destroy)
+    for button in buttons.winfo_children():button.configure(width=12);button.grid_configure(sticky='')
 
 
 def show_selection(app):
-    app.selection_count.set(f'已选中{len(app.tree.selection())}项');app.task_sheet.place(x=2,relwidth=1,width=-4,rely=1,anchor='sw',y=-2);app.task_sheet.lift();app.tree._schedule()
+    app.selection_count.set(f'已选中{len(app.tree.selection())}项')
+    if not app.task_sheet.winfo_ismapped():slide_sheet(app.task_sheet)
+    app.tree._schedule()
 
 
 def exit_selection(app):
@@ -160,7 +190,7 @@ def task_menu(app,key,x,y):
 
 
 def refresh(app):
-    app.start_button.configure(state='normal',text='暂停全部' if app.engine.running else '开始全部')
+    app.start_button.configure(state='normal',text='Ⅱ  暂停全部' if app.engine.running else '▶  开始全部')
     for task in app.engine.tasks:
         old=app.previous_states.get(task.key);app.previous_states[task.key]=task.status
         if old and old!='done' and task.status=='done':notice(app.root,'下载完成');refresh_preview(app)
@@ -169,47 +199,147 @@ def refresh(app):
 
 
 def refresh_preview(app):
-    import threading,queue
-    results=queue.Queue()
-    def load():
-        from cover_cache import CoverCache
-        cache=CoverCache(app.home);images=[]
-        try:
-            for key,item in app.engine.library.select('',False)[:5]:images.append(cache.load(item['path'],item['format']))
-        except Exception:pass
-        results.put(images)
-    threading.Thread(target=load,daemon=True).start()
-    def poll():
-        try:images=results.get_nowait()
-        except queue.Empty:app.root.after(80,poll);return
-        if not images:return
-        from PIL import ImageTk
-        from covers import fit_cover
-        for child in app.preview_strip.winfo_children():child.destroy()
-        app.preview_images=[]
-        for image in images:
-            if image is None:continue
-            photo=ImageTk.PhotoImage(fit_cover(image,(100,90)),master=app.root);app.preview_images.append(photo);label=ttk.Label(app.preview_strip,image=photo);label.pack(side='left',padx=7);label.bind('<Button-1>',lambda e:app.show_library())
-    app.root.after(80,poll)
+    # Refresh data without replacing either persistent page or its viewport.
+    view=getattr(app,'library_window',None)
+    if view is not None:view.refresh()
+    if getattr(app,'page_exchange',None) is None:app.root.after_idle(lambda:paint_live_seam(app))
 
 
-def show_library(app):
-    from library_ui import LibraryWindow
-    app.library_visible=True;app.home_panel.place_forget()
-    existing=getattr(app,'library_window',None)
-    if existing and existing.window.winfo_exists():existing.window.place(x=0,y=0,relwidth=1,relheight=1);existing.refresh()
-    else:app.library_window=LibraryWindow(app,app.pages)
-    panel=app.library_window.window
-    def frame(step=0):
-        if not app.library_visible:return
-        panel.place(x=0,y=int(100*(1-step/12)**3),relwidth=1,relheight=1)
-        if step<12:app.root.after(16,lambda:frame(step+1))
+def native_page_alpha(widget,alpha):
+    """Apply opacity to the actual Windows child window and all of its controls."""
+    import ctypes
+    from ctypes import wintypes
+    alpha=round(max(0,min(1,alpha))*255)
+    if getattr(widget,'_page_alpha',255)==alpha:return
+    user=ctypes.WinDLL('user32',use_last_error=True)
+    user.GetWindowLongW.argtypes=[wintypes.HWND,ctypes.c_int];user.GetWindowLongW.restype=ctypes.c_long
+    user.SetWindowLongW.argtypes=[wintypes.HWND,ctypes.c_int,ctypes.c_long];user.SetWindowLongW.restype=ctypes.c_long
+    user.SetLayeredWindowAttributes.argtypes=[wintypes.HWND,wintypes.COLORREF,wintypes.BYTE,wintypes.DWORD]
+    hwnd=widget.winfo_id()
+    if not hasattr(widget,'_page_style'):widget._page_style=user.GetWindowLongW(hwnd,-20)
+    user.SetWindowLongW(hwnd,-20,widget._page_style|0x80000)
+    if not user.SetLayeredWindowAttributes(hwnd,0,alpha,2):raise ctypes.WinError(ctypes.get_last_error())
+    if alpha==255:user.SetWindowLongW(hwnd,-20,widget._page_style)
+    widget._page_alpha=alpha
+
+
+def layout_live_pages(app):
+    if not hasattr(app,'library_window'):return
+    width,height=app.pages.winfo_width(),app.pages.winfo_height()
+    if width<2 or height<2:return
+    app.page_offset=min(app.page_offset,height//2)
+    app.page_size=(width,height)
+    for page,surface in ((app.download_panel,app.download_panel),(app.library_window.window,app.library_window.surface)):
+        page.place(x=0,width=width,height=height+28,relwidth=0,relheight=0)
+        surface.content_height=height-app.page_offset
+        surface.itemconfigure(surface.item,height=max(1,surface.content_height-2*surface.padding))
+    app.library_window.page_content_height=height-app.page_offset
+    # Clip the persistent child pages at the common viewport, including its lower corners.
+    import ctypes
+    from ctypes import wintypes
+    gdi=ctypes.windll.gdi32;user=ctypes.windll.user32
+    gdi.CreateRoundRectRgn.restype=ctypes.c_void_p;gdi.DeleteObject.argtypes=[ctypes.c_void_p]
+    user.SetWindowRgn.argtypes=[wintypes.HWND,ctypes.c_void_p,wintypes.BOOL]
+    region=gdi.CreateRoundRectRgn(0,0,width+1,height+1,36,36)
+    if not user.SetWindowRgn(app.pages.winfo_id(),region,True):gdi.DeleteObject(region)
+    settle_live_pages(app)
+
+
+def settle_live_pages(app):
+    front=app.library_window.window if app.library_visible else app.download_panel
+    rear=app.download_panel if app.library_visible else app.library_window.window
+    for page,y in ((rear,0),(front,app.page_offset)):
+        native_page_alpha(page,1);page.place_configure(y=y)
+    front.lift();app.root.after_idle(lambda:paint_live_seam(app))
+
+
+def paint_live_seam(app):
+    # Only the stationary 54 px seam uses a filtered sample. Page motion is native.
+    if not hasattr(app,'seam_canvas') or getattr(app,'page_exchange',None) is not None:return
+    from PIL import Image,ImageGrab,ImageFilter,ImageTk,ImageDraw
+    width,height=app.pages.winfo_width(),app.pages.winfo_height()
+    if width<30 or height<60:return
+    rear=app.download_panel if app.library_visible else app.library_window.window
+    band=min(54,app.page_offset);top=app.page_offset-band
+    app.seam_canvas.place_forget();app.root.update_idletasks()
+    if getattr(app,'page_exchange',None) is not None:return
+    picture=ImageGrab.grab(window=rear.winfo_id()).crop((14,top,width-14,app.page_offset)).convert('RGB')
+    mask=Image.new('L',picture.size);draw=ImageDraw.Draw(mask)
+    for y in range(band):draw.line((0,y,picture.width,y),fill=round(255*y/max(1,band-1)))
+    softened=Image.composite(picture.filter(ImageFilter.GaussianBlur(1.8)),picture,mask)
+    fade=mask.point(lambda value:max(0,value*2-255));picture=Image.composite(Image.new('RGB',picture.size,'white'),softened,fade)
+    app.seam_image=ImageTk.PhotoImage(picture,master=app.root);app.seam_canvas.delete('all');app.seam_canvas.create_image(0,0,image=app.seam_image,anchor='nw')
+    app.seam_canvas.place(x=14,y=top,width=width-28,height=band);tk.Misc.lift(app.seam_canvas)
+
+
+def show_library(app,animate=True):set_front_page(app,True,animate)
+
+
+def hide_library(app,back=True,animate=True):
+    if getattr(app,'page_exchange',None) is not None:return
+    if back and getattr(app,'page_exchange',None) is None and app.library_window.back():return
+    set_front_page(app,False,animate)
+
+
+def set_front_page(app,library,animate=True):
+    if getattr(app,'page_exchange',None) is not None:return
+    if app.library_visible==library:return
+    source=app.library_visible;app.library_visible=library
+    if not animate:settle_live_pages(app);return
+    import time
+    from types import SimpleNamespace
+    outgoing=app.library_window.window if source else app.download_panel
+    incoming=app.download_panel if source else app.library_window.window
+    app.seam_canvas.place_forget()
+    app.root.focus_set()
+    state=app.page_exchange=SimpleNamespace(source_library=source,outgoing=outgoing,incoming=incoming,progress=0.,direction=1,last_frame=time.monotonic(),incoming_on_top=False)
+    def ease(t):return t*t*(3-2*t)
+    def frame():
+        if app.page_exchange is not state:return
+        now=time.monotonic();state.progress=max(0,min(1,state.progress+state.direction*(now-state.last_frame)/0.99));state.last_frame=now
+        top=state.progress>=1/3
+        if top!=state.incoming_on_top:
+            state.incoming_on_top=top;(incoming if top else outgoing).lift()
+        if not top:
+            t=ease(state.progress/(1/3));incoming.place_configure(y=round(-28*t));native_page_alpha(incoming,1);outgoing.place_configure(y=app.page_offset);native_page_alpha(outgoing,1-t)
+        else:
+            t=ease((state.progress-1/3)/(2/3));incoming.place_configure(y=round(-28+(app.page_offset+28)*t));native_page_alpha(incoming,1);outgoing.place_configure(y=round(app.page_offset*(1-t)));native_page_alpha(outgoing,t)
+        if state.direction>0 and state.progress>=1 or state.direction<0 and state.progress<=0:finish_page_exchange(app)
+        else:app.page_animation=app.root.after(16,frame)
     frame()
 
 
-def hide_library(app):
-    existing=getattr(app,'library_window',None)
-    if existing and existing.back():return
-    app.library_visible=False
-    if existing:existing.window.place_forget()
-    app.home_panel.place(x=0,y=0,relwidth=1,relheight=1);refresh_preview(app)
+def finish_page_exchange(app):
+    job=getattr(app,'page_animation',None)
+    if job:app.root.after_cancel(job)
+    app.page_animation=None;state=getattr(app,'page_exchange',None);app.page_exchange=None
+    if state is not None:app.library_visible=state.source_library if state.direction<0 else not state.source_library
+    if hasattr(app,'library_window'):settle_live_pages(app)
+
+
+def align_page_exchange(app):
+    if not hasattr(app,'library_window'):return
+    size=(app.pages.winfo_width(),app.pages.winfo_height())
+    if size!=getattr(app,'page_size',None):
+        finish_page_exchange(app);layout_live_pages(app)
+
+
+def bind_page_switch(app,panel,to_library):
+    tag=f'PageSwitch:{panel}';pressed=None
+    def handle(event):
+        nonlocal pressed
+        moving=getattr(app,'page_exchange',None) is not None
+        if moving:pressed=None;return 'break'
+        if not moving and app.library_visible==to_library:return
+        if event.type==tk.EventType.ButtonPress:pressed=(event.x_root,event.y_root)
+        elif event.type==tk.EventType.Motion:
+            if pressed and abs(event.x_root-pressed[0])+abs(event.y_root-pressed[1])>12:pressed=None
+        elif event.type==tk.EventType.ButtonRelease:
+            clicked=pressed is not None;pressed=None
+            if clicked:set_front_page(app,to_library)
+        return 'break'
+    for event in ('<ButtonPress>','<Double-ButtonPress-1>','<ButtonRelease>','<Motion>','<MouseWheel>','<KeyPress>','<KeyRelease>'):app.root.bind_class(tag,event,handle)
+    def bind(widget):
+        widget.bindtags((tag,)+widget.bindtags())
+        for child in widget.winfo_children():bind(child)
+    bind(panel)

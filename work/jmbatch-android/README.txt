@@ -1,20 +1,22 @@
-JM Batch 0.6.15 — Android 使用说明
+JM Batch 0.6.16 — Android 使用说明
 
-1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
+本版双页交互：下载页与漫画库同时加载，点击后方露出的页面切换。淡化 0.33 秒、下滑 0.66 秒，切换期间锁定两页操作，结束后恢复。
+
+1. 在设置中选择保存目录，点击主页面右下角“＋”，输入编号或区间并选择 PDF、ZIP 或文件夹格式；点击“添加”后新任务自动开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
 3. 调高任务数自动补位；调低时等待已运行任务结束。取消会删除该任务文件和记录，不影响其他任务；暂停会停止全部下载并保留缓存。
 4. ZIP 只含图片，图片文件夹另含相册隐藏标记 .nomedia：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。导出和文件删除前请暂停下载并等待请求退出。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
-安装包下载（2026-10-22）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.6.15-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.6.15-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.6.15-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/SHA256-release-0.3.32-0.6.15.txt
+安装包下载（2026-10-23）
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.33-0.6.16/JMBatch-0.6.16-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.33-0.6.16/JMBatch-0.6.16-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.33-0.6.16/JMBatch-0.6.16-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.33-0.6.16/SHA256-release-0.3.33-0.6.16.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
-6. 漫画库 / 收藏列表默认显示第一页封面，多章节取第一章第一页。无法读取时显示占位图；恢复文件或授权后点击刷新。
+6. 漫画库 / 收藏列表默认显示第一页封面，多章节取第一章第一页。无法读取时显示占位图；恢复文件或授权后重新进入应用刷新。
 
 7. 在任务列表或漫画库中打开漫画，即可使用内置阅读器。支持章节切换、本章/总页码、跳页、快捷收藏、书签列表及跳转；再次打开恢复上次页码和模式。滚动阅读与左右翻页可随时切换，轻点漫画隐藏或恢复工具栏，并有平滑过渡。Windows 使用滚轮、方向键或左右拖动，Android 使用上下滚动或左右滑动。Windows 按 Esc、Android 隐藏时按返回也可恢复工具栏。PDF 按一个章节显示。阅读记录绑定原文件路径/地址；移动文件或清除应用数据后不自动迁移。Android 外部 ZIP 首次打开需准备临时缓存，返回可取消，关闭后清理。
 
@@ -22,7 +24,7 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-
 
 9. 下载列表会在首章第一页成功下载后自动显示封面，无需等待整本完成；暂停、继续和重启后可从缓存恢复。尚未就绪或无法读取时显示占位，完成后优先使用已保存的小尺寸封面，缺失时从 PDF、ZIP 或文件夹成品读取并缓存。
 
-10. 点击主界面“软件更新”立即联网检查，更新窗口与完整更新日志也可手动检查。关闭启动自动检查后仍可使用。检查采用已保存仓库；修改后先保存。检查失败保留本地更新日志，可再次点击重试。下载和安装更新需要手动确认。
+10. 在设置的软件更新区域手动检查新版本和查看更新日志。关闭启动自动检查后仍可使用；设置的有效修改自动保存。检查失败保留本地更新日志，可再次点击重试。下载和安装更新需要手动确认。
 
 章节选择说明
 

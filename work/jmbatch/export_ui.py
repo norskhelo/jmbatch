@@ -14,10 +14,10 @@ def show_export(library_window, keys):
     all_pdf = all(item['format'] == 'pdf' for item in items)
     from ui_common import modal, actions
     dialog, panel = modal(owner.window)
-    ttk.Label(panel, text="导出为", anchor="center", font=("Microsoft YaHei UI", 16, "bold")).pack(fill="x", pady=(0, 20))
+    ttk.Label(panel, text="导出为", anchor="center", font=("Microsoft YaHei UI", 16, "bold")).pack(fill="x", pady=(8, 32))
     fmt, destination = tk.StringVar(value="zip" if all_pdf else "pdf"), tk.StringVar(value=items[0]['root'])
     numeric, split = tk.BooleanVar(), tk.BooleanVar()
-    formats = ttk.Frame(panel); formats.pack(fill="x")
+    formats = ttk.Frame(panel); formats.pack(fill="x",pady=(4,16))
     for label, value in (("pdf", "pdf"), ("zip", "zip")):
         ttk.Radiobutton(formats, text=label, value=value, variable=fmt).pack(side="left", expand=True)
     def start():

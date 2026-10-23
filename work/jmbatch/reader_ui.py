@@ -17,8 +17,8 @@ class ReaderWindow:
         entry = self.library.entries[key]
         self.window = tk.Toplevel(app.root)
         self.window.title("阅读 · " + entry["title"])
-        self.window.geometry("1000x820")
-        self.window.minsize(740, 520)
+        self.window.geometry(f"620x{min(900,self.window.winfo_screenheight()-100)}")
+        self.window.minsize(440, 540)
         self.window.protocol("WM_DELETE_WINDOW", self.close)
         self.closed = False
         self.pages, self.chapters, self.starts = [], [], []
@@ -51,7 +51,7 @@ class ReaderWindow:
         controls(self, top_content, bottom_content, entry['title'])
         holder = ttk.Frame(outer)
         holder.pack(fill="both", expand=True)
-        self.canvas = tk.Canvas(holder, bg="#20252c", highlightthickness=0, yscrollincrement=1)
+        self.canvas = tk.Canvas(holder, bg="white", highlightthickness=0, yscrollincrement=1)
         self.scrollbar = ttk.Scrollbar(holder, orient="vertical", command=self.scroll)
         self.canvas.pack(fill="both", expand=True)
         self.scrollbar.place(relx=1, x=0, y=0, anchor='ne', relheight=1)
@@ -70,7 +70,7 @@ class ReaderWindow:
         for sequence, delta in (("<Left>", -1), ("<Right>", 1), ("<Prior>", -1), ("<Next>", 1)):
             self.window.bind(sequence, lambda e, d=delta: self.key_page(e, d))
         self.status = tk.StringVar(value="正在读取漫画…")
-        ttk.Label(bottom_content, textvariable=self.status).pack(anchor="w")
+        ttk.Label(bottom_content, textvariable=self.status)
 
         self.chrome = ReaderChrome(outer, self.top, self.bottom, (top_content, bottom_content), holder, self.chrome_changed)
         self.viewport_size = (0, 0)
