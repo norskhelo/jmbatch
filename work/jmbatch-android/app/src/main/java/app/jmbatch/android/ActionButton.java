@@ -16,5 +16,7 @@ public final class ActionButton extends Button {
         setSingleLine(false);setMaxLines(Integer.MAX_VALUE);setEllipsize(null);
         setHorizontallyScrolling(false);setAllCaps(false);setIncludeFontPadding(true);
         setGravity(Gravity.CENTER);setPadding(padding,padding,padding,padding);
+        setTextColor(Ui.INK);setTextSize(14);setBackgroundTintList(null);
+        setBackground(new android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x18777777),Ui.shape(context,0xfffafafb,9,true),null));
     }
 }

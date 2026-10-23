@@ -7,7 +7,8 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public final class DownloadService extends Service {
-    public static final String START="start", SELECTED="selected", PAUSE="pause", CANCEL="cancel";
+    public static final String START="start", SELECTED="selected", PAUSE="pause", PAUSE_ONE="pause_one", CANCEL="cancel";
+    private final DownloadRate rate=new DownloadRate(()->Store.get(this).settings.downloadLimitKB);
     private static final String CHANNEL="downloads";
     private Store store;
     private final DownloadPool<String,DownloadJob> pool=new DownloadPool<>();
@@ -39,6 +40,7 @@ public final class DownloadService extends Service {
 
     public int onStartCommand(Intent intent,int flags,int startId){
         String action=intent==null?PAUSE:intent.getAction();
+        if(PAUSE_ONE.equals(action)){String key=intent.getStringExtra("key");DownloadJob job=pool.get(key);if(job!=null)job.cancel("PAUSE");return START_NOT_STICKY;}
         if(PAUSE.equals(action)){
             accepting=false;pool.cancelAll("PAUSE");
             try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}
@@ -140,6 +142,7 @@ public final class DownloadService extends Service {
         private synchronized JmApi.Control attempt(){
             if(!stop.isEmpty())return null;
             control=new JmApi.Control();control.routeMessage=message->task.phase=message;
+            final JmApi.Control current=control;control.rateLimit=bytes->rate.acquire(bytes,current);
             return control;
         }
         private void stopped(){task.status=task.discardRequested?"cancelling":"paused";task.phase=task.discardRequested?"正在取消并删除任务文件…":"已暂停，缓存保留";}

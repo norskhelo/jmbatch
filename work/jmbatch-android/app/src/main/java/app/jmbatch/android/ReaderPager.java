@@ -22,7 +22,9 @@ public final class ReaderPager extends FrameLayout {
     private int page=-1,target,direction=1,pointer=-1;
     private int first=0,end;
     private float downX,downY,offset;
-    private boolean dragging,vertical,closed;
+    private boolean dragging,vertical,closed,verticalPaging;
+    public void setVerticalPaging(boolean value){verticalPaging=value;}
+    private int extent(){return verticalPaging?getHeight():getWidth();}
 
     public ReaderPager(Context context,int total,int initial,Listener listener){
         super(context);this.total=total;end=total;target=initial;this.listener=listener;
@@ -59,15 +61,15 @@ public final class ReaderPager extends FrameLayout {
             settle(target>page?1:-1,true);
         }
     }
-    private void place(float x,int dir){offset=x;front.setTranslationX(x);back.setTranslationX(x+dir*getWidth());}
+    private void place(float x,int dir){offset=x;if(verticalPaging){front.setTranslationY(x);back.setTranslationY(x+dir*extent());front.setTranslationX(0);back.setTranslationX(0);}else{front.setTranslationX(x);back.setTranslationX(x+dir*extent());front.setTranslationY(0);back.setTranslationY(0);}}
     private void cancelAnimation(){
         if(animator!=null){ValueAnimator old=animator;animator=null;old.removeAllListeners();old.cancel();}
         incoming=null;back.setImageDrawable(null);back.setVisibility(INVISIBLE);place(0,0);
     }
     private void settle(int dir,boolean commit){
         final int destination=target;
-        float end=commit?-dir*getWidth():0;
-        long duration=Math.max(60,Math.round(200*Math.abs(end-offset)/Math.max(1,getWidth())));
+        float end=commit?-dir*extent():0;
+        long duration=Math.max(60,Math.round(200*Math.abs(end-offset)/Math.max(1,extent())));
         ValueAnimator running=ValueAnimator.ofFloat(offset,end);animator=running;
         running.setDuration(ValueAnimator.areAnimatorsEnabled()?duration:0);
         running.setInterpolator(new android.view.animation.DecelerateInterpolator());
@@ -100,7 +102,7 @@ public final class ReaderPager extends FrameLayout {
             releaseTouch();if(moved)settle(direction,false);else ready();listener.requested();return true;
         }
         int index=event.findPointerIndex(pointer);if(index<0){releaseTouch();cancelAnimation();return true;}
-        float dx=event.getX(index)-downX,dy=event.getY(index)-downY;
+        float dx=verticalPaging?event.getY(index)-downY:event.getX(index)-downX,dy=verticalPaging?event.getX(index)-downX:event.getY(index)-downY;
         if(action==MotionEvent.ACTION_MOVE){
             if(!dragging&&!vertical&&Math.max(Math.abs(dx),Math.abs(dy))>slop){
                 dragging=Math.abs(dx)>Math.abs(dy);vertical=!dragging;
@@ -109,16 +111,16 @@ public final class ReaderPager extends FrameLayout {
             if(dragging){
                 direction=dx<0?1:-1;int neighbor=page+direction;incoming=neighbor>=first&&neighbor<end?listener.lookup(neighbor):null;
                 back.setImageBitmap(incoming);back.setVisibility(incoming==null?INVISIBLE:VISIBLE);
-                float x=incoming==null?Math.max(-getWidth()*.12f,Math.min(getWidth()*.12f,dx*.22f)):Math.max(-getWidth(),Math.min(getWidth(),dx));
+                float x=incoming==null?Math.max(-extent()*.12f,Math.min(extent()*.12f,dx*.22f)):Math.max(-extent(),Math.min(extent(),dx));
                 place(x,direction);
             }
             return true;
         }
         if(action==MotionEvent.ACTION_UP){
             if(dragging){
-                velocity.computeCurrentVelocity(1000);float speed=velocity.getXVelocity(pointer);
+                velocity.computeCurrentVelocity(1000);float speed=verticalPaging?velocity.getYVelocity(pointer):velocity.getXVelocity(pointer);
                 int dir=dx<0?1:-1;
-                boolean commit=Math.abs(dx)>getWidth()*.22f||(Math.abs(dx)>slop*2&&Math.abs(speed)>minVelocity&&speed*dx>0);
+                boolean commit=Math.abs(dx)>extent()*.22f||(Math.abs(dx)>slop*2&&Math.abs(speed)>minVelocity&&speed*dx>0);
                 target=commit?clamp(page+dir):page;direction=dir;
                 releaseTouch();settle(dir,commit&&target!=page&&incoming!=null);listener.requested();
             }else{

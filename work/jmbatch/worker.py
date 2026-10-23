@@ -51,7 +51,19 @@ def run_download(task: dict, cookie: str, emit, client_factory=None):
 
     import jmcomic
     from network_routes import HttpFailure, make_strategy
-    route_strategy = make_strategy(lambda message: emit({"type": "route", "message": message}))
+    rate = None
+    if task.get('_rate_path'):
+        from download_rate import DownloadRate
+        heartbeat_lock = threading.Lock()
+        last_heartbeat = [0.0]
+        def heartbeat():
+            with heartbeat_lock:
+                now = time.monotonic()
+                if now - last_heartbeat[0] >= .5:
+                    last_heartbeat[0] = now
+                    emit({'type': 'throttled'})
+        rate = DownloadRate(task['_rate_path'], task['_rate_limit'], heartbeat)
+    route_strategy = make_strategy(lambda message: emit({"type": "route", "message": message}), rate)
 
     settings = Settings(**task["settings"]).validate()
     output = Path(settings.output)

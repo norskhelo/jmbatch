@@ -29,6 +29,7 @@ int top;int getTop(){return top;}void requestFocus(){}void clearFocus(){}Object 
 void setVisibility(int v){visibility=v;}void setEnabled(boolean v){enabled=v;}boolean isEnabled(){return enabled;}}
 static class TextView extends View {String text="";void setText(String s){text=s;}}
 static class Button extends TextView {}
+static class Ui {static void sheet(View view){view.setVisibility(View.VISIBLE);}}
 static class RadioGroup {View child=new View();int getChildCount(){return 2;}View getChildAt(int i){return child;}}
 static class EditText extends TextView {String getText(){return text;}}
 static class CheckBox extends View {boolean checked;boolean isChecked(){return checked;}}
@@ -51,14 +52,14 @@ static class Adapter {int changes;void notifyDataSetChanged(){changes++;}}
 static class Dialog {boolean dismissed;void dismiss(){dismissed=true;}}
 static class LibraryStore {static class Entry {String uri;Entry(String s){uri=s;}boolean isCollection(){return uri.startsWith("collection:");}}}
 static class ReaderActivity {static List<String> opened=new ArrayList<>();static void open(Object a,LibraryStore.Entry e){opened.add(e.uri);}}
-Activity activity=new Activity();boolean busy,loading,batchMode,returningFromReader;String report="",collection="",managed="";Bundle pendingViewState;
+Activity activity=new Activity();boolean busy,loading,batchMode,returningFromReader,moving;String report="",collection="",managed="";Bundle pendingViewState;
 void navigate(String key){collection=key;setBatchMode(false);}void manageCollection(String key){managed=key;}
 EditText query=new EditText();CheckBox favorites=new CheckBox();int loads;
 boolean visible(){return !dialog.dismissed;}void load(){loads++;pendingViewState=viewportState();}
 Set<String> selected=new HashSet<>();List<LibraryStore.Entry> entries=new ArrayList<>();
 ListView list=new ListView();Dialog dialog=new Dialog();Adapter adapter=new Adapter();
 RadioGroup displaySelector=new RadioGroup();Button modeButton=new Button(),backButton=new Button();TextView hint=new TextView(),status=new TextView();
-View selectionControls=new View(),batchActions=new View();
+View selectionControls=new View(),batchActions=new View(),moveBar=new View(),sheet=new View();TextView selectionTitle=new TextView();
 List<Button> singleButtons=Arrays.asList(new Button()),batchButtons=Arrays.asList(new Button());
 '''+methods+'''
 static int checks;static void check(boolean ok,String why){checks++;if(!ok)throw new AssertionError(why);}
@@ -76,7 +77,7 @@ ReaderActivity.opened.clear();f=new LibraryInteractionTest();
 check(f.itemLongClick(1),"long click consumed by list (no click on release)");
 check(f.batchMode&&f.list.mode==2&&f.selected.equals(new HashSet<>(Arrays.asList("b"))),"long click enters and selects held book");
 check(f.list.checked.equals(new HashSet<>(Arrays.asList(1))),"held row visibly checked");
-check(f.batchActions.visibility==0&&f.selectionControls.visibility==0&&f.modeButton.text.equals("完成"),"batch tools visible");
+check(f.batchActions.visibility==0&&f.sheet.visibility==0&&f.selectionTitle.text.equals("已选中1项"),"selection sheet and count visible");
 check(f.singleButtons.get(0).enabled&&f.batchButtons.get(0).enabled,"single and batch actions enabled");
 check(ReaderActivity.opened.isEmpty(),"hold never reads");
 f.tap(0);check(f.selected.size()==2&&f.list.checked.size()==2,"tap toggles selection once after native toggle");
@@ -137,8 +138,8 @@ subprocess.run([str(jdk/'javac.exe'),'-encoding','UTF-8','-d',str(out),str(progr
 subprocess.run([str(jdk/'java.exe'),'-cp',str(out),'LibraryInteractionTest'],check=True)
 assert 'setOnItemClickListener((p,v,position,id)->itemClick(position))' in source
 assert 'setOnItemLongClickListener((p,v,position,id)->itemLongClick(position))' in source
-assert 'KeyEvent.KEYCODE_BACK&&!busy&&!loading&&(batchMode||!collection.isEmpty())' in source
-assert 'if(batchMode)setBatchMode(false);else navigate("")' in source
+assert 'if(moving){cancelMove();return true;}if(batchMode){setBatchMode(false);return true;}' in method('back')
+assert 'if(!collection.isEmpty()){navigate("");return true;}' in method('back')
 assert 'if(!filter.equals(nextFilter)){selected.clear();filter=nextFilter;pendingViewState=new Bundle();}' in source
 assert 'resetCovers();acceptEntries(result);' in source
 assert 'row.bindChoice(batchMode&&!entry.isCollection(),selected.contains(entry.uri))' in source

@@ -56,6 +56,11 @@ public final class ReaderActivity extends Activity {
     private TextView status;
     private final Runnable loadingNotice=()->{if(!closed&&pager!=null&&pager.target()!=pager.displayed()&&cache.get(job(pager.target()).key)==null&&!errors.containsKey(pager.target()))status.setText(statusText()+"\n正在加载第 "+(pager.target()+1)+" 页…");};
     private Button chapterButton,favoriteButton,modeButton,markButton;
+    private LinearLayout pageNavigation;
+    private PopupWindow bookmarkPanel;
+    private final Map<Integer,String> bookmarkNames=new HashMap<>();
+    private boolean verticalPages;
+
     private BaseAdapter adapter;
     private SharedPreferences history;
     private final Runnable savePosition=()->save();
@@ -70,18 +75,15 @@ public final class ReaderActivity extends Activity {
         try{entry=new LibraryStore.Entry(new JSONObject(getIntent().getStringExtra("entry")));}catch(Exception error){finish();return;}
         history=getSharedPreferences("reader-history",MODE_PRIVATE);
         splitChapters=Store.get(this).settings.chapterViewMode==2;
-        LinearLayout controls=new LinearLayout(this);controls.setOrientation(LinearLayout.VERTICAL);
-        controls.setPadding(dp(6),dp(4),dp(6),dp(4));
-        TextView title=new TextView(this);title.setText(entry.title);title.setTextSize(18);title.setSingleLine(true);title.setEllipsize(android.text.TextUtils.TruncateAt.END);controls.addView(title);
-        chapterButton=button("章节",this::chooseChapter);favoriteButton=button("☆ 收藏",this::favorite);modeButton=button("滚动阅读",this::toggleMode);
-        row(controls,button("返回",this::finish),chapterButton,favoriteButton,modeButton);
-        markButton=button("添加书签",this::toggleMark);row(controls,button("上一章",()->chapterStep(-1)),button("下一章",()->chapterStep(1)),markButton,button("书签列表",this::bookmarks));
-        viewport=new ReaderViewport(this);viewport.setBackgroundColor(Color.rgb(32,37,44));
-        viewport.setOnClickListener(v->{if(ready&&!closed){chrome.toggle();updateChromeDescription();}});
-        LinearLayout navigation=new LinearLayout(this);navigation.setOrientation(LinearLayout.VERTICAL);
-        navigation.setPadding(dp(6),dp(4),dp(6),dp(4));
-        status=new TextView(this);status.setText(entry.format.equals("images")?"正在读取页面索引…\n将优先打开上次阅读页及后续页面。":"正在读取漫画…\n外部 ZIP 需要准备本地副本，点击返回可取消。");status.setTextSize(12);status.setLines(3);status.setEllipsize(android.text.TextUtils.TruncateAt.END);status.setGravity(Gravity.CENTER);navigation.addView(status);
-        row(navigation,button("‹ 上一页",()->step(-1)),button("跳转页码",this::jumpPage),button("下一页 ›",()->step(1)));
+        getWindow().setStatusBarColor(Ui.BG);getWindow().setNavigationBarColor(Ui.BG);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        LinearLayout controls=Ui.column(this);controls.setBackgroundColor(android.graphics.Color.WHITE);controls.setPadding(dp(12),dp(8),dp(12),dp(10));
+        TextView title=Ui.text(this,entry.title,18);title.setTypeface(null,Typeface.BOLD);title.setSingleLine(true);title.setGravity(Gravity.CENTER);title.setEllipsize(android.text.TextUtils.TruncateAt.END);controls.addView(title);Ui.gap(controls,12);
+        chapterButton=button("章节列表",this::chooseChapter);favoriteButton=button("收藏",this::favorite);modeButton=button("滚动阅读",this::toggleMode);row(controls,chapterButton,favoriteButton);
+        markButton=button("书签",this::showBookmarkInput);Ui.gap(controls,8);row(controls,markButton,button("跳转",this::jumpPage));
+        viewport=new ReaderViewport(this);viewport.setBackgroundColor(Ui.BG);viewport.setOnClickListener(v->{if(ready&&!closed){chrome.toggle();updateChromeDescription();}});
+        LinearLayout navigation=Ui.column(this);navigation.setBackgroundColor(Color.WHITE);navigation.setPadding(dp(12),dp(4),dp(12),dp(10));
+        status=Ui.text(this,"正在读取漫画…",12);status.setGravity(Gravity.CENTER);status.setTextColor(Ui.MUTED);status.setLines(2);navigation.addView(status);
+        pageNavigation=Ui.pair(this,button("上一页",()->step(-1)),button("下一页",()->step(1)));navigation.addView(pageNavigation);
         chrome=new ReaderChrome(this,new ControlScroll(this,controls),new ControlScroll(this,navigation),viewport,()->{
             if(closed)return;
             getWindow().getDecorView().setSystemUiVisibility(chrome.controlsVisible()?View.SYSTEM_UI_FLAG_VISIBLE:
@@ -123,7 +125,7 @@ public final class ReaderActivity extends Activity {
     }
     private void restore(){
         try{
-            JSONObject saved=new JSONObject(history.getString(entry.uri,"{}"));page=ReaderRules.clamp(saved.optInt("page",0),chapters.length);scroll=!saved.optString("mode","scroll").equals("paged");
+            JSONObject saved=new JSONObject(history.getString(entry.uri,"{}"));page=ReaderRules.clamp(saved.optInt("page",0),chapters.length);String preference=Store.get(this).settings.readingMode;String mode=preference.isEmpty()?saved.optString("mode","scroll"):preference;scroll=mode.equals("scroll");verticalPages=mode.equals("vertical");JSONObject names=saved.optJSONObject("bookmarkNames");if(names!=null){Iterator<String> keys=names.keys();while(keys.hasNext()){String key=keys.next();try{bookmarkNames.put(Integer.parseInt(key),names.optString(key));}catch(NumberFormatException ignored){}}}
             JSONArray items=saved.optJSONArray("bookmarks");if(items!=null)for(int i=0;i<items.length();i++){int mark=items.getInt(i);if(mark>=0&&mark<chapters.length)marks.add(mark);}
         }catch(Exception error){stateWritable=false;message("阅读记录损坏，原记录保留，本次不覆盖。"+error.getMessage());}
     }
@@ -131,7 +133,7 @@ public final class ReaderActivity extends Activity {
         if(!ready||!stateWritable)return;
         try{
             JSONArray items=new JSONArray();for(int mark:marks)items.put(mark);
-            String value=new JSONObject().put("page",page).put("mode",scroll?"scroll":"paged").put("bookmarks",items).toString();
+            JSONObject names=new JSONObject();for(int mark:marks)if(bookmarkNames.containsKey(mark))names.put(Integer.toString(mark),bookmarkNames.get(mark));String value=new JSONObject().put("page",page).put("mode",scroll?"scroll":verticalPages?"vertical":"paged").put("bookmarks",items).put("bookmarkNames",names).toString();
             if(value.equals(lastSaved))return;
             lastSaved=value;final String key=entry.uri;final SharedPreferences preferences=history;
             historyWorker.execute(()->{
@@ -142,11 +144,11 @@ public final class ReaderActivity extends Activity {
     }
     private void scheduleSave(){main.removeCallbacks(savePosition);main.postDelayed(savePosition,700);}
     private void update(){
-        text(favoriteButton,entry.favorite?"★ 已收藏":"☆ 收藏");text(modeButton,scroll?"滚动阅读":"左右翻页");text(markButton,marks.contains(page)?"移除本页书签":"添加书签");
+        text(favoriteButton,entry.favorite?"取消收藏":"收藏");text(modeButton,scroll?"滚动阅读":"左右翻页");text(markButton,"书签");pageNavigation.setVisibility(scroll?View.GONE:View.VISIBLE);
         if(!ready)return;
         int chapter=ReaderRules.chapter(starts,page);
-        text(chapterButton,"第 "+chapters[page]+" 章");
-        text(status,statusText()+"\n"+(checkStatus.isEmpty()?"点按漫画隐藏或显示工具栏"+(!scroll?" · 左右滑动翻页":""):checkStatus));
+        text(chapterButton,"章节列表");
+        text(status,statusText()+"\n"+(checkStatus.isEmpty()?"点按漫画隐藏或显示工具栏"+(!scroll?(verticalPages?" · 上下滑动翻页":" · 左右滑动翻页"):""):checkStatus));
     }
     private String statusText(){
         int chapter=ReaderRules.chapter(starts,page),end=chapter+1<starts.size()?starts.get(chapter+1):chapters.length;
@@ -192,7 +194,7 @@ public final class ReaderActivity extends Activity {
                 public void requested(){planPages();}
                 public void committed(int index){page=index;main.removeCallbacks(loadingNotice);update();scheduleSave();}
             });
-            pager.setRange(scopeStart,scopeEnd);
+            pager.setVerticalPaging(verticalPages);pager.setRange(scopeStart,scopeEnd);
             viewport.addView(pager,new FrameLayout.LayoutParams(-1,-1));
             final ReaderPager opening=pager;
             opening.post(()->{if(!closed&&pager==opening)opening.go(opening.target());});
@@ -343,11 +345,18 @@ public final class ReaderActivity extends Activity {
         new AlertDialog.Builder(this).setTitle("选择章节").setSingleChoiceItems(labels,ReaderRules.chapter(starts,page),(dialog,index)->jumpFromDialog(dialog,starts.get(index))).setNegativeButton("关闭",null).show();
     }
     private void toggleMode(){if(ready){if(pager!=null)page=pager.target();scroll=!scroll;buildPages();update();save();}}
+    private void showBookmarkInput(){
+        if(!ready)return;if(bookmarkPanel!=null&&bookmarkPanel.isShowing()){bookmarkPanel.dismiss();return;}
+        LinearLayout body=Ui.column(this);int pad=dp(14);body.setPadding(pad,pad,pad,pad);body.setBackground(Ui.shape(this,Color.WHITE,12,true));EditText name=Ui.input(this,"请输入名称",false);name.setSingleLine(true);body.addView(name);Ui.gap(body,12);
+        bookmarkPanel=new PopupWindow(body,Math.min(dp(310),getResources().getDisplayMetrics().widthPixels-dp(28)),-2,true);bookmarkPanel.setBackgroundDrawable(Ui.shape(this,Color.WHITE,12,true));bookmarkPanel.setElevation(dp(8));bookmarkPanel.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        Button add=button("添加",()->{String value=name.getText().toString().trim();if(value.isEmpty()){name.setError("请输入名称");return;}if(value.length()>80){name.setError("名称最多 80 个字符");return;}marks.add(page);bookmarkNames.put(page,value);save();bookmarkPanel.dismiss();Ui.notice(this,"书签已添加");});Ui.primary(add);body.addView(Ui.pair(this,add,button("取消",()->bookmarkPanel.dismiss())));bookmarkPanel.showAsDropDown(markButton,0,dp(6));
+    }
     private void jumpPage(){
-        if(!ready)return;
-        EditText input=new EditText(this);input.setInputType(InputType.TYPE_CLASS_NUMBER);input.setText(String.valueOf(page+1));input.selectAll();
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("跳转页码（1–"+chapters.length+"）").setView(input).setPositiveButton("跳转",null).setNegativeButton("取消",null).create();
-        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{int target=Integer.parseInt(input.getText().toString());if(target<1||target>chapters.length)throw new NumberFormatException();jumpFromDialog(dialog,target-1);}catch(NumberFormatException error){input.setError("请输入有效页码");}}));dialog.show();
+        if(!ready)return;if(bookmarkPanel!=null)bookmarkPanel.dismiss();
+        LinearLayout body=Ui.column(this);EditText input=Ui.input(this,"请输入页码",true);body.addView(input);Ui.gap(body,12);LinearLayout items=Ui.column(this);ScrollView scrollView=new ScrollView(this);scrollView.addView(items);body.addView(scrollView,new LinearLayout.LayoutParams(-1,dp(190)));
+        final AlertDialog[] targetDialog={null};
+        for(int mark:marks){Button item=button(bookmarkNames.getOrDefault(mark,"第 "+(mark+1)+" 页"),()->jumpFromDialog(targetDialog[0],mark));item.setOnLongClickListener(v->{marks.remove(mark);bookmarkNames.remove(mark);save();items.removeView(item);return true;});item.setGravity(Gravity.LEFT|Gravity.CENTER_VERTICAL);items.addView(item);Ui.gap(items,6);}if(marks.isEmpty())items.addView(Ui.text(this,"暂无书签",14));Ui.gap(body,16);
+        AlertDialog dialog=Ui.modal(this,body,true);targetDialog[0]=dialog;Button jump=button("跳转",()->{try{int target=Integer.parseInt(input.getText().toString());if(target<1||target>chapters.length)throw new NumberFormatException();jumpFromDialog(dialog,target-1);}catch(NumberFormatException error){input.setError("请输入 1–"+chapters.length+" 的页码");}});Ui.primary(jump);body.addView(Ui.pair(this,jump,button("取消",dialog::dismiss)));dialog.show();
     }
     private void favorite(){
         if(!ready||favoriteBusy)return;favoriteBusy=true;favoriteButton.setEnabled(false);

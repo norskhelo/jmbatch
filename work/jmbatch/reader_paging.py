@@ -20,13 +20,14 @@ class CanvasPager:
         self.animating = False
         self.enabled = True
         self.closed = False
+        self.vertical = False
 
     def place(self, offset=0, incoming=None):
         width, height = self.canvas.winfo_width(), self.canvas.winfo_height()
         self.dx = offset
-        self.canvas.coords(self.front, width / 2 + offset, height / 2)
+        self.canvas.coords(self.front, width / 2 + (0 if self.vertical else offset), height / 2 + (offset if self.vertical else 0))
         if incoming is not None:
-            self.canvas.coords(self.back, width / 2 + incoming, height / 2)
+            self.canvas.coords(self.back, width / 2 + (0 if self.vertical else incoming), height / 2 + (incoming if self.vertical else 0))
         self.canvas.coords(self.notice, width / 2, height - 12)
 
     def cancel(self):
@@ -102,7 +103,7 @@ class CanvasPager:
             self.settle(direction, commit=True)
 
     def settle(self, direction, commit):
-        width = self.canvas.winfo_width()
+        width = self.canvas.winfo_height() if self.vertical else self.canvas.winfo_width()
         start = self.dx
         end = -direction * width if commit else 0
         started = time.monotonic()
@@ -143,7 +144,7 @@ class CanvasPager:
         if not self.drag:
             return
         x, y, started, moved = self.drag
-        dx, dy = event.x - x, event.y - y
+        dx, dy = (event.y - y, event.x - x) if self.vertical else (event.x - x, event.y - y)
         if not moved and (abs(dx) < 8 or abs(dx) <= abs(dy)):
             return
         if not moved:
@@ -156,7 +157,7 @@ class CanvasPager:
         photo = self.lookup(neighbor) if self.first <= neighbor < self.total else None
         self.next_photo = photo
         self.canvas.itemconfigure(self.back, image=photo or '', state='normal' if photo else 'hidden')
-        width = self.canvas.winfo_width()
+        width = self.canvas.winfo_height() if self.vertical else self.canvas.winfo_width()
         offset = max(-width, min(width, dx)) if photo else max(-width * .12, min(width * .12, dx * .22))
         self.place(offset, offset + direction * width)
 
@@ -168,10 +169,10 @@ class CanvasPager:
         if not moved:
             self.ready()
             return
-        dx = event.x - x
+        dx = event.y - y if self.vertical else event.x - x
         direction = 1 if dx < 0 else -1
         velocity = abs(dx) / max(.01, time.monotonic() - started)
-        commit = abs(dx) > self.canvas.winfo_width() * .22 or (abs(dx) > 35 and velocity > 550)
+        commit = abs(dx) > (self.canvas.winfo_height() if self.vertical else self.canvas.winfo_width()) * .22 or (abs(dx) > 35 and velocity > 550)
         target = max(self.first, min(self.total - 1, self.page + direction))
         self.target = target if commit else self.page
         self.direction = direction

@@ -12,7 +12,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-VERSION = "0.3.31"
+VERSION = "0.3.32"
 ZIP_LAYOUT_VERSION = 3
 MAX_TASKS = 2000
 
@@ -59,11 +59,16 @@ class Settings:
     flat_zip: bool = False
     download_all_chapters: bool = False
     chapter_view_mode: int = 1
+    download_limit_kbps: int = 0
+    reading_mode: str = ""
 
     def validate(self):
+        if self.reading_mode not in ("", "scroll", "paged", "vertical"):
+            raise ValueError("阅读模式无效")
         if self.format not in ("images", "pdf", "zip"):
             raise ValueError("输出格式必须是图片、PDF 或 ZIP。")
         for name, low, high, label in [
+            ("download_limit_kbps", 0, 1048576, "下载限速"),
             ("concurrent_tasks", 1, 4, "同时下载任务数"),
             ("chapter_workers", 1, 8, "章节读取并行数"),
             ("chapter_view_mode", 1, 2, "多章节观看模式"),

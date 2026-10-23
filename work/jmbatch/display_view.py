@@ -45,7 +45,7 @@ class DisplayView(ttk.Treeview):
     def __init__(self, master, *, kind, **kwargs):
         super().__init__(master, **kwargs)
         self.kind, self.mode = kind, 'list'
-        self.canvas = tk.Canvas(master, background='#f3f5f8', highlightthickness=0,
+        self.canvas = tk.Canvas(master, background='#ffffff', highlightthickness=0,
                                 takefocus=True, yscrollincrement=1)
         self.columns, self.cell_width, self.cell_height = 1, 210, 238 if kind == 'library' else 270
         self.paint_timer = None
@@ -301,8 +301,8 @@ class DisplayView(ttk.Treeview):
             x, y = (n % self.columns)*self.cell_width+5, (n//self.columns)*self.cell_height+5
             width = self.cell_width-10
             chosen = key in selected
-            self.canvas.create_rectangle(x,y,x+width,y+self.cell_height-10,fill='#d7edf0' if chosen else 'white',
-                outline='#087f8c' if chosen or key == self.focus() else '#dce4eb', width=2 if chosen else 1)
+            self.canvas.create_rectangle(x,y,x+width,y+self.cell_height-10,fill='#eeeef1' if chosen else 'white',
+                outline='#73757c' if chosen or key == self.focus() else '#dadce1', width=2 if chosen else 1)
             data = super().item(key)
             picture = data['image']
             if self.kind == 'library':
@@ -324,14 +324,16 @@ class DisplayView(ttk.Treeview):
             values = [str(v) for v in data['values']]
             if self.kind == 'library':
                 favorite, number, title, fmt = values
-                subtitle = f'{number} · 收藏夹' if fmt == '收藏夹' else f'{favorite} JM{number} · {fmt}'
+                subtitle = '' if fmt == '收藏夹' else f'编号 {number}'
+                if favorite:
+                    self.canvas.create_text(x+width-16,y+12,anchor='ne',text='★',fill='#d6a039',font=('Segoe UI',22))
                 text = self._lines(title,width-20,2)+'\n'+self._lines(subtitle,width-20,1)
             else:
                 number,title,status,progress,size,fmt,resets = values
                 text = self._lines(title or number,width-20,2)+'\n'+self._lines(f'{number} · {fmt}',width-20,1)
                 text += '\n'+status+'\n'+self._lines(progress,width-20,1)+'\n'+self._lines(size,width-20,1)
             text_top = self.cover_height+20 if self.kind == 'library' else 115
-            self.canvas.create_text(x+10,y+text_top,anchor='nw',text=text,font=self.tile_font,fill='#172c3e')
+            self.canvas.create_text(x+10,y+text_top,anchor='nw',text=text,font=self.tile_font,fill='#1d1f26')
             if chosen:
-                self.canvas.create_text(x+width-10,y+8,anchor='ne',text='✓',fill='#087f8c',font=self.tile_font)
+                self.canvas.create_text(x+width-10,y+8,anchor='ne',text='✓',fill='#73757c',font=self.tile_font)
         self.tile_images = painted_images

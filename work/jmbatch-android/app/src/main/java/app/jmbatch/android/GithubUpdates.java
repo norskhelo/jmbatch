@@ -14,7 +14,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.31 / Android 0.6.14 — 备用 DNS 下载恢复与实时速度\n\n发布日期：2026-10-22\n\nWindows 0.3.30 → 0.3.31；Android 0.6.13 → 0.6.14（versionCode 614）。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。\n\n修复内容\n• Android 为备用 IP 的连接、握手和响应头设置独立的单次等待上限；响应头超时后尝试其他地址，正文继续使用用户设置的读取超时。\n• 图片正文超时、连接中断或内容不完整时记住失败 IP，暂时避让；成功完整读取后才更新优选地址。DNS 按 TTL 刷新时保留地址状态，包括旧请求稍后报告的失败；保留解析到的全部安全候选地址。\n• 短期记住已确认的系统 DNS 全零结果，避免短 TTL 刷新反复经过已知失败的系统连接；不擅自延长 DNS TTL，代理与 HTTPS 证书校验规则保持有效。\n• 慢速 CDN 探测不再长期占住探测机会，其他候选线路仍可被尝试。持续少量收包的图片连接按单请求读取耗时恢复，阈值按线程数分摊；图片处理、内存等待和写文件耗时不计入该慢速判断。\n• Android 下载监控区分实际网络等待和本地处理，避免处理队列满或落盘较慢时重连整个任务。\n• Windows 与 Android 统一显示实时有效速度：按最近约 1 秒内完成下载、图片处理并写入缓存的图片字节计算。网络和落盘不重复相加，不计缓存复用或失败重试，不再显示过去 10 秒的平滑速度；大图尚未完成时可能暂时为 0。\n\n验证范围\n• Android 10/15 共 20 项 HTTP/TLS 与下载监控框架检查通过，覆盖响应头超时取消、正文超时不被缩短、连接复用、证书校验及本地处理堵塞。\n• Android 专项宿主回归覆盖 DNS 刷新、正文失败换址、CDN 探测、流水线、取消、重试与速度显示；Windows 32 项相关测试通过。\n• 未连接 Android 真机；这些结果验证已确认的代码缺陷，不代表已实测用户移动网络上的吞吐或排除了运营商/CDN 路由差异。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.32 / Android 0.6.15 — 新版界面\n\n发布日期：2026-10-23\n\nWindows 0.3.31 → 0.3.32；Android 0.6.14 → 0.6.15（versionCode 615）。保留原包名、Android 签名和更新公钥，可覆盖安装。\n\n界面与交互\n\n• 采用确认的灰阶、圆角界面。主页面上方预览漫画库，下方显示下载卡片，右下角“＋”添加任务；漫画库在同一区域切换。\n• 添加窗口保留编号校验与去重，支持 pdf、zip、文件夹，新任务自动开始。点击运行中的任务可单独暂停，失败任务可重试；长按选择后删除任务记录，保留漫画文件与缓存。\n• 漫画库使用封面网格，支持名称、时间、大小和章节数排序。收藏固定置顶，收藏之间保留原顺序；长按显示导出、删除、分享、收藏、移动、取消六个操作。\n• 移动时进入目的收藏夹后确认；删除时可勾选多章节漫画中的部分章节。新建收藏夹和 pdf/zip 导出采用简洁弹窗。\n• 漫画库顶部可检查已保存多章节漫画的新增章节，确认后加入正常下载队列；缺少下载历史的导入内容首次检查建立基线。\n• 阅读页采用居中标题及两行按钮；书签输入在按钮下方展开，跳转弹窗带可滚动的书签列表。保留旧书签与阅读位置，新增书签名称，并支持上下翻页、左右翻页、上下滚动及两种章节观看方式。\n• 设置改为连续滚动页面，左侧导航随位置高亮。手动检查新版本显示居中确认，启动检查及下载完成使用短暂顶部提示。\n\n下载限速\n\n• 下载限速按所有任务的图片传输合计计算，单位 KB/s，0 表示不限速。修改后用于后续图片传输；正在限速的传输会读取最新额度。\n• 主动等待限速额度不作为慢速重连依据。实时速度仍按完成处理并提交缓存的有效图片字节计算，与限速额度可能短时不同。\n• Windows 限速传输使用可复用的 HTTPS 流式会话，保留 TLS 校验及读取超时；无限速时沿用原传输路径。\n\n使用说明\n\n• 阅读方式在设置中保存后，重新打开漫画生效。Android 跳转列表点击书签即可跳转，长按书签可删除；Windows 选择书签后点击跳转或双击，Delete/右键可删除。\n• 图片文件夹需先导出为 pdf 或 zip 后分享。Android 使用系统分享选择器；Windows 调用系统分享菜单，多选文件先生成一个分享 ZIP。\n• 本次以新界面及关联交互为重点，使用隔离的合成漫画验证；Android 页面在 BlueStacks 5 / Android 9 通过 ADB 检查，另有针对性框架检查。未使用 Windows 鼠标键盘自动操作，未进行全功能回归，也不代表所有实体手机的显示与系统分享均已验证。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;
@@ -29,7 +29,7 @@ public final class GithubUpdates {
     private Button downloadButton,checkButton,notesCheckButton;
     private String status="尚未配置更新仓库", latestVersion="", latestUrl="";
     private long generation;
-    private boolean downloading,checking;
+    private boolean downloading,checking,manual;
     private final AtomicBoolean cancel=new AtomicBoolean();
     private UpdateInstaller.Ready ready;
 
@@ -51,7 +51,7 @@ public final class GithubUpdates {
     }
     public void startup() {
         if(!Core.VERSION.equals(prefs.getString("announcement_seen",""))){
-            showNotes();prefs.edit().putString("announcement_seen",Core.VERSION).apply();
+            Ui.notice(activity,"更新完成");prefs.edit().putString("announcement_seen",Core.VERSION).apply();
         }
         if(startupChecked)return;
         startupChecked=true;
@@ -74,7 +74,8 @@ public final class GithubUpdates {
             if(!text.contentEquals(notesView.getText()))notesView.setText(text);
         }
     }
-    public void showAndCheck(){show();check();}
+    public void showAndCheck(){manualCheck();}
+    public void manualCheck(){manual=true;if(ready!=null||downloading){show();return;}check();}
     private void check() {
         if(downloading||ready!=null)return;
         if(checking){refresh();return;}
@@ -87,7 +88,7 @@ public final class GithubUpdates {
         AtomicBoolean delivered=new AtomicBoolean();
         status="正在检查更新…";refresh();
         Runnable timeout=()->{
-            if(delivered.compareAndSet(false,true)&&ticket==generation){checking=false;latestUrl="";status="无法获取完整更新日志。已保留本地日志，请稍后重试。";refresh();}
+            if(delivered.compareAndSet(false,true)&&ticket==generation){checking=false;latestUrl="";status="无法获取完整更新日志。已保留本地日志，请稍后重试。";refresh();if(manual)Ui.notice(activity,status);manual=false;}
         };
         main.postDelayed(timeout,8000);
         Thread worker=new Thread(()->{
@@ -112,6 +113,8 @@ public final class GithubUpdates {
                 }
                 status=!ok?"无法获取完整更新日志。已保留本地日志，请稍后重试。":!newer?"当前已是最新版本":"发现新版 "+latestVersion;
                 refresh();
+                if(newer){if(manual)Ui.confirm(activity,"检测到新版本 "+latestVersion+"\n是否更新",()->{show();download();});else Ui.notice(activity,"检测到新版本 "+latestVersion);}
+                else if(manual)Ui.notice(activity,status);manual=false;
             });
         },"github-update-check");
         worker.setDaemon(true);worker.start();
@@ -210,7 +213,7 @@ public final class GithubUpdates {
             prefs.getString("announcement_installed_version",""),prefs.getString("announcement_upgrade_from",""),
             Core.VERSION,Core.VERSION,prefs.getString("repository",""));
     }
-    private void showNotes(){
+    public void showNotes(){
         if(activity.isDestroyed()||activity.isFinishing())return;
         if(notesDialog!=null&&notesDialog.isShowing()){refresh();return;}
         int pad=(int)(20*activity.getResources().getDisplayMetrics().density);

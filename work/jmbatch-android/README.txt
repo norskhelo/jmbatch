@@ -1,4 +1,4 @@
-JM Batch 0.6.14 — Android 使用说明
+JM Batch 0.6.15 — Android 使用说明
 
 1. 选择保存目录和 PDF、ZIP 或文件夹格式，输入编号或区间并加入队列，点击“开始下载”。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -7,10 +7,10 @@ JM Batch 0.6.14 — Android 使用说明
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
 安装包下载（2026-10-22）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.6.14-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.6.14-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.6.14-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/SHA256-release-0.3.31-0.6.14.txt
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.6.15-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.6.15-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.6.15-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/SHA256-release-0.3.32-0.6.15.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
@@ -28,11 +28,11 @@ SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-
 
 多章节在获取列表后选择下载范围，支持多选、全选和稍后选择。设置中可默认下载全章节；单章直接下载。选中范围随任务保存，保留原章节编号，暂停和重试不增加未选择的章节。
 
-Windows 0.3.31 / Android 0.6.14 — 备用 DNS 下载恢复与实时速度
+Windows 0.3.32 / Android 0.6.15 — 备用 DNS 下载恢复与实时速度
 
 发布日期：2026-10-22
 
-Windows 0.3.30 → 0.3.31；Android 0.6.13 → 0.6.14（versionCode 614）。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。
+Windows 0.3.30 → 0.3.32；Android 0.6.13 → 0.6.15（versionCode 614）。沿用原包名、APK 签名证书和更新公钥，可覆盖安装。
 
 修复内容
 • Android 为备用 IP 的连接、握手和响应头设置独立的单次等待上限；响应头超时后尝试其他地址，正文继续使用用户设置的读取超时。
@@ -46,3 +46,5 @@ Windows 0.3.30 → 0.3.31；Android 0.6.13 → 0.6.14（versionCode 614）。沿
 • Android 10/15 共 20 项 HTTP/TLS 与下载监控框架检查通过，覆盖响应头超时取消、正文超时不被缩短、连接复用、证书校验及本地处理堵塞。
 • Android 专项宿主回归覆盖 DNS 刷新、正文失败换址、CDN 探测、流水线、取消、重试与速度显示；Windows 32 项相关测试通过。
 • 未连接 Android 真机；这些结果验证已确认的代码缺陷，不代表已实测用户移动网络上的吞吐或排除了运营商/CDN 路由差异。
+
+新版界面：主页面 + 添加下载；漫画库长按批量操作；设置中配置合计下载限速（0 不限速）与阅读方式。

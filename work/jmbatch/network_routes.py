@@ -39,6 +39,7 @@ def merge_hosts(primary, fallback):
 
 
 def failure_kind(error):
+    from requests.exceptions import Timeout as RequestsTimeout, SSLError as RequestsTLS, ConnectionError as RequestsConnection
     for _ in range(8):
         if error is None:
             break
@@ -50,11 +51,11 @@ def failure_kind(error):
         code = getattr(error, "code", None)  # curl_cffi CurlECode
         if isinstance(error, socket.gaierror) or code in (5, 6):
             return "dns"
-        if isinstance(error, ssl.SSLError) or code in (35, 51, 58, 60, 77, 80, 82, 83, 90, 91):
+        if isinstance(error, (ssl.SSLError, RequestsTLS)) or code in (35, 51, 58, 60, 77, 80, 82, 83, 90, 91):
             return "tls"
-        if isinstance(error, TimeoutError) or code == 28:
+        if isinstance(error, (TimeoutError, RequestsTimeout)) or code == 28:
             return "timeout"
-        if isinstance(error, ConnectionError) or code in (7, 55, 56):
+        if isinstance(error, (ConnectionError, RequestsConnection)) or code in (7, 55, 56):
             return "connect"
         if isinstance(error, BadResponse) or code in (18, 52):
             return "response"
@@ -110,7 +111,7 @@ def run_routes(hosts, retries, stage, request, notice=lambda _: None, check=lamb
         "仅凭此错误不能确定是设备故障；重试保留已下载图片。") from None
 
 
-def make_strategy(notice=lambda _: None):
+def make_strategy(notice=lambda _: None, rate=None):
     """Use jmcomic's supported request strategy hook, including session initialization."""
     def strategy(client, request=None, url=None, is_image=False, **kwargs):
         from jmcomic import JmModuleConfig
@@ -138,7 +139,9 @@ def make_strategy(notice=lambda _: None):
             timeout = options.get("timeout", client.get_meta_data("timeout", 25))
             if isinstance(timeout, (int, float)):
                 options["timeout"] = (min(8, timeout), timeout)
-            response = request(make_url(host), **options)
+            response = (rate.request(make_url(host), options, client)
+                        if is_image and rate is not None and rate.limit.value > 0
+                        else request(make_url(host), **options))
             if response.status_code != 200:
                 raise HttpFailure(response.status_code)
             try:

@@ -27,10 +27,13 @@ public final class Store {
         public int concurrentTasks = 2, threads = 8, timeout = 25, retries = 2, slowKB = 30, window = 90, stall = 180, maxResets = 3;
         public int chapterWorkers = ChapterMetadata.DEFAULT_WORKERS;
         public int chapterViewMode = 1;
+        public int downloadLimitKB = 0;
+        public String readingMode = "";
         public boolean autoReset = true, keepImages = false, numericFilename = false, flatZip = false;
         public boolean downloadAllChapters = false;
         public Settings() {}
         public Settings(JSONObject json) {
+            downloadLimitKB=json.optInt("downloadLimitKB",0);readingMode=json.optString("readingMode","");
             concurrentTasks = json.optInt("concurrentTasks", 2);
             chapterWorkers = json.optInt("chapterWorkers", ChapterMetadata.DEFAULT_WORKERS);
             chapterViewMode = json.optInt("chapterViewMode", 1);
@@ -44,6 +47,8 @@ public final class Store {
             validate();
         }
         public void validate() {
+            check(downloadLimitKB,0,1048576,"下载限速");
+            if(!Arrays.asList("","scroll","paged","vertical").contains(readingMode))throw new IllegalArgumentException("阅读模式无效");
             check(concurrentTasks, 1, 4, "同时下载任务数");
             check(chapterWorkers, 1, ChapterMetadata.MAX_WORKERS, "章节读取并行数");
             check(chapterViewMode, 1, 2, "多章节观看模式");
@@ -54,6 +59,7 @@ public final class Store {
         private static void check(int n, int min, int max, String label) { if (n < min || n > max) throw new IllegalArgumentException(label + "应为 " + min + "–" + max); }
         public JSONObject json() {
             JSONObject json = new JSONObject();
+            try{json.put("downloadLimitKB",downloadLimitKB).put("readingMode",readingMode);}catch(JSONException error){throw new IllegalStateException(error);}
             try { json.put("chapterViewMode", chapterViewMode).put("chapterWorkers", chapterWorkers).put("downloadAllChapters", downloadAllChapters).put("outputUri", outputUri).put("outputLabel", outputLabel).put("format", format).put("threads", threads).put("timeout", timeout).put("retries", retries)
                 .put("concurrentTasks", concurrentTasks).put("slowKB", slowKB).put("window", window).put("stall", stall).put("maxResets", maxResets).put("autoReset", autoReset).put("keepImages", keepImages).put("numericFilename", numericFilename).put("flatZip", flatZip); }
             catch (JSONException impossible) { throw new IllegalStateException(impossible); }

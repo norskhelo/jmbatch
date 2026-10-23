@@ -26,6 +26,7 @@ class ReaderWindow:
         self.split_chapters = app.engine.settings.chapter_view_mode == 2
         self.scope_start = self.scope_end = 0
         self.marks = set()
+        self.bookmark_names = {}
         self.mode = tk.StringVar(value="滚动阅读")
         self.generation = 0
         self.images, self.errors = OrderedDict(), {}
@@ -46,30 +47,8 @@ class ReaderWindow:
         top_content.pack(fill='x')
         bottom_content = ttk.Frame(self.bottom, padding=(10, 6))
         bottom_content.pack(fill='x')
-        bar = ttk.Frame(top_content)
-        bar.pack(fill="x")
-        ttk.Button(bar, text="上一章", command=lambda: self.chapter_step(-1)).pack(side="left")
-        self.chapter_box = ttk.Combobox(bar, state="readonly", width=24)
-        self.chapter_box.pack(side="left", padx=6)
-        self.chapter_box.bind("<<ComboboxSelected>>", lambda e: self.go(self.starts[self.chapter_box.current()]))
-        ttk.Button(bar, text="下一章", command=lambda: self.chapter_step(1)).pack(side="left")
-        self.favorite_button = ttk.Button(bar, command=self.favorite)
-        self.favorite_button.pack(side="right")
-        bar2 = ttk.Frame(top_content)
-        bar2.pack(fill="x", pady=8)
-        modes = ttk.Combobox(bar2, textvariable=self.mode, state="readonly", values=("滚动阅读", "左右翻页"), width=12)
-        modes.pack(side="left")
-        modes.bind("<<ComboboxSelected>>", lambda e: self.relayout())
-        ttk.Button(bar2, text="‹ 上一页", command=lambda: self.step(-1)).pack(side="left", padx=(8, 3))
-        ttk.Button(bar2, text="下一页 ›", command=lambda: self.step(1)).pack(side="left")
-        self.jump = tk.StringVar(value="1")
-        jump = ttk.Entry(bar2, textvariable=self.jump, width=6)
-        jump.pack(side="left", padx=(10, 2))
-        jump.bind("<Return>", lambda e: self.jump_page())
-        ttk.Button(bar2, text="跳转页码", command=self.jump_page).pack(side="left")
-        ttk.Button(bar2, text="书签列表", command=self.bookmarks).pack(side="right")
-        self.mark_button = ttk.Button(bar2, text="添加书签", command=self.mark)
-        self.mark_button.pack(side="right", padx=4)
+        from ui_reader import controls
+        controls(self, top_content, bottom_content, entry['title'])
         holder = ttk.Frame(outer)
         holder.pack(fill="both", expand=True)
         self.canvas = tk.Canvas(holder, bg="#20252c", highlightthickness=0, yscrollincrement=1)
@@ -92,7 +71,7 @@ class ReaderWindow:
             self.window.bind(sequence, lambda e, d=delta: self.key_page(e, d))
         self.status = tk.StringVar(value="正在读取漫画…")
         ttk.Label(bottom_content, textvariable=self.status).pack(anchor="w")
-        ttk.Label(bottom_content, text="点击漫画隐藏或显示工具栏；左右拖动 / 方向键翻页，鼠标滚轮滚动；Esc 显示工具栏").pack(anchor="w")
+
         self.chrome = ReaderChrome(outer, self.top, self.bottom, (top_content, bottom_content), holder, self.chrome_changed)
         self.viewport_size = (0, 0)
         self.worker = ReaderWorker(entry["path"])
@@ -168,6 +147,9 @@ class ReaderWindow:
         self.resize_timer = None
         if not self.pages:
             return
+        self.pager.vertical = self.mode.get() == "上下翻页"
+        if self.is_scroll(): self.page_buttons.pack_forget()
+        else: self.page_buttons.pack(fill="x")
         self.viewport_size = (self.canvas.winfo_width(), self.canvas.winfo_height())
         target = self.pager.target if self.pager.enabled else self.current
         chapter = bisect.bisect_right(self.starts, target) - 1
@@ -347,7 +329,9 @@ class ReaderWindow:
                     try:
                         saved = self.state.get(self.key, len(self.pages))
                         self.current, self.marks = saved["page"], set(saved["bookmarks"])
-                        self.mode.set("滚动阅读" if saved["mode"] == "scroll" else "左右翻页")
+                        self.bookmark_names = saved.get("bookmarkNames", {})
+                        mode = self.app.engine.settings.reading_mode or saved["mode"]
+                        self.mode.set({"scroll":"滚动阅读","paged":"左右翻页","vertical":"上下翻页"}[mode])
                     except ValueError as exc:
                         self.state.error = str(exc)
                     self.relayout()
@@ -382,8 +366,8 @@ class ReaderWindow:
 
     def refresh_buttons(self):
         entry = self.library.entries.get(self.key, {})
-        self.favorite_button.configure(text="★ 已收藏" if entry.get("favorite") else "☆ 收藏")
-        self.mark_button.configure(text="移除本页书签" if self.current in self.marks else "添加书签")
+        self.favorite_button.configure(text="取消收藏" if entry.get("favorite") else "收藏")
+        self.mark_button.configure(text="书签")
         if self.pages:
             chapter = bisect.bisect_right(self.starts, self.current) - 1
             self.chapter_box.current(chapter)
@@ -449,7 +433,7 @@ class ReaderWindow:
         self.save_timer = None
         if self.pages:
             try:
-                self.state.put(self.key, self.current, "scroll" if self.is_scroll() else "paged", self.marks)
+                self.state.put(self.key, self.current, "scroll" if self.is_scroll() else "vertical" if self.pager.vertical else "paged", self.marks, self.bookmark_names)
             except Exception as exc:
                 if not self.state_error_shown:
                     self.state_error_shown = True

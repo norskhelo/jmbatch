@@ -40,6 +40,8 @@ public final class JmApi {
     public final Control control;
 
     public static final class Control {
+        public interface RateLimit { void acquire(int bytes) throws IOException; }
+        public RateLimit rateLimit=bytes->{};
         public volatile String stop = "";
         public volatile String stage = "metadata";
         public java.util.function.Consumer<String> routeMessage = message -> {};
@@ -213,6 +215,7 @@ public final class JmApi {
                     try{watch.read(SystemClock.elapsedRealtime()-begin,n);}
                     catch(SocketTimeoutException error){response.failed(error);throw error;}
                     control.check(); total += n; if (total > maxBytes) throw new IOException("响应过大，已停止以保护手机内存/存储");
+                    if(image)control.rateLimit.acquire(n);
                     output.write(buffer, 0, n); if (image) control.received(n);
                 }
                 if (total == 0) {NetworkRoutes.BadResponse error=new NetworkRoutes.BadResponse();response.failed(error);throw error;}

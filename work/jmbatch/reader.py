@@ -116,17 +116,24 @@ class ReaderState:
     def get(self, key, total):
         data = self.books.get(key, {})
         try:
-            return dict(page=max(0, min(total - 1, int(data.get("page", 0)))),
-                        mode=data.get("mode") if data.get("mode") in ("scroll", "paged") else "scroll",
-                        bookmarks=sorted({int(i) for i in data.get("bookmarks", []) if 0 <= int(i) < total}))
+            result = dict(page=max(0, min(total - 1, int(data.get("page", 0)))),
+                          mode=data.get("mode") if data.get("mode") in ("scroll", "paged", "vertical") else "scroll",
+                          bookmarks=sorted({int(i) for i in data.get("bookmarks", []) if 0 <= int(i) < total}))
+            if 'bookmarkNames' in data:
+                result['bookmarkNames'] = {str(i): str(data['bookmarkNames'].get(str(i), ''))[:80]
+                                           for i in result['bookmarks'] if str(i) in data['bookmarkNames']}
+            return result
         except (ValueError, TypeError, AttributeError):
             raise ValueError("本书阅读记录损坏，未覆盖原记录")
 
-    def put(self, key, page, mode, bookmarks):
+    def put(self, key, page, mode, bookmarks, bookmarkNames=None):
         if self.error:
             raise OSError(self.error)
         books = dict(self.books)
         books[key] = dict(page=page, mode=mode, bookmarks=sorted(bookmarks))
+        if bookmarkNames is not None:
+            books[key]['bookmarkNames'] = {str(i): str(bookmarkNames[str(i)])[:80]
+                                           for i in bookmarks if str(i) in bookmarkNames}
         atomic_json(self.path, dict(version=1, books=books))
         self.books = books
 

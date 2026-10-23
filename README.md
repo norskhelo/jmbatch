@@ -15,30 +15,30 @@ Windows 客户端使用 **Python / Tkinter**，Android 客户端使用 **Java / 
 | 批量下载 | 支持多个编号、JM 前缀和连续区间，自动去重；可选择部分章节或全部章节。 |
 | 队列与恢复 | 多任务并行、暂停与继续、失败重试、缓存复用，以及备用 API / 图片线路。 |
 | 格式与导出 | 下载为 PDF、ZIP 或图片文件夹；支持离线互转和批量导出，保留源文件。 |
-| 漫画库 | 扫描本地内容、搜索、星标、收藏夹、列表 / 平铺显示及批量管理。 |
-| 离线阅读 | 滚动阅读与左右翻页、章节切换、页码跳转、书签和阅读位置恢复。 |
+| 漫画库 | 封面网格、收藏置顶、四种排序、收藏夹与长按批量管理。 |
+| 离线阅读 | 上下滚动、左右/上下翻页、章节切换、命名书签和阅读位置恢复。 |
 | 更新 | 检查漫画新增章节；检查软件版本，并校验签名更新清单及安装包。 |
 
 ## 下载安装
 
 | 平台 | 当前正式版 | 下载 | 发布说明与校验 |
 | --- | --- | --- | --- |
-| Windows x64 | **0.3.31** | [完整 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.3.31-Windows-x64.zip) | [发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.31-0.6.14) · [SHA-256](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/SHA256-release-0.3.31-0.6.14.txt) |
-| Android 8.0+ | **0.6.14** | [APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.6.14-Android.apk) | [发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.31-0.6.14) · [SHA-256](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/SHA256-release-0.3.31-0.6.14.txt) |
+| Windows x64 | **0.3.32** | [完整 ZIP](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.3.32-Windows-x64.zip) | [发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.32-0.6.15) · [SHA-256](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/SHA256-release-0.3.32-0.6.15.txt) |
+| Android 8.0+ | **0.6.15** | [APK](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.6.15-Android.apk) | [发布说明](https://github.com/norskhelo/jmbatch/releases/tag/release-0.3.32-0.6.15) · [SHA-256](https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/SHA256-release-0.3.32-0.6.15.txt) |
 
 两端版本独立发布，最新一条 Release 可能只更新其中一个平台。完整历史与附件见 [Releases](https://github.com/norskhelo/jmbatch/releases)，功能变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 - **Windows**：完整解压 ZIP 后运行 `JMBatch.exe`，保留同目录的依赖文件。
 - **Android**：安装 APK；更新正式版时覆盖安装，以保留应用数据。重要漫画请另行备份，卸载应用可能删除其内部目录。
-- **软件更新**：在应用中点击“软件更新”，更新仓库使用 `norskhelo/jmbatch`；下载和安装需要手动确认。
+- **软件更新**：在设置中点击“检查更新”，更新仓库使用 `norskhelo/jmbatch`；下载和安装需要手动确认。
 
 <details>
 <summary>GitHub 下载较慢时：备用镜像</summary>
 
 | 文件 | GHFast | GH-Proxy |
 | --- | --- | --- |
-| Windows 0.3.31 ZIP | [下载](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.3.31-Windows-x64.zip) | [下载](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.3.31-Windows-x64.zip) |
-| Android 0.6.14 APK | [下载](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.6.14-Android.apk) | [下载](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.31-0.6.14/JMBatch-0.6.14-Android.apk) |
+| Windows 0.3.32 ZIP | [下载](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.3.32-Windows-x64.zip) | [下载](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.3.32-Windows-x64.zip) |
+| Android 0.6.15 APK | [下载](https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.6.15-Android.apk) | [下载](https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.32-0.6.15/JMBatch-0.6.15-Android.apk) |
 
 镜像由第三方转发 GitHub Release 附件，可用性取决于线路与缓存。请使用上表的 GitHub 原始 SHA-256 文件核对下载内容；一个入口不可用时可切换另一个。
 
@@ -46,21 +46,21 @@ Windows 客户端使用 **Python / Tkinter**，Android 客户端使用 **Java / 
 
 ## 快速使用
 
-1. 在下载设置中选择保存目录和 PDF / ZIP / 图片文件夹格式。
-2. 输入一个或多个编号，加入队列并开始；按提示选择章节，也可在设置中启用“默认下载全章节”。
-3. 下载完成后，在漫画库中打开阅读；需要转换格式或整理内容时，进入“批量处理”。
+1. 在设置中选择保存目录、并行数及合计限速（0 不限速）。
+2. 点击下载面板右下角“＋”，输入编号、选择格式并添加；新任务自动开始，按提示选择章节，也可在设置中启用“默认下载全章节”。
+3. 下载完成后，在漫画库中打开阅读；需要转换格式或整理内容时，长按漫画选择操作。
 
-**暂停**保留续传数据；**取消未完成任务**会清理该任务的文件、缓存和队列记录。导出保留源文件，同名输出会跳过；只移除漫画库记录与删除实际文件是不同操作。
+**暂停**保留续传数据；下载面板长按后的**删除**只移除任务记录，保留文件与缓存，运行中的任务需先暂停。导出保留源文件，同名输出会跳过；漫画库删除弹窗会明确确认实际文件与章节的删除。
 
 <details>
 <summary>章节、收藏夹、格式与阅读说明</summary>
 
-- **检查新增章节**：漫画库 → 批量处理（或长按）→ 选中一本 → 检查更新。先读取章节目录，有新增章节后再确认下载；新增内容独立保存，原漫画和阅读记录保留。缺少下载记录的导入漫画首次检查只建立目录基线。
+- **检查新增章节**：漫画库顶部“检查更新”检查所有已保存的多章节漫画。先读取章节目录，有新增章节后再确认下载；新增内容独立保存，原漫画和阅读记录保留。缺少下载记录的导入漫画首次检查只建立目录基线。
 - **收藏夹**：在漫画库中新建收藏夹，批量选择漫画后移入。分类不移动实际文件；删除收藏夹会将漫画归回默认库，保留文件、星标和阅读记录。
 - **格式结构**：单章节 ZIP / 图片文件夹按 `00001.jpg`、`00002.jpg` 排列；多章节按 `0001/00001.jpg`、`0002/00001.jpg` 分目录。请保留目录名称与图片顺序，便于扫描和导出。
-- **导出画质**：文件夹与 ZIP 互转、图片嵌入 PDF 不额外缩放；PDF 转图片需要渲染，可能损失画质，当前上限为 144 DPI、长边 8192 像素、每页约 1600 万像素。多章节 PDF 可合并导出或分章节导出。
+- **导出画质**：文件夹与 ZIP 互转、图片嵌入 PDF 不额外缩放；PDF 转图片需要渲染，可能损失画质，当前上限为 144 DPI、长边 8192 像素、每页约 1600 万像素。新版导出面板提供 pdf / zip 两种格式，PDF 按整本合并。
 - **删除章节**：支持图片目录和分章 ZIP，至少保留一章；PDF、平铺 ZIP 和单章漫画使用整本删除。操作前暂停下载，Windows 还需关闭对应阅读窗口，并预留临时空间。
-- **阅读模式**：在下载设置中选择“多章节合一”或“分章节观看”，重新打开漫画后生效。两种模式共享书签和阅读位置；PDF、平铺 ZIP 和单章漫画按一个章节显示。
+- **阅读模式**：在设置的阅读区域选择阅读方式及“多章节合一”或“分章节观看”，重新打开漫画后生效。两种模式共享书签和阅读位置；PDF、平铺 ZIP 和单章漫画按一个章节显示。
 - **阅读位置**：绑定文件路径或地址；移动文件或清除应用数据后不会自动迁移。Android 外部 ZIP 首次打开需要准备临时缓存。
 - **Android 相册**：漫画目录使用 `.nomedia` 减少系统相册收录，图片仍能在漫画库和文件管理器中访问；这不加密文件，旧缩略图可能需要等待系统缓存刷新。
 

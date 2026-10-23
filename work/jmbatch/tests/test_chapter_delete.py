@@ -188,21 +188,24 @@ class ChapterDeletionTests(unittest.TestCase):
             ui.tree.selection_set(key)
             root.update()
             ui.details()
-            self.assertEqual(str(ui.action_buttons["chapters"]["state"]), "normal")
-            ui.action_buttons["chapters"].invoke()
+            self.assertEqual(str(ui.action_buttons["delete"]["state"]), "normal")
+            ui.action_buttons["delete"].invoke()
             wait(lambda: not ui.busy)
             dialog = next(child for child in ui.window.winfo_children() if isinstance(child, tk.Toplevel))
-            box = next(child for child in dialog.winfo_children() if isinstance(child, tk.Listbox))
-            self.assertEqual(box.size(), 3)
-            box.selection_set(1)
-            button = next(button for child in dialog.winfo_children() for button in child.winfo_children() if button.winfo_class() == "TButton" and button.cget("text") == "删除所选章节")
-            with patch.object(ui.messagebox, "askyesno", return_value=True), patch.object(ui.messagebox, "showerror") as error:
+            def widgets(widget):
+                yield widget
+                for child in widget.winfo_children(): yield from widgets(child)
+            checks = [w for w in widgets(dialog) if w.winfo_class() == "TCheckbutton"]
+            self.assertEqual(len(checks), 3)
+            checks[0].invoke(); checks[2].invoke()  # Delete only the middle chapter.
+            button = next(w for w in widgets(dialog) if w.winfo_class() == "TButton" and w.cget("text") == "确认")
+            with patch.object(ui.messagebox, "showerror") as error:
                 button.invoke()
                 wait(lambda: not ui.busy)
                 error.assert_not_called()
             self.assertFalse(source.exists())
             self.assertIn("删除 1 章", ui.status.get())
             self.assertEqual(len(ui.tree.get_children()), 1)
-            self.assertEqual(len(ui.tree.selection()), 1)
+            self.assertEqual(len(ui.tree.selection()), 0)
         finally:
             root.destroy()

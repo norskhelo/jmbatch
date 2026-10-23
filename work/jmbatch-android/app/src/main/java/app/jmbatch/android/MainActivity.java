@@ -18,7 +18,7 @@ import java.io.*;
 import java.util.*;
 
 public final class MainActivity extends Activity {
-    private final int BG=Color.rgb(243,245,248),INK=Color.rgb(23,44,62),MUTED=Color.rgb(97,115,135),ACCENT=Color.rgb(8,127,140);
+    private final int BG=Ui.BG,INK=Ui.INK,MUTED=Ui.MUTED,ACCENT=Ui.ACCENT;
     private Store store;
     private GithubUpdates updates;
     private DownloadCovers downloadCovers;
@@ -32,6 +32,17 @@ public final class MainActivity extends Activity {
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final Map<String,Row> rows=new LinkedHashMap<>();
     private int limit=50;
+    private FrameLayout pages,downloadPage,libraryHost;
+    private LinearLayout taskSheet,preview;
+    private TextView selectedCount;
+    private final Set<String> selected=new LinkedHashSet<>();
+    private final Map<String,String> previousStates=new HashMap<>();
+    private boolean selecting,libraryVisible;
+    private AlertDialog addDialog;
+    FrameLayout libraryHost(){return libraryHost;}
+    void hideLibrary(){libraryVisible=false;if(libraryScreen!=null)libraryScreen.close();libraryHost.setVisibility(View.GONE);downloadPage.setVisibility(View.VISIBLE);downloadPage.setTranslationY(dp(80));downloadPage.animate().translationY(0).setDuration(240).start();refreshPreview();}
+    @Override public void onBackPressed(){if(libraryVisible){if(libraryScreen==null||!libraryScreen.back())hideLibrary();return;}if(selecting){exitSelection();return;}super.onBackPressed();}
+
     private AlertDialog chapterDialog;
     private Store.Task chapterTask;
     private final Runnable refresh=new Runnable(){public void run(){render();handler.postDelayed(this,700);}};
@@ -40,49 +51,48 @@ public final class MainActivity extends Activity {
         super.onCreate(state);store=Store.get(this);downloadCovers=new DownloadCovers(this);
         for(Store.Task task:store.snapshot())if(task.discardRequested&&task.status.equals("cancelling"))send(DownloadService.CANCEL,task.key);
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(BG);
-        scroll.setOnScrollChangeListener((view,x,y,oldX,oldY)->refreshDownloadCovers());
-        layout=column();layout.setPadding(dp(18),dp(20),dp(18),dp(28));scroll.addView(layout);
-        inputFocus=new InputFocusLayout(this);inputFocus.addView(scroll);setContentView(inputFocus);inputFocus.requestFocus();
-        LinearLayout header=horizontal();TextView brand=text("JM Batch",27,INK);brand.setTypeface(null,Typeface.BOLD);header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));header.addView(button("下载设置",v->settings()));layout.addView(header);
-        add(text("Android  ·  "+Core.VERSION,12,MUTED),0,4);
-        Button updateButton=button("软件更新",v->{});add(updateButton,0,10);updates=new GithubUpdates(this,updateButton);handler.postDelayed(()->updates.startup(),1500);
-        add(button("漫画库",v->showLibrary()),0,6);
-        add(button("清理下载缓存",v->CleanupScreen.show(this,store,null)),0,6);
-        add(button("权限与联网检测",v->PermissionActivity.open(this)),0,6);
-
-        LinearLayout target=card();target.addView(text("保存位置",13,MUTED));
-        output=text(store.settings.outputLabel,14,INK);output.setPadding(0,dp(8),0,dp(6));target.addView(output);
-        target.addView(new ActionRow(this,button("选择目录",v->chooseDirectory()),button("使用应用目录",v->{store.settings.outputUri="";store.settings.outputLabel="应用下载目录";save();output.setText(store.settings.outputLabel);})));
-        target.addView(button("打开保存目录",v->new SavedDirectory(this,store.settings.outputUri,store.settings.outputLabel).openExternal()));
-        target.addView(text("漫画图片对系统相册隐藏，仍可在漫画库和文件管理器中查看。",11,MUTED));
-        RadioGroup formats=new RadioGroup(this);formats.setOrientation(RadioGroup.HORIZONTAL);
-        String[] labels={"PDF","ZIP","文件夹"},values={"pdf","zip","images"};
-        for(int index=0;index<values.length;index++){
-            RadioButton choice=new RadioButton(this);choice.setId(View.generateViewId());choice.setText(labels[index]);choice.setTag(values[index]);formats.addView(choice);
-            if(values[index].equals(store.settings.format))formats.check(choice.getId());
-        }
-        formats.setOnCheckedChangeListener((group,id)->{store.settings.format=(String)group.findViewById(id).getTag();save();});target.addView(formats);
-        target.addView(button("导出漫画",v->showLibrary()));add(target,0,12);
-
-        LinearLayout input=card();TextView title=text("添加下载编号",17,INK);title.setTypeface(null,Typeface.BOLD);input.addView(title);
-        ids=edit("示例：123456, 123460-123465\n支持空格、换行、逗号及 JM 前缀",false);ids.setMinLines(2);ids.setMaxLines(5);ids.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);input.addView(ids);
-        input.addView(buttonAccent("加入队列",v->{if(addIds(ids.getText().toString())){ids.setText("");inputFocus.finishEditing();}}));
-        LinearLayout range=horizontal();rangeFirst=edit("起始编号",true);rangeLast=edit("结束编号",true);range.addView(rangeFirst,new LinearLayout.LayoutParams(0,-2,1));TextView to=text(" 至 ",14,MUTED);to.setGravity(Gravity.CENTER);range.addView(to);range.addView(rangeLast,new LinearLayout.LayoutParams(0,-2,1));input.addView(range);
-        input.addView(button("添加连续编号",v->{if(addIds(rangeFirst.getText().toString().trim()+"-"+rangeLast.getText().toString().trim())){rangeFirst.setText("");rangeLast.setText("");inputFocus.finishEditing();}}));
-        input.addView(text("每次最多添加 2000 个编号，自动跳过重复任务。\n新任务使用当前保存位置和格式，下载后可在漫画库转换格式。",11,MUTED));add(input,0,12);
-
-        start=buttonAccent("开始下载",v->startQueue());pause=button("暂停全部",v->send(DownloadService.PAUSE,null));add(new ActionRow(this,start,pause),0,8);
-        summary=text("",13,MUTED);add(summary,0,4);global=text("",12,ACCENT);add(global,0,10);
-        queue=column();layout.addView(queue);more=button("显示更多任务",v->{limit+=50;render();});layout.addView(more);
-        layout.addView(button("清除已结束任务记录",v->new AlertDialog.Builder(this).setTitle("清除已结束任务记录").setMessage("仅移除已完成和已取消的任务记录，保留已保存文件及缓存。移除后无法通过这些记录继续下载。").setNegativeButton("取消",null).setPositiveButton("移除",(d,w)->{clearHistory();}).show()));
-        layout.addView(text("可在通知栏查看下载进度或暂停任务。应用被系统关闭后，重新打开即可继续下载。",11,MUTED));
+        inputFocus=new InputFocusLayout(this);inputFocus.setBackgroundColor(BG);setContentView(inputFocus);
+        LinearLayout shell=column();shell.setPadding(dp(16),dp(12),dp(16),dp(12));inputFocus.addView(shell,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout header=horizontal(),brandBox=column();TextView brand=text("JM Batch",26,INK);brand.setTypeface(null,Typeface.BOLD);brandBox.addView(brand);brandBox.addView(text("ver "+Core.VERSION,12,MUTED));header.addView(brandBox,new LinearLayout.LayoutParams(0,-2,1));header.addView(button("⚙ 设置",v->settings()));shell.addView(header);
+        Button updateButton=button("检查更新",v->{});updates=new GithubUpdates(this,updateButton);handler.postDelayed(()->updates.startup(),1500);
+        pages=new FrameLayout(this);LinearLayout.LayoutParams pageParams=new LinearLayout.LayoutParams(-1,0,1);pageParams.topMargin=dp(12);shell.addView(pages,pageParams);
+        downloadPage=new FrameLayout(this);pages.addView(downloadPage,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout home=column();downloadPage.addView(home,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout libraryPreview=card();libraryPreview.addView(Ui.button(this,"漫画库  ↑",this::showLibrary));preview=horizontal();libraryPreview.addView(preview,new LinearLayout.LayoutParams(-1,dp(88)));home.addView(libraryPreview);
+        View fade=new View(this);android.graphics.drawable.GradientDrawable gradient=new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{Color.WHITE,BG});fade.setBackground(gradient);home.addView(fade,new LinearLayout.LayoutParams(-1,dp(18)));
+        FrameLayout panel=new FrameLayout(this);panel.setBackground(Ui.shape(this,Color.WHITE,18,true));home.addView(panel,new LinearLayout.LayoutParams(-1,0,1));
+        layout=column();layout.setPadding(dp(14),dp(10),dp(14),dp(12));panel.addView(layout,new FrameLayout.LayoutParams(-1,-1));layout.addView(Ui.heading(this,"下载页面"));
+        start=buttonAccent("开始全部",v->{if(store.running)send(DownloadService.PAUSE,null);else startQueue();});pause=button("暂停全部",v->send(DownloadService.PAUSE,null));
+        layout.addView(Ui.pair(this,start,button("清除下载记录",v->Ui.confirm(this,"是否删除任务记录",this::clearHistory))));
+        summary=text("",12,MUTED);add(summary,8,3);global=text("",12,MUTED);add(global,0,6);
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setOnScrollChangeListener((view,x,y,oldX,oldY)->refreshDownloadCovers());
+        queue=column();queue.setPadding(0,0,0,dp(80));scroll.addView(queue);layout.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));more=button("显示更多任务",v->{limit+=50;render();});layout.addView(more);
+        Button add=buttonAccent("＋",v->addDownload());add.setTextSize(28);add.setContentDescription("添加下载");add.setBackground(Ui.shape(this,ACCENT,32,false));add.setElevation(dp(5));FrameLayout.LayoutParams fab=new FrameLayout.LayoutParams(dp(58),dp(58),Gravity.BOTTOM|Gravity.RIGHT);fab.setMargins(0,0,dp(18),dp(18));panel.addView(add,fab);
+        taskSheet=column();taskSheet.setPadding(dp(18),dp(20),dp(18),dp(24));taskSheet.setBackground(Ui.shape(this,Color.WHITE,18,true));taskSheet.setElevation(dp(10));selectedCount=text("",16,INK);selectedCount.setGravity(Gravity.CENTER);selectedCount.setTypeface(null,Typeface.BOLD);taskSheet.addView(selectedCount);Ui.gap(taskSheet,20);taskSheet.addView(Ui.pair(this,button("删除任务",v->removeSelected()),button("返回",v->exitSelection())));FrameLayout.LayoutParams sheetParams=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);panel.addView(taskSheet,sheetParams);taskSheet.setVisibility(View.GONE);
+        libraryHost=new FrameLayout(this);libraryHost.setBackground(Ui.shape(this,Color.WHITE,18,true));pages.addView(libraryHost,new FrameLayout.LayoutParams(-1,-1));libraryHost.setVisibility(View.GONE);
+        output=text(store.settings.outputLabel,14,INK);inputFocus.requestFocus();refreshPreview();
         if(!store.note.isEmpty())toast(store.note);
         GalleryPrivacy.start(this,store);
-        if(state!=null&&state.getBundle("library")!=null){libraryScreen=new LibraryScreen(this,store);libraryScreen.show(state.getBundle("library"));}
+        if(state!=null&&state.getBundle("library")!=null){libraryVisible=true;downloadPage.setVisibility(View.GONE);libraryHost.setVisibility(View.VISIBLE);libraryScreen=new LibraryScreen(this,store);libraryScreen.show(state.getBundle("library"));}
     }
 
-    private void showLibrary(){if(libraryScreen==null||!libraryScreen.isOpen())libraryScreen=new LibraryScreen(this,store);libraryScreen.show();}
+    private void showLibrary(){libraryVisible=true;downloadPage.setVisibility(View.GONE);libraryHost.setVisibility(View.VISIBLE);if(libraryScreen==null||!libraryScreen.isOpen())libraryScreen=new LibraryScreen(this,store);libraryScreen.show();libraryHost.setTranslationY(dp(120));libraryHost.animate().translationY(0).setDuration(260).start();}
+    private void refreshPreview(){
+        new Thread(()->{try{LibraryStore lib=LibraryStore.get(this);lib.sync(store.snapshot());List<LibraryStore.Entry> items=lib.list("",false);List<android.graphics.Bitmap> images=new ArrayList<>();for(int i=0;i<Math.min(4,items.size());i++)images.add(LibraryCover.load(getApplicationContext(),items.get(i)));
+            runOnUiThread(()->{if(isDestroyed())return;preview.removeAllViews();if(images.isEmpty()){TextView empty=text("下载的漫画会显示在这里",13,MUTED);empty.setGravity(Gravity.CENTER);preview.addView(empty,new LinearLayout.LayoutParams(-1,-1));}for(android.graphics.Bitmap bitmap:images){ImageView image=new ImageView(this);image.setImageBitmap(bitmap);image.setScaleType(ImageView.ScaleType.CENTER_CROP);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-1,1);p.setMargins(dp(3),0,dp(3),0);preview.addView(image,p);}preview.setOnClickListener(v->showLibrary());});
+        }catch(Exception ignored){}},"library-preview").start();
+    }
+    private void addDownload(){
+        LinearLayout body=column();ids=edit("请输入数字编号，多个编号请用空格隔开",false);ids.setMinLines(3);ids.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);body.addView(ids);Ui.gap(body,14);
+        RadioGroup formats=new RadioGroup(this);formats.setOrientation(RadioGroup.HORIZONTAL);String[] labels={"pdf","zip","文件夹"},values={"pdf","zip","images"};
+        for(int i=0;i<values.length;i++){RadioButton b=new RadioButton(this);b.setId(View.generateViewId());b.setText(labels[i]);b.setTextColor(INK);b.setButtonTintList(android.content.res.ColorStateList.valueOf(ACCENT));b.setTag(values[i]);formats.addView(b,new RadioGroup.LayoutParams(0,-2,1));if(values[i].equals(store.settings.format))formats.check(b.getId());}body.addView(formats);Ui.gap(body,18);
+        addDialog=Ui.modal(this,body,false);Button accept=buttonAccent("添加",v->{String format=(String)formats.findViewById(formats.getCheckedRadioButtonId()).getTag();store.settings.format=format;save();if(addIds(ids.getText().toString())){inputFocus.finishEditing();addDialog.dismiss();PermissionAccess.requestDownloadNotifications(this);startForegroundService(new Intent(this,DownloadService.class).setAction(DownloadService.SELECTED));}});body.addView(Ui.pair(this,accept,button("返回",v->addDialog.dismiss())));addDialog.show();
+    }
+    private void selectTask(Store.Task task){if(!selecting){selecting=true;Ui.sheet(taskSheet);}if(!selected.add(task.key))selected.remove(task.key);render();}
+    private void exitSelection(){selecting=false;selected.clear();taskSheet.setVisibility(View.GONE);render();}
+    private void removeSelected(){if(selected.isEmpty())return;Ui.confirm(this,"是否删除任务记录",()->{try{LibraryStore.get(this).sync(store.snapshot());synchronized(store){if(store.libraryBusy)throw new IOException("请等待文件操作完成");for(String key:selected)if(store.activeKeys.contains(key)||store.tasks.stream().anyMatch(t->t.key.equals(key)&&(t.discardRequested||t.status.equals("cancel_failed"))))throw new IOException("请先暂停选中的下载任务，等待停止后删除记录");store.tasks.removeIf(t->selected.contains(t.key));store.save();}exitSelection();refreshPreview();}catch(Exception e){showError(e.getMessage());}});}
+    private void clickTask(Store.Task task){if(selecting){selectTask(task);return;}if(task.status.equals("running")||task.status.equals("resetting")){send(DownloadService.PAUSE_ONE,task.key);}else if(task.status.equals("failed")){retry(task);}else if(task.status.equals("done")){open(task,false);}else if(task.status.equals("paused")||task.status.equals("cancelled")){retry(task);}}
+    private void taskMenu(Store.Task task,View anchor){PopupMenu menu=new PopupMenu(this,anchor);String[] labels={"任务信息","重试","阅读","分享","选择任务"};for(String label:labels)menu.getMenu().add(label);menu.setOnMenuItemClickListener(item->{switch(item.getTitle().toString()){case "任务信息":details(task);break;case "重试":retry(task);break;case "阅读":open(task,false);break;case "分享":open(task,true);break;default:selectTask(task);}return true;});menu.show();}
     @Override protected void onSaveInstanceState(Bundle state){
         super.onSaveInstanceState(state);if(libraryScreen!=null){Bundle library=libraryScreen.saveState();if(library!=null)state.putBundle("library",library);}
     }
@@ -117,7 +127,9 @@ public final class MainActivity extends Activity {
     }
 
     private void render(){
-        if(queue==null)return;List<Store.Task> tasks=store.snapshot();int completed=0,failed=0,active=0;long speed=0;
+        if(queue==null)return;
+        if(libraryVisible){for(Store.Task task:store.snapshot()){String old=previousStates.put(task.key,task.status);if(old!=null&&!old.equals("done")&&task.status.equals("done"))Ui.notice(this,"下载完成");}showChapterSelection();return;}
+        List<Store.Task> tasks=store.snapshot();int completed=0,failed=0,active=0;long speed=0;
         Set<String> visible=new HashSet<>();
         for(int i=0;i<tasks.size();i++){
             Store.Task task=tasks.get(i);if(task.status.equals("done"))completed++;if(task.status.equals("failed"))failed++;if(task.status.equals("running")||task.status.equals("resetting")){active++;speed+=task.speed;}
@@ -126,7 +138,7 @@ public final class MainActivity extends Activity {
             row.state.setText(Store.status(task.status)+" · "+(task.settings.format.equals("images")?"图片":task.settings.format.toUpperCase(Locale.ROOT))+" · "+task.progressText()+" · 重连 "+task.resets);
             row.state.setTextColor(task.status.equals("failed")?Color.rgb(180,35,54):task.status.equals("done")?ACCENT:MUTED);
             row.progress.setIndeterminate(task.status.equals("running")&&task.total==0);row.progress.setProgress((int)(DownloadDisplay.percent(task.done,task.total,task.status)*10));
-            row.phase.setText(task.phase+"\n"+task.sizeText()+(task.status.equals("running")||task.status.equals("resetting")?"\n"+DownloadDisplay.speed(task.speed)+" · "+task.etaText():""));row.open.setVisibility(task.resultUri.isEmpty()?View.GONE:View.VISIBLE);
+            row.phase.setText(task.phase+"\n"+task.sizeText()+(task.status.equals("running")||task.status.equals("resetting")?"\n"+DownloadDisplay.speed(task.speed)+" · "+task.etaText():""));row.open.setVisibility(View.GONE);row.chosen.setVisibility(selecting&&selected.contains(task.key)?View.VISIBLE:View.GONE);String old=previousStates.put(task.key,task.status);if(old!=null&&!old.equals("done")&&task.status.equals("done")){Ui.notice(this,"下载完成");refreshPreview();}
             downloadCovers.bind(task,row.cover);
         }
         Iterator<Map.Entry<String,Row>> iterator=rows.entrySet().iterator();while(iterator.hasNext()){Map.Entry<String,Row> entry=iterator.next();if(!visible.contains(entry.getKey())){entry.getValue().cover.remove();queue.removeView(entry.getValue().card);iterator.remove();}}
@@ -134,7 +146,7 @@ public final class MainActivity extends Activity {
         global.setText(active==0?(store.running?"正在启动…":store.note.isEmpty()?(completed>0&&completed==tasks.size()?"下载完成":"暂无正在下载的任务"):store.note):"同时下载 "+active+" 本 · 总实时速度 "+DownloadDisplay.speed(speed));
         if(!store.galleryNotice.isEmpty())global.append("\n"+store.galleryNotice);
         if(!store.cleanupNotice.isEmpty())global.append("\n最近清理："+store.cleanupNotice);
-        start.setEnabled(!store.running);pause.setEnabled(store.running);more.setVisibility(tasks.size()>limit?View.VISIBLE:View.GONE);
+        start.setEnabled(true);start.setText(store.running?"暂停全部":"开始全部");pause.setEnabled(store.running);selected.retainAll(visible);selectedCount.setText("已选中"+selected.size()+"项");more.setVisibility(tasks.size()>limit?View.VISIBLE:View.GONE);
         showChapterSelection();
     }
 
@@ -184,7 +196,7 @@ public final class MainActivity extends Activity {
     }
 
     private final class Row{
-        LinearLayout card,heading,description;FrameLayout frame;TextView title,state,phase;ProgressBar progress;Button open;DownloadCovers.Target cover;
+        LinearLayout card,heading,description;FrameLayout frame;TextView title,state,phase,chosen;ProgressBar progress;Button open;DownloadCovers.Target cover;
         Row(Store.Task task){
             card=card();LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(-1,-2);params.bottomMargin=dp(10);card.setLayoutParams(params);
             heading=horizontal();card.addView(heading);
@@ -193,10 +205,10 @@ public final class MainActivity extends Activity {
             ImageView image=new ImageView(MainActivity.this);image.setScaleType(ImageView.ScaleType.CENTER_CROP);frame.addView(image,new FrameLayout.LayoutParams(-1,-1));
             TextView placeholder=text("暂无\n封面",11,MUTED);placeholder.setGravity(Gravity.CENTER);frame.addView(placeholder,new FrameLayout.LayoutParams(-1,-1));cover=new DownloadCovers.Target(image,placeholder);
             description=column();heading.addView(description,new LinearLayout.LayoutParams(0,-2,1));
-            title=text("",15,INK);title.setTypeface(null,Typeface.BOLD);title.setMaxLines(2);description.addView(title);state=text("",12,MUTED);state.setPadding(0,dp(7),0,dp(6));description.addView(state);
-            progress=new ProgressBar(MainActivity.this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(1000);card.addView(progress,new LinearLayout.LayoutParams(-1,dp(8)));
-            phase=text("",12,MUTED);phase.setPadding(0,dp(7),0,0);card.addView(phase);
-            open=button("阅读",v->open(task,false));card.addView(new ActionRow(MainActivity.this,button("详情",v->details(task)),button("重试",v->retry(task)),open));
+            title=text("",15,INK);title.setTypeface(null,Typeface.BOLD);title.setMaxLines(2);LinearLayout titleRow=horizontal();titleRow.addView(title,new LinearLayout.LayoutParams(0,-2,1));Button dots=button("⋯",v->taskMenu(task,v));dots.setContentDescription("任务更多菜单");titleRow.addView(dots,new LinearLayout.LayoutParams(dp(44),dp(44)));description.addView(titleRow);chosen=text("✓",22,ACCENT);chosen.setContentDescription("已选中任务");heading.addView(chosen);chosen.setVisibility(View.GONE);state=text("",12,MUTED);state.setPadding(0,dp(7),0,dp(6));description.addView(state);
+            progress=new ProgressBar(MainActivity.this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(1000);progress.setProgressTintList(android.content.res.ColorStateList.valueOf(ACCENT));description.addView(progress,new LinearLayout.LayoutParams(-1,dp(6)));
+            phase=text("",12,MUTED);phase.setPadding(0,dp(7),0,0);description.addView(phase);
+            open=button("阅读",v->open(task,false));card.setOnClickListener(v->clickTask(task));card.setOnLongClickListener(v->{selectTask(task);return true;});
         }
     }
 
@@ -250,33 +262,7 @@ public final class MainActivity extends Activity {
         }catch(Exception error){showError("无法保留目录授权："+error.getMessage());}
     }
 
-    private void settings(){
-        LinearLayout form=column();form.setPadding(dp(20),dp(12),dp(20),dp(18));ScrollView scroll=new ScrollView(this);scroll.addView(form);
-        String[] names={"每任务图片线程数（1–16）","请求超时（秒，5–120）","请求重试次数（0–5）","慢速阈值（KB/s，0 表示仅检测无进度）","慢速检测时长（秒，15–600）","无进度超时（秒，30–1800）","每任务自动重连上限（0–10）","同时下载任务数（1–4，默认 2）","每任务章节并行数（1–8，默认 4）"};
-        int[] values={store.settings.threads,store.settings.timeout,store.settings.retries,store.settings.slowKB,store.settings.window,store.settings.stall,store.settings.maxResets,store.settings.concurrentTasks,store.settings.chapterWorkers};
-        EditText[] fields=new EditText[names.length];
-        for(int i=0;i<names.length;i++){form.addView(text(names[i],13,MUTED));fields[i]=edit("",true);fields[i].setText(Integer.toString(values[i]));form.addView(fields[i]);}
-        CheckBox auto=new CheckBox(this);auto.setText("下载缓慢或无进度时自动重连");auto.setChecked(store.settings.autoReset);form.addView(auto);
-        CheckBox allChapters=new CheckBox(this);allChapters.setText("默认下载全部章节（跳过章节选择）");allChapters.setChecked(store.settings.downloadAllChapters);form.addView(allChapters);
-        form.addView(text("多章节观看模式",13,MUTED));
-        Spinner chapterView=new Spinner(this);ArrayAdapter<String> chapterModes=new ArrayAdapter<>(this,android.R.layout.simple_spinner_item,new String[]{"1 多章节合一","2 分章节观看"});chapterModes.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);chapterView.setAdapter(chapterModes);chapterView.setSelection(store.settings.chapterViewMode-1);form.addView(chapterView);
-        form.addView(text("保存后重新打开漫画生效。分章节观看在章末停止，通过上一章、下一章或章节列表切换；书签及总页码跳转可跨章。",12,MUTED));
-        form.addView(text("Cookie（可选，仅本次会话有效）",13,MUTED));EditText cookie=edit("key=value; key2=value2",false);cookie.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);cookie.setText(store.cookie);form.addView(cookie);
-        form.addView(text("并行数越高，请求和内存占用越多；超时或限流时可适当调低。\n实时速度按每秒完成下载、处理并写入缓存的图片字节统计；大图未完成时可能为 0，缓存复用和失败重试不计入。\n慢速检测针对单个图片连接，阈值按图片线程数分摊；本地处理等待不触发网络重连。\n任务数保存后生效；调低时等待当前任务完成。\n其他设置用于新任务和手动重试，已有任务保留原保存位置和格式。",12,MUTED));
-        form.addView(button("离线诊断",v->selfTest()));
-        form.addView(button("使用说明",v->new AlertDialog.Builder(this).setTitle("使用说明").setMessage("1. 选择保存位置和下载格式，添加编号或连续编号。\n2. 点击“开始下载”，可在通知栏查看进度或暂停。\n3. 下载后在任务详情或漫画库选择“导出漫画”，再选择 PDF、ZIP、命名方式与保存目录。\n4. 多章节 PDF 可统一导出或分章节导出，导出始终保留原始图片。\n5. 下载失败时保留完整缓存，可查看失败原因后点击“重试”。\n6. 应用目录在卸载后会被删除，重要图片请选公共目录或导出备份。\n7. 导出和文件管理前请暂停下载，系统目录授权失效时需重新选择目录。").setPositiveButton("确定",null).show()));
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("下载设置").setView(scroll).setNegativeButton("取消",null).setPositiveButton("保存",null).create();
-        dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
-            try{
-                int[] nums=new int[fields.length];for(int i=0;i<fields.length;i++)nums[i]=Integer.parseInt(fields[i].getText().toString().trim());
-                Store.Settings options=new Store.Settings(store.settings.json());options.threads=nums[0];options.timeout=nums[1];options.retries=nums[2];options.slowKB=nums[3];options.window=nums[4];options.stall=nums[5];options.maxResets=nums[6];options.concurrentTasks=nums[7];options.chapterWorkers=nums[8];options.autoReset=auto.isChecked();options.keepImages=false;options.numericFilename=false;options.flatZip=false;options.validate();
-                options.downloadAllChapters=allChapters.isChecked();
-                options.chapterViewMode=chapterView.getSelectedItemPosition()+1;options.validate();
-                String secret=cookie.getText().toString().trim();if(secret.contains("\n")||secret.contains("\r")||(!secret.isEmpty()&&!secret.contains("=")))throw new IllegalArgumentException("Cookie 格式应为 key=value; key2=value2，不能包含换行");
-                store.settings=options;store.cookie=secret;store.save();toast("设置已保存");dialog.dismiss();
-            }catch(Exception error){showError(error instanceof NumberFormatException?"请输入有效的整数，并确认数值在允许范围内。":error.getMessage());}
-        }));dialog.show();
-    }
+    private void settings(){new SettingsScreen(this,store,updates,this::chooseDirectory,()->output,()->save()).show();}
 
     private void selfTest(){
         if(store.running){toast("请先暂停下载，再运行离线诊断。");return;}
@@ -293,8 +279,9 @@ public final class MainActivity extends Activity {
     private LinearLayout horizontal(){LinearLayout v=new LinearLayout(this);v.setOrientation(LinearLayout.HORIZONTAL);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
     private LinearLayout card(){LinearLayout v=column();v.setPadding(dp(14),dp(14),dp(14),dp(14));GradientDrawable shape=new GradientDrawable();shape.setColor(Color.WHITE);shape.setCornerRadius(dp(14));v.setBackground(shape);return v;}
     private TextView text(String value,int size,int color){TextView v=new TextView(this);v.setText(value);v.setTextSize(size);v.setTextColor(color);v.setLineSpacing(dp(2),1);return v;}
-    private EditText edit(String hint,boolean number){EditText v=new EditText(this);v.setTextSize(15);v.setTextColor(INK);v.setHintTextColor(MUTED);v.setHint(hint);v.setSingleLine(number);if(number)v.setInputType(InputType.TYPE_CLASS_NUMBER);v.setSelectAllOnFocus(false);return v;}
-    private Button button(String label,View.OnClickListener click){Button v=new ActionButton(this);v.setText(label);v.setTextSize(13);v.setTextColor(ACCENT);v.setOnClickListener(click);return v;}
-    private Button buttonAccent(String label,View.OnClickListener click){Button v=button(label,click);v.setTextColor(Color.WHITE);v.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ACCENT));return v;}
+    private EditText editLegacy(String hint,boolean number){EditText v=new EditText(this);v.setTextSize(15);v.setTextColor(INK);v.setHintTextColor(MUTED);v.setHint(hint);v.setSingleLine(number);if(number)v.setInputType(InputType.TYPE_CLASS_NUMBER);v.setSelectAllOnFocus(false);return v;}
+    private EditText edit(String hint,boolean number){return Ui.input(this,hint,number);}
+    private Button button(String label,View.OnClickListener click){Button v=new ActionButton(this);v.setText(label);v.setTextSize(13);v.setTextColor(INK);v.setOnClickListener(click);return v;}
+    private Button buttonAccent(String label,View.OnClickListener click){Button v=button(label,click);Ui.primary(v);return v;}
     private void add(View view,int top,int bottom){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(top);p.bottomMargin=dp(bottom);layout.addView(view,p);}
 }

@@ -47,6 +47,10 @@ class Engine:
         self.last_saved = 0
         self.context = mp.get_context("spawn")
         self.load()
+        self.rate_limit = self.context.Value('i', self.settings.download_limit_kbps, lock=False)
+        self.rate_path = self.home / 'download-rate.bin'
+        self.home.mkdir(parents=True, exist_ok=True)
+        self.rate_path.write_bytes(bytes(24))
         self.library = Library(home)
         try:
             self.library.sync(self.tasks)
@@ -120,6 +124,15 @@ class Engine:
         # Dispatch through the usual worker without resuming unrelated paused tasks.
         self.running = True
         return task
+
+    def pause_one(self,key):
+        state=self.active.pop(key,None)
+        if state:
+            self._stop_process(state)
+            state.task.status="paused"
+            state.task.phase="已暂停，保留已验证图片"
+            state.task.speed=0
+            self.save()
 
     def pause(self):
         self.running = False
@@ -256,7 +269,8 @@ class Engine:
         state.bytes = 0
         state.watch = SpeedWatch(Settings(**task.settings), now)
         state.channel = self.context.Queue()
-        snapshot = dict(task.to_dict(), _cover_home=str(self.home))
+        snapshot = dict(task.to_dict(), _cover_home=str(self.home),
+                        _rate_limit=self.rate_limit, _rate_path=str(self.rate_path))
         state.process = self.context.Process(target=self.worker_target, args=(snapshot, self.cookie, state.channel), daemon=True)
         try:
             state.process.start()
@@ -301,6 +315,9 @@ class Engine:
         elif kind == "metadata":
             task.phase = event["message"]
             state.watch.last_progress = now
+        elif kind == "throttled":
+            state.watch.last_progress = now
+            state.watch.start = now
         elif kind == "phase":
             state.phase = event["phase"]
             task.phase = event["message"]
@@ -394,6 +411,7 @@ class Engine:
                 task.speed = 0
 
     def tick(self, now=None):
+        self.rate_limit.value = self.settings.download_limit_kbps
         now = time.monotonic() if now is None else now
         self._tick_cancellations()
         for state in list(self.active.values()):

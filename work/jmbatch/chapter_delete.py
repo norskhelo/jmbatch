@@ -50,8 +50,12 @@ def remap_state(state, chapters, removed):
     mapping = {old: new for new, old in enumerate(kept)}
     current = state["page"]
     nearest = next((i for i in kept if i >= current), kept[-1])
-    return dict(page=mapping[nearest], mode=state["mode"],
-                bookmarks=[mapping[i] for i in state["bookmarks"] if i in mapping])
+    result = dict(page=mapping[nearest], mode=state["mode"],
+                  bookmarks=[mapping[i] for i in state["bookmarks"] if i in mapping])
+    if 'bookmarkNames' in state:
+        result['bookmarkNames'] = {str(mapping[i]): state['bookmarkNames'][str(i)]
+                                   for i in state['bookmarks'] if i in mapping and str(i) in state['bookmarkNames']}
+    return result
 
 
 def _copy(source, target, cancelled):

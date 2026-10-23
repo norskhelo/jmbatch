@@ -92,7 +92,10 @@ public final class ChapterDeletion {
         for(int i:mapping.keySet())if(i>=old){page=mapping.get(i);break;}
         JSONArray marks=new JSONArray(),original=previous.optJSONArray("bookmarks");
         if(original!=null)for(int i=0;i<original.length();i++)if(mapping.containsKey(original.getInt(i)))marks.put(mapping.get(original.getInt(i)));
-        return new JSONObject().put("page",page).put("mode",previous.optString("mode","scroll")).put("bookmarks",marks);
+        JSONObject result=new JSONObject().put("page",page).put("mode",previous.optString("mode","scroll")).put("bookmarks",marks);
+        JSONObject oldNames=previous.optJSONObject("bookmarkNames"),names=new JSONObject();
+        if(oldNames!=null){for(int oldPage:mapping.keySet())if(oldNames.has(Integer.toString(oldPage)))names.put(Integer.toString(mapping.get(oldPage)),oldNames.getString(Integer.toString(oldPage)));result.put("bookmarkNames",names);}
+        return result;
     }
     public static String delete(Context context,Store store,LibraryStore.Entry item,Plan expected,Set<Integer> removed,
                                 BooleanSupplier cancelled,Consumer<String> progress)throws Exception {

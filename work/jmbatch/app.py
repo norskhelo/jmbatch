@@ -16,10 +16,10 @@ from engine import Engine
 from download_display import format_size, format_speed, percent, progress_text, size_text, eta_text
 from chapter_ui import poll_chapters
 
-BG = "#f3f5f8"
-INK = "#172c3e"
-MUTED = "#617387"
-ACCENT = "#087f8c"
+BG = "#f5f5f7"
+INK = "#1d1f26"
+MUTED = "#747780"
+ACCENT = "#73757c"
 STATUS = {"cancelling": "正在取消", "cancel_failed": "清理失败", "selecting": "待选章节", "queued": "等待下载", "running": "下载中", "paused": "已暂停", "resetting": "正在重连", "failed": "下载失败", "done": "下载完成", "cancelled": "已取消"}
 
 
@@ -80,19 +80,20 @@ class App:
         style = ttk.Style(self.root)
         style.theme_use("clam")
         self.root.option_add("*Font", ("Microsoft YaHei UI", 10))
-        style.configure("TFrame", background=BG)
+        style.configure("TFrame", background="white")
         style.configure("Card.TFrame", background="white")
-        style.configure("TLabel", background=BG, foreground=INK, font=("Microsoft YaHei UI", 10))
+        style.configure("TLabel", background="white", foreground=INK, font=("Microsoft YaHei UI", 10))
         style.configure("Card.TLabel", background="white")
         style.configure("Muted.TLabel", foreground=MUTED)
         style.configure("TButton", padding=(13, 8), background="white", foreground=INK, borderwidth=1)
-        style.map("TButton", background=[("active", "#e5edf2"), ("disabled", "#eff1f4")])
+        style.map("TButton", background=[("active", "#e8e8ec"), ("disabled", "#eff1f4")])
         style.configure("Accent.TButton", background=ACCENT, foreground="white", font=("Microsoft YaHei UI", 10, "bold"))
-        style.map("Accent.TButton", background=[("active", "#096a75"), ("disabled", "#9bbbbd")], foreground=[("disabled", "white")])
-        style.configure("TEntry", padding=6)
+        style.map("Accent.TButton", background=[("active", "#606269"), ("disabled", "#aaaab0")], foreground=[("disabled", "white")])
+        style.configure("Fab.TButton", background=ACCENT, foreground="white", font=("Segoe UI",22), padding=(12,6))
+        style.configure("TEntry", padding=9)
         style.configure("Treeview", font=("Microsoft YaHei UI", 10), rowheight=34, background="white", fieldbackground="white", foreground=INK, borderwidth=0)
         style.configure("Treeview.Heading", font=("Microsoft YaHei UI", 10, "bold"), background="#e8eef3", padding=8)
-        style.map("Treeview", background=[("selected", "#d7edf0")], foreground=[("selected", INK)])
+        style.map("Treeview", background=[("selected", "#e5e5e9")], foreground=[("selected", INK)])
         style.configure("Horizontal.TProgressbar", background=ACCENT, troughcolor="#dfe8ed", borderwidth=0, thickness=9)
         style.configure("TRadiobutton", background=BG, foreground=INK)
         style.configure("TCheckbutton", background=BG, foreground=INK)
@@ -100,117 +101,8 @@ class App:
         style.configure("TNotebook.Tab", padding=(14, 6))
 
     def _build(self):
-        outer = ttk.Frame(self.root, padding=20)
-        outer.pack(fill="both", expand=True)
-        outer.columnconfigure(0, weight=1)
-        outer.rowconfigure(5, weight=1)
-        header = ttk.Frame(outer)
-        header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
-        ttk.Label(header, text="JM Batch", font=("Segoe UI", 26, "bold"), foreground=INK).pack(side="left")
-        ttk.Label(header, text="  批量漫画下载", font=("Microsoft YaHei UI", 12), foreground=MUTED).pack(side="left", pady=(10, 0))
-        from cleanup_ui import show_cleanup
-        self.cleanup_button = ttk.Button(header, text="清理下载缓存", command=lambda: show_cleanup(self))
-        self.cleanup_button.pack(side="right", padx=(6, 0))
-        ttk.Button(header, text="下载设置", command=self.settings_dialog).pack(side="right")
-        self.update_button = ttk.Button(header, text="软件更新")
-        self.update_button.pack(side="right", padx=6)
-        ttk.Label(header, text=f"Windows  ·  {VERSION}", foreground=ACCENT, font=("Segoe UI", 10, "bold")).pack(side="right", padx=18)
-
-        dest = ttk.Frame(outer)
-        dest.grid(row=1, column=0, sticky="ew", pady=(0, 8))
-        dest.columnconfigure(1, weight=1)
-        ttk.Label(dest, text="保存位置").grid(row=0, column=0, padx=(0, 12))
-        self.output_var = tk.StringVar(value=self.engine.settings.output)
-        ttk.Entry(dest, textvariable=self.output_var).grid(row=0, column=1, sticky="ew")
-        ttk.Button(dest, text="选择目录", command=self.choose_dir).grid(row=0, column=2, padx=(8, 18))
-        self.format_var = tk.StringVar(value=self.engine.settings.format)
-        formats = ttk.Frame(dest)
-        formats.grid(row=0, column=3, padx=7)
-        for label, value in (("PDF", "pdf"), ("ZIP", "zip"), ("文件夹", "images")):
-            ttk.Radiobutton(formats, text=label, value=value, variable=self.format_var, command=self.save_format).pack(side="left")
-        ttk.Button(dest, text="导出漫画", command=self.export_selected).grid(row=0, column=4)
-
-        entry = ttk.Frame(outer, style="Card.TFrame", padding=12)
-        entry.grid(row=2, column=0, sticky="ew", pady=(0, 8))
-        entry.columnconfigure(0, weight=1)
-        ttk.Label(entry, text="添加下载编号", font=("Microsoft YaHei UI", 11, "bold"), style="Card.TLabel").grid(row=0, column=0, sticky="w")
-        ttk.Label(entry, text="示例：123456, 123460-123465  ·  支持空格、换行、逗号及 JM 前缀", foreground=MUTED, style="Card.TLabel").grid(row=1, column=0, sticky="w", pady=(5, 8))
-        self.input = tk.Text(entry, height=2, wrap="word", bg="#f7f9fb", fg=INK, relief="flat", highlightthickness=1, highlightbackground="#dce4eb", padx=10, pady=8, undo=True)
-        self.input.grid(row=2, column=0, sticky="ew", padx=(0, 16))
-        self.input.bind("<Control-Return>", lambda _: self.add_input())
-        quick = ttk.Frame(entry, style="Card.TFrame")
-        quick.grid(row=0, column=1, rowspan=3, sticky="ns")
-        ttk.Label(quick, text="连续编号", style="Card.TLabel").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 10))
-        self.range_start = tk.StringVar()
-        self.range_end = tk.StringVar()
-        ttk.Entry(quick, textvariable=self.range_start, width=10).grid(row=1, column=0)
-        ttk.Label(quick, text=" 至 ", style="Card.TLabel").grid(row=1, column=1)
-        ttk.Entry(quick, textvariable=self.range_end, width=10).grid(row=1, column=2)
-        ttk.Button(quick, text="添加连续编号", command=self.add_range).grid(row=2, column=0, columnspan=3, sticky="ew", pady=(10, 0))
-        ttk.Button(entry, text="加入队列  Ctrl + Enter", style="Accent.TButton", command=self.add_input).grid(row=3, column=0, sticky="w", pady=(10, 0))
-        ttk.Label(entry, text="新任务使用当前保存位置和格式。下载完成后可在漫画库转换格式。", foreground=MUTED, style="Card.TLabel").grid(row=4, column=0, columnspan=2, sticky="w", pady=(9, 0))
-
-        bar = ttk.Frame(outer)
-        bar.grid(row=3, column=0, sticky="ew", pady=(0, 10))
-        self.start_button = ttk.Button(bar, text="开始下载", style="Accent.TButton", command=self.start)
-        self.start_button.pack(side="left")
-        self.pause_button = ttk.Button(bar, text="暂停全部", command=self.pause)
-        self.pause_button.pack(side="left", padx=7)
-        ttk.Button(bar, text="重试任务", command=self.retry).pack(side="left")
-        self.cancel_button = ttk.Button(bar, text="取消并删除", command=self.cancel)
-        self.cancel_button.pack(side="left", padx=7)
-        ttk.Button(bar, text="移除记录", command=self.remove).pack(side="left")
-        ttk.Button(bar, text="漫画库", command=self.show_library).pack(side="left", padx=6)
-        ttk.Button(bar, text="开始阅读", command=self.open_selected).pack(side="right")
-        ttk.Button(bar, text="打开保存目录", command=self.open_output).pack(side="right", padx=7)
-
-        stats = ttk.Frame(outer)
-        stats.grid(row=4, column=0, sticky="ew", pady=(0, 9))
-        self.summary = tk.StringVar(value="暂无任务，请添加下载编号")
-        ttk.Label(stats, textvariable=self.summary, foreground=MUTED).pack(side="left")
-        self.speed_text = tk.StringVar(value="实时速度  —")
-        ttk.Label(stats, textvariable=self.speed_text, foreground=ACCENT).pack(side="right")
-
-        table = ttk.Frame(outer)
-        table.grid(row=5, column=0, sticky="nsew")
-        columns = ("id", "title", "status", "progress", "size", "format", "resets")
-        ttk.Style(self.root).configure("Download.Treeview", rowheight=82)
-        self.tree = ttk.Treeview(table, columns=columns, show="tree headings", selectmode="extended", height=2, style="Download.Treeview")
-        self.tree.heading("#0", text="封面")
-        self.tree.column("#0", width=76, minwidth=76, stretch=False)
-        from download_covers import DownloadCovers
-        self.download_covers = DownloadCovers(self.tree, self.home)
-        for key, label, width in [("id", "编号", 100), ("title", "标题", 220), ("status", "状态", 95), ("progress", "完成进度", 180), ("size", "漫画大小", 125), ("format", "格式", 65), ("resets", "重连", 60)]:
-            self.tree.heading(key, text=label)
-            self.tree.column(key, width=width, minwidth=60, stretch=key == "title", anchor="w")
-        for tag, color in [("failed", "#b42336"), ("done", "#117767"), ("paused", MUTED), ("cancelled", MUTED), ("resetting", "#9d6507")]:
-            self.tree.tag_configure(tag, foreground=color)
-        scroll = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scroll.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        scroll.pack(side="right", fill="y")
-        self.tree.bind("<<TreeviewSelect>>", lambda _: self.update_details())
-        self.tree.bind("<Double-1>", lambda _: self.open_selected())
-        self.tree.bind("<Return>", lambda _: self.open_selected())
-
-        progress = ttk.Frame(outer)
-        progress.grid(row=6, column=0, sticky="ew", pady=(8, 6))
-        self.progress_text = tk.StringVar(value="等待添加任务")
-        self.progress_label = ttk.Label(progress, textvariable=self.progress_text, foreground=MUTED, justify="left", wraplength=920)
-        self.progress_label.pack(anchor="w", pady=(0, 7))
-        progress.bind("<Configure>", lambda event: self.progress_label.configure(wraplength=max(100, event.width)))
-        self.progressbar = ttk.Progressbar(progress, mode="determinate", maximum=100)
-        self.progressbar.pack(fill="x")
-
-        notebook = ttk.Notebook(outer)
-        notebook.grid(row=7, column=0, sticky="ew")
-        details_frame = ttk.Frame(notebook)
-        logs_frame = ttk.Frame(notebook)
-        notebook.add(details_frame, text="任务详情")
-        notebook.add(logs_frame, text="运行记录")
-        self.details = self._text_panel(details_frame, 4)
-        self.logs = self._text_panel(logs_frame, 4)
-        self._set_text(self.details, "选择任务可查看进度、保存位置和失败原因。\n自动重连会保留完整图片，导出期间不执行。")
+        from ui_main import build
+        build(self)
 
     def _text_panel(self, parent, height):
         text = tk.Text(parent, height=height, wrap="word", relief="flat", bg="white", fg=INK, padx=12, pady=10, state="disabled", font=("Microsoft YaHei UI", 9))
@@ -330,13 +222,8 @@ class App:
         self.render()
 
     def show_library(self):
-        from library import LibraryWindow
-        existing = getattr(self, "library_window", None)
-        if existing and existing.window.winfo_exists():
-            existing.window.lift()
-            existing.refresh()
-        else:
-            self.library_window = LibraryWindow(self)
+        from ui_main import show_library
+        show_library(self)
 
     def remove(self):
         keys = set(self.tree.selection())
@@ -451,6 +338,8 @@ class App:
                                    (f"JM{latest.album_id} · 下载完成 · 100.0%\n" + size_text(latest.done, latest.total, latest.image_bytes, latest.result_bytes, latest.status) if latest else "暂无正在下载的任务"))
             self.progressbar["value"] = 100 if latest and not waiting else 0
         self.update_details()
+        from ui_main import refresh
+        refresh(self)
 
     def tick(self):
         try:
@@ -480,6 +369,10 @@ class App:
             self.library_window.status.set("请在漫画库选择一本漫画，然后点击“导出漫画”。")
 
     def settings_dialog(self):
+        from ui_settings import show
+        return show(self)
+
+    def advanced_settings_dialog(self):
         dialog = tk.Toplevel(self.root)
         dialog.title("下载设置")
         dialog.configure(bg=BG)
