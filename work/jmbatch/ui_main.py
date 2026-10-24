@@ -28,6 +28,7 @@ class DownloadList(DisplayView):
         self.paint_timer=None
         if self.mode!='tiles':return
         self._extent();self.canvas.delete('all');keys=self.get_children();chosen=set(self.selection())
+        self.selection_effects.begin(self.app.selecting)
         tasks={t.key:t for t in self.app.engine.tasks};width=self.canvas.winfo_width();pictures={}
         for key in self.visible_keys():
             task=tasks.get(key)
@@ -56,8 +57,9 @@ class DownloadList(DisplayView):
             detail=f'{format_size(task.result_bytes if task.status=="done" and task.result_bytes else task.image_bytes)} / {format_size(total) if total else "—"}'
             if task.status in ('running','resetting'):detail+=' · '+format_speed(task.speed)
             self.canvas.create_text(108,y+96,text=self._lines(detail,max(40,width-150),1),anchor='nw',fill=MUTED,font=self.tile_font)
-            if self.app.selecting and key in chosen:self.canvas.create_text(width-23,y+73,text='✓',font=('Segoe UI',18,'bold'),fill=ACCENT)
+            if self.app.selecting:self.selection_effects.draw(self.canvas,key,width-33,y+63,key in chosen)
         self.row_images=pictures
+        if self.selection_effects.end() and self.paint_timer is None:self.paint_timer=self.after(16,self._paint)
 
     def cancel_press(self,event=None):
         if self.press_job:self.after_cancel(self.press_job)
@@ -80,8 +82,8 @@ class DownloadList(DisplayView):
         if not self.pressed or self.held:return 'break'
         key=self.pressed[0];self.pressed=None
         if not key or key!=self.identify_at(event.x,event.y):return 'break'
-        if event.x>self.canvas.winfo_width()-60:task_menu(self.app,key,event.x_root,event.y_root);return 'break'
         if self.app.selecting:self.selection_toggle(key);show_selection(self.app);return 'break'
+        if event.x>self.canvas.winfo_width()-60:task_menu(self.app,key,event.x_root,event.y_root);return 'break'
         self.selection_set(key);task=self.app.selected_task()
         if task.status in ('running','resetting'):self.app.engine.pause_one(key)
         elif task.status=='failed':self.app.retry()
@@ -98,10 +100,10 @@ def build(app):
     install_styles(app.root)
     app.selecting=False;app.previous_states={};app.library_visible=False
     height=min(940,app.root.winfo_screenheight()-100);app.root.minsize(480,640);app.root.geometry(f'{int(height*.735)}x{height}')
-    outer=ttk.Frame(app.root,padding=12,style='Page.TFrame');outer.pack(fill='both',expand=True)
+    outer=app.main_page=ttk.Frame(app.root,padding=12,style='Page.TFrame');outer.pack(fill='both',expand=True)
     header=ttk.Frame(outer,style='Page.TFrame');header.pack(fill='x',pady=(0,16))
     brand=ttk.Frame(header,style='Page.TFrame');brand.pack(side='left');ttk.Label(brand,text='JM Batch',font=('Segoe UI',26,'bold'),style='Page.TLabel').pack(anchor='w');ttk.Label(brand,text=f'ver {VERSION}',foreground=MUTED,style='Page.TLabel').pack(anchor='w')
-    ttk.Button(header,text='⚙ 设置',command=app.settings_dialog).pack(side='right',anchor='s')
+    app.settings_button=ttk.Button(header,text='⚙',width=3,command=app.settings_dialog);app.settings_button.pack(side='right',anchor='s')
     app.update_button=ttk.Button(header);app.cleanup_button=ttk.Button(header)
     app.output_var=tk.StringVar(value=app.engine.settings.output);app.format_var=tk.StringVar(value=app.engine.settings.format)
     app.range_start=tk.StringVar();app.range_end=tk.StringVar()
@@ -135,7 +137,7 @@ def build(app):
     actions(app.task_sheet.body,'删除任务','返回',lambda:remove_selected(app),lambda:exit_selection(app))
     # Keep existing diagnostic widgets as a model, accessed from the task menu.
     hidden=ttk.Frame(app.root);app.input=tk.Text(hidden);app.details=app._text_panel(hidden,4);app.logs=app._text_panel(hidden,4);app.progress_text=tk.StringVar();app.progressbar=ttk.Progressbar(hidden)
-    app.root.bind('<Escape>',lambda e:'break' if getattr(app,'page_exchange',None) is not None else hide_library(app) if app.library_visible else exit_selection(app))
+    app.root.bind('<Escape>',lambda e:back(app))
     from library_ui import LibraryWindow
     app.library_window=LibraryWindow(app,app.pages)
     app.page_exchange=None;app.page_animation=None
@@ -145,6 +147,13 @@ def build(app):
     bind_page_switch(app,app.library_window.window,True)
     app.root.after_idle(lambda:layout_live_pages(app))
 
+
+def back(app):
+    if getattr(app,'settings_page',None) is not None:app.close_settings()
+    elif getattr(app,'page_exchange',None) is None:
+        if app.library_visible:hide_library(app)
+        else:exit_selection(app)
+    return 'break'
 
 
 def add_dialog(app):
@@ -256,6 +265,8 @@ def settle_live_pages(app):
 def paint_live_seam(app):
     # Only the stationary 54 px seam uses a filtered sample. Page motion is native.
     if not hasattr(app,'seam_canvas') or getattr(app,'page_exchange',None) is not None:return
+    # Keep the last valid seam while the home page is offscreen behind settings.
+    if getattr(app,'settings_page',None) is not None:return
     from PIL import Image,ImageGrab,ImageFilter,ImageTk,ImageDraw
     width,height=app.pages.winfo_width(),app.pages.winfo_height()
     if width<30 or height<60:return

@@ -154,7 +154,7 @@ public final class ChapterDeletion {
             if(metadata!=null){AlbumStorage.remember(context,replacement,metadata);AlbumStorage.load(context,replacement);}
             check(cancelled);
             if(!history.edit().putString(replacement.toString(),mapped.toString()).commit())throw new IOException("无法保存阅读记录，原漫画保留");
-            LibraryStore.Entry updated=new LibraryStore.Entry(item.id,item.title,replacement.toString(),item.tree,item.label,item.format,item.favorite);
+            LibraryStore.Entry updated=new LibraryStore.Entry(item.id,item.title,replacement.toString(),item.tree,item.label,item.format,item.favorite,item.collection,current.counts.size()-removed.size());
             try{LibraryStore.get(context).replaceChapters(store,item,updated);}
             catch(LibraryStore.RecoveryFailure error){committed=true;throw error;}
             committed=true;String warning="";

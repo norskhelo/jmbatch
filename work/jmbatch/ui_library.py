@@ -7,7 +7,7 @@ from ui_common import *
 
 
 def build(view,parent):
-    view.embedded=parent is not None;view.moving=False;view.sort_mode='name';view.sort_reverse=False;view.sort_facts={};view.checking_updates=False
+    view.embedded=parent is not None;view.moving=False;view.sort_mode='name';view.sort_facts={};view.checking_updates=False
     if parent is None:
         view.window=tk.Toplevel(view.app.root);view.window.title('漫画库');view.window.geometry('980x700');view.window.protocol('WM_DELETE_WINDOW',view.close)
     else:
@@ -15,7 +15,7 @@ def build(view,parent):
     surface=view.surface=Panel(view.window,padding=18,connected_top=view.embedded);surface.pack(fill='both',expand=True);body=surface.body
     header=ttk.Frame(body);header.pack(fill='x');ttk.Label(header,text='漫画库',font=('Microsoft YaHei UI',22,'bold')).pack(side='left')
     bar=ttk.Frame(body);bar.pack(fill='x',pady=14);bar.columnconfigure((0,1,2),weight=1,uniform='tools')
-    ttk.Button(bar,text='检查更新',command=lambda:check_all(view)).grid(row=0,column=0,sticky='ew',padx=(0,4));view.sort_button=ttk.Button(bar,text='排序方式（正序）⌄',command=lambda:sort_menu(view));view.sort_button.grid(row=0,column=1,sticky='ew',padx=4);icon_button(bar,'folder','新建收藏夹',lambda:new_collection(view)).grid(row=0,column=2,sticky='ew',padx=(4,0))
+    ttk.Button(bar,text='检查更新',command=lambda:check_all(view)).grid(row=0,column=0,sticky='ew',padx=(0,4));view.sort_button=ttk.Button(bar,text='排序方式',command=lambda:sort_menu(view));view.sort_button.grid(row=0,column=1,sticky='ew',padx=4);icon_button(bar,'folder',command=lambda:new_collection(view)).grid(row=0,column=2,sticky='ew',padx=(4,0))
 
     view.query=tk.StringVar();view.only_favorites=tk.BooleanVar();view.hint=tk.StringVar();view.breadcrumb=tk.StringVar()
     hidden=ttk.Frame(body);view.back_button=ttk.Button(hidden);view.mode_button=ttk.Button(hidden);view.selection_controls=ttk.Frame(hidden);view.stop_button=ttk.Button(hidden);view.display_mode=tk.StringVar(value='tiles')
@@ -45,22 +45,14 @@ def build(view,parent):
 
 
 def update_mode(view):
+    view.tree.selecting=view.batch_mode;view.tree._schedule()
     view.selection_count.set(f'已选中{len(view.tree.selection())}项')
-    shade=getattr(view,'selection_shade',None)
-    if shade:shade.destroy();view.selection_shade=None
-    if view.batch_mode and not view.moving:
-        from PIL import ImageGrab,ImageFilter,Image,ImageTk
-        view.tree.canvas.update_idletasks()
-        shot=ImageGrab.grab(window=view.tree.canvas.winfo_id()).filter(ImageFilter.GaussianBlur(4));shot=Image.blend(shot.convert('RGB'),Image.new('RGB',shot.size,'#aeb0b6'),.28)
-        shade=tk.Label(view.tree.canvas,bd=0);shade.image=ImageTk.PhotoImage(shot,master=view.window);shade.configure(image=shade.image);shade.place(x=0,y=0,relwidth=1,relheight=1);view.selection_shade=shade
-        for sequence in ('<ButtonPress-1>','<ButtonRelease-1>','<B1-Motion>'):
-            shade.bind(sequence,lambda e,s=sequence:view.tree.canvas.event_generate(s,x=e.x,y=e.y,state=e.state))
-        shade.bind('<MouseWheel>',lambda e:(view.tree.canvas.event_generate('<MouseWheel>',delta=e.delta),view.window.after_idle(lambda:update_mode(view))))
     if view.batch_mode or view.moving:
-        new_sheet=not view.sheet_surface.winfo_ismapped();view.sheet_surface.configure(height=118 if view.moving else 218);view.sheet_surface.place(x=1,y=getattr(view,'page_content_height',view.window.winfo_height())-1,relwidth=1,width=-2,anchor='sw');view.sheet_surface.lift()
-        if new_sheet:slide_sheet(view.sheet_surface)
+        bottom=lambda:getattr(view,'page_content_height',view.window.winfo_height())
+        new_sheet=not view.sheet_surface.winfo_ismapped();view.sheet_surface.configure(height=118 if view.moving else 218);view.sheet_surface.place(x=1,rely=0,y=bottom()-1,relwidth=1,width=-2,anchor='sw');view.sheet_surface.lift()
+        if new_sheet:slide_sheet(view.sheet_surface,bottom=bottom)
         if view.moving:view.batch_area.pack_forget();view.selection_label.pack_forget();view.move_area.pack(fill='x')
-        else:view.move_area.pack_forget();view.selection_label.pack(fill='x',before=view.batch_area);view.batch_area.pack(fill='x')
+        else:view.move_area.pack_forget();view.batch_area.pack(fill='x');view.selection_label.pack(fill='x',before=view.batch_area)
     else:view.sheet_surface.place_forget()
 
 
@@ -75,22 +67,16 @@ def new_collection(view):
 def sort_menu(view):
     menu=tk.Menu(view.window,tearoff=False,bg='white')
     def choose(mode):
-        if mode==view.sort_mode:view.sort_reverse=not view.sort_reverse
-        else:view.sort_mode=mode
-        view.sort_button.configure(text='排序方式（'+('倒序' if view.sort_reverse else '正序')+'）⌄')
-        if view.sort_mode in ('size','chapters','time'):
+        if view.busy:return
+        view.sort_mode=mode
+        if view.sort_mode in ('size','time'):
             def load():
                 facts={}
-                from reader import ReaderSource
                 for key,item in view.library.entries.items():
                     try:
                         path=Path(item['path']);st=path.stat()
                         if view.sort_mode=='time':facts[key]=st.st_mtime
                         elif view.sort_mode=='size':facts[key]=sum(p.stat().st_size for p in path.rglob('*') if p.is_file() and not p.is_symlink()) if path.is_dir() else st.st_size
-                        else:
-                            source=ReaderSource(path)
-                            try:facts[key]=len({page['chapter'] for page in source.pages})
-                            finally:source.close()
                     except (OSError,ValueError):facts[key]=-1
                 return facts
             view.run(load,lambda facts:(setattr(view,'sort_facts',facts),view.render()))
@@ -100,9 +86,48 @@ def sort_menu(view):
 
 
 def sorted_items(view,items):
-    favorites=[pair for pair in items if pair[1].get('favorite')];rest=[pair for pair in items if not pair[1].get('favorite')]
-    key=(lambda pair:pair[1]['title'].casefold()) if view.sort_mode=='name' else (lambda pair:view.sort_facts.get(pair[0],0))
-    return favorites+sorted(rest,key=key,reverse=view.sort_reverse)
+    facts=({key:item.get('chapter_count',-1) for key,item in view.library.entries.items()}
+           if view.sort_mode=='chapters' else dict(view.sort_facts))
+    if view.sort_mode!='name':
+        folders={key:0 for key,item in items if item.get('format')=='collection'}
+        for key,item in view.library.entries.items():
+            folder=item.get('collection','')
+            if folder in folders:
+                value=max(0,facts.get(key,0))
+                folders[folder]=max(folders[folder],value) if view.sort_mode=='time' else folders[folder]+value
+        facts.update(folders)
+    def key(pair):
+        identity,item=pair
+        group=0 if item.get('format')=='collection' else 1 if item.get('favorite') else 2
+        title=item['title'].casefold()
+        return group,title if view.sort_mode=='name' else facts.get(identity,0),title
+    return sorted(items,key=key)
+
+
+def prepare_chapter_counts(view):
+    """Populate legacy metadata without blocking the library or a sort change."""
+    if getattr(view,'chapter_scan_running',False):return
+    attempted=getattr(view,'chapter_scan_attempted',set())
+    items=[(key,dict(item)) for key,item in view.library.entries.items()
+           if item.get('chapter_count',-1)<0 and key not in attempted]
+    if not items:return
+    view.chapter_scan_attempted=attempted|{key for key,_ in items}
+    view.chapter_scan_running=True;results=queue.Queue()
+    def scan():
+        try:results.put((view.library.read_chapter_counts(items),None))
+        except Exception as error:results.put(({},str(error)))
+    def poll():
+        if view.busy or results.empty():view.chapter_scan_timer=view.window.after(100,poll);return
+        view.chapter_scan_timer=None
+        counts,error=results.get();view.chapter_scan_running=False
+        try:
+            if error:raise OSError(error)
+            changed=view.library.save_chapter_counts(counts)
+        except Exception as error:
+            view.status.set('章节信息保存失败：'+str(error));return
+        if changed:view.render()
+        else:prepare_chapter_counts(view)
+    threading.Thread(target=scan,daemon=True).start();view.chapter_scan_timer=view.window.after(100,poll)
 
 
 def favorite(view):

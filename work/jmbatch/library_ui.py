@@ -144,6 +144,7 @@ class LibraryWindow:
             self.cancel_press()
             self.cover_worker.close()
             self.window.after_cancel(self.cover_timer)
+            if getattr(self,'chapter_scan_timer',None):self.window.after_cancel(self.chapter_scan_timer)
             self.cover_images.clear()
 
     def cancel_press(self):
@@ -367,6 +368,8 @@ class LibraryWindow:
         elif not same_filter:
             self.tree.yview_moveto(0)
         self.details()
+        from ui_library import prepare_chapter_counts
+        prepare_chapter_counts(self)
 
     def details(self, *_):
         if self.busy:

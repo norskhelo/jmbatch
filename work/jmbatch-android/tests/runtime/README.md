@@ -1,5 +1,16 @@
 # Android framework regression tests
 
+ClearHistoryRuntimeTest covers the download page's real clear-history confirmation
+on Android 10/15: paused/failed/completed records, cancel, active and pending task
+protection, removal of incomplete cache/output files, retention of successful files
+and library entries, save-failure rollback, background cleanup and restart recovery,
+SAF permission failure/retry, empty-queue feedback, and clearing after a page round trip. Use
+`--tests ClearHistoryRuntimeTest`; `--main-source` accepts an old MainActivity in
+the isolated test snapshot for regression proof.
+The taskMenu cases also check long-press selection/counts, the menu's full visible
+bounds, return/cancel/delete, viewport resizing and page round trips. Select just
+these with `--tests 'ClearHistoryRuntimeTest#taskMenu*'`.
+
 BookmarkRuntimeTest checks one-click cold/backward/cross-chapter bookmarks,
 mixed page heights, the last short page, an active fling, rapid replacement
 jumps, both reading modes and toolbar/viewport changes during a blocked decode.

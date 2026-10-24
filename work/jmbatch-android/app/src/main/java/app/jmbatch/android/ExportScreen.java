@@ -34,7 +34,10 @@ public final class ExportScreen {
         boolean allPdf=true;for(LibraryStore.Entry entry:entries)if(!entry.format.equals("pdf"))allPdf=false;final boolean pdfOnly=allPdf;
         LinearLayout form=Ui.column(activity);TextView title=Ui.heading(activity,"导出为");title.setGravity(android.view.Gravity.CENTER);form.addView(title);Ui.gap(form,20);
         RadioGroup formats=new RadioGroup(activity);formats.setOrientation(RadioGroup.HORIZONTAL);formats.setGravity(android.view.Gravity.CENTER);RadioButton pdf=new RadioButton(activity),zip=new RadioButton(activity),images=new RadioButton(activity);pdf.setId(android.view.View.generateViewId());zip.setId(android.view.View.generateViewId());images.setId(android.view.View.generateViewId());pdf.setText("pdf");zip.setText("zip");formats.addView(pdf,new RadioGroup.LayoutParams(-2,-2));RadioGroup.LayoutParams second=new RadioGroup.LayoutParams(-2,-2);second.leftMargin=Ui.dp(activity,68);formats.addView(zip,second);pdf.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.MUTED));zip.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.MUTED));formats.check(pdfOnly?zip.getId():pdf.getId());form.addView(formats);
-        CheckBox numeric=new CheckBox(activity),split=new CheckBox(activity);destination=new TextView(activity);destination.setText(label);
+        RadioButton numeric=new RadioButton(activity){@Override public void toggle(){setChecked(!isChecked());}};
+        CheckBox split=new CheckBox(activity);destination=new TextView(activity);destination.setText(label);
+        numeric.setText("只保留编号");numeric.setTextColor(Ui.INK);numeric.setTextSize(16);numeric.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.MUTED));
+        LinearLayout.LayoutParams numericLayout=new LinearLayout.LayoutParams(-2,Ui.dp(activity,48));numericLayout.gravity=android.view.Gravity.CENTER_HORIZONTAL;numericLayout.topMargin=Ui.dp(activity,12);form.addView(numeric,numericLayout);
         Ui.gap(form,28);dialog=Ui.modal(activity,form,false);Button confirm=Ui.button(activity,"确认",()->{});Ui.primary(confirm);form.addView(Ui.pair(activity,confirm,Ui.button(activity,"取消",dialog::dismiss)));
         dialog.setOnDismissListener(d->{if(pending==this)pending=null;});
         confirm.setOnClickListener(v->{

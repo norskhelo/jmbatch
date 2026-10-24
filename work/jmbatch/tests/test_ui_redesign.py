@@ -70,12 +70,10 @@ class RedesignTests(unittest.TestCase):
                 rate.local.session.close()
         finally:server.shutdown();server.server_close();thread.join()
 
-    def test_favorites_stable_in_both_sort_directions(self):
+    def test_favorites_sort_ascending_before_ordinary_comics(self):
         items=[('a',{'title':'Z','favorite':True}),('b',{'title':'B','favorite':False}),('c',{'title':'A','favorite':True}),('d',{'title':'C','favorite':False})]
-        view=SimpleNamespace(sort_mode='name',sort_reverse=False,sort_facts={})
-        self.assertEqual([k for k,_ in sorted_items(view,items)],['a','c','b','d'])
-        view.sort_reverse=True
-        self.assertEqual([k for k,_ in sorted_items(view,items)],['a','c','d','b'])
+        view=SimpleNamespace(sort_mode='name',sort_facts={})
+        self.assertEqual([k for k,_ in sorted_items(view,items)],['c','a','b','d'])
 
     def test_named_bookmarks_survive_restart_and_chapter_deletion(self):
         with tempfile.TemporaryDirectory() as directory:

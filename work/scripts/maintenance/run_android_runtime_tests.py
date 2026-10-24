@@ -13,6 +13,7 @@ ROOT=Path(__file__).resolve().parents[3]
 sys.stdout.reconfigure(encoding='utf-8',errors='replace')
 parser=argparse.ArgumentParser()
 parser.add_argument('--run-id', required=True)
+parser.add_argument('--main-source', type=Path, help='Optional pre-fix MainActivity.java for regression proof')
 parser.add_argument('--library-source', type=Path, help='Optional pre-fix LibraryScreen.java for regression proof')
 parser.add_argument('--download-covers-source', type=Path, help='Optional pre-fix DownloadCovers.java for regression proof')
 parser.add_argument('--reader-source', type=Path, help='Optional pre-fix ReaderActivity.java for regression proof')
@@ -35,6 +36,8 @@ if not maven.exists():
     with zipfile.ZipFile(archive) as z:z.extractall(tools)
 source=run/'src/main/java'
 shutil.copytree(ROOT/'work/jmbatch-android/app/src/main/java',source,dirs_exist_ok=True)
+if args.main_source:
+    shutil.copyfile(args.main_source,source/'app/jmbatch/android/MainActivity.java')
 if args.library_source:
     shutil.copyfile(args.library_source,source/'app/jmbatch/android/LibraryScreen.java')
 if args.download_covers_source:

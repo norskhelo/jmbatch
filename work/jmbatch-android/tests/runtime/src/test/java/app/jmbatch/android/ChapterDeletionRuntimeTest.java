@@ -58,6 +58,9 @@ public class ChapterDeletionRuntimeTest {
     void assertUpdated(LibraryStore.Entry old,boolean saf)throws Exception {
         List<LibraryStore.Entry> all=library.list("",false);assertEquals(1,all.size());LibraryStore.Entry next=all.get(0);assertTrue(next.favorite);assertNotEquals(old.uri,next.uri);assertEquals(next.uri,store.tasks.get(0).resultUri);
         assertEquals(4,ChapterDeletion.inspect(context,next,()->false).chapters.size());
+        assertEquals(2,next.chapterCount);
+        store.tasks.get(0).selectedChapters=Arrays.asList(new ChapterRules.Chapter("1",1,"one"),new ChapterRules.Chapter("2",2,"two"),new ChapterRules.Chapter("3",3,"three"));
+        library.sync(store.snapshot());assertEquals(2,library.list("",false).get(0).chapterCount);
         JSONObject state=new JSONObject(context.getSharedPreferences("reader-history",0).getString(next.uri,"{}"));assertEquals(2,state.getInt("page"));assertEquals("[0,2,3]",state.getJSONArray("bookmarks").toString());assertEquals("paged",state.getString("mode"));
         assertFalse(root.exists());assertFalse(store.libraryBusy);
     }
@@ -66,6 +69,7 @@ public class ChapterDeletionRuntimeTest {
         LibraryStore.Entry next=library.list("",false).get(0);AlbumStorage.Album album=AlbumStorage.load(context,Uri.parse(next.uri));
         assertArrayEquals(new byte[]{3,1,7},Files.readAllBytes(AlbumStorage.local(context,album.images.get(2).uri).toPath()));
         delete(next,1);LibraryStore.Entry last=library.list("",false).get(0);AlbumStorage.forget(context,Uri.parse(last.uri));
+        assertEquals(1,last.chapterCount);
         assertEquals(2,AlbumStorage.load(context,Uri.parse(last.uri)).images.size());
         assertEquals("00001.jpg",AlbumStorage.load(context,Uri.parse(last.uri)).images.get(0).file);
     }

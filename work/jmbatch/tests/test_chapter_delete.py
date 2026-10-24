@@ -70,6 +70,10 @@ class ChapterDeletionTests(unittest.TestCase):
     def test_folder_middle_and_repeated_delete_preserve_bytes_history_and_queue(self):
         source, key = self.fixture()
         new_key, _ = self.delete(key, [2])
+        self.assertEqual(self.engine.library.entries[new_key]['chapter_count'],2)
+        self.engine.tasks[0].selected_chapters=[dict(id=str(i),number=i,title=str(i)) for i in (1,2,3)]
+        self.engine.library.sync(self.engine.tasks)
+        self.assertEqual(Library(self.home).entries[new_key]['chapter_count'],2)
         target = Path(self.engine.library.entries[new_key]["path"])
         self.assertFalse(source.exists())
         self.assertEqual((target / "0002/00001.jpg").read_bytes(), self.payloads["0003/00001.jpg"])
@@ -78,6 +82,7 @@ class ChapterDeletionTests(unittest.TestCase):
         self.assertEqual(Engine(self.home).tasks[0].result, str(target))
         self.assertEqual(len(Library(self.home).entries), 1)
         next_key, _ = self.delete(new_key, [1])
+        self.assertEqual(self.engine.library.entries[next_key]['chapter_count'],1)
         last = Path(self.engine.library.entries[next_key]["path"])
         self.assertEqual(sorted(p.name for p in last.iterdir()), ["00001.jpg", "00002.jpg"])
         album_index(last).unlink()

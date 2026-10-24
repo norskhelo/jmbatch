@@ -68,6 +68,10 @@ class Library:
                         favorite=previous.get("favorite", False), added=previous.get("added", time.time()))
             if previous.get("collection"):
                 item["collection"] = previous["collection"]
+            if "chapter_count" in previous:
+                item["chapter_count"] = previous["chapter_count"]
+            elif not previous and getattr(task, "selected_chapters", None):
+                item["chapter_count"] = len({chapter["id"] for chapter in task.selected_chapters})
             if item != previous:
                 self.entries[key] = item
                 changed = True
@@ -77,6 +81,38 @@ class Library:
             except Exception:
                 self.entries = previous_entries
                 raise
+
+    @staticmethod
+    def read_chapter_counts(items):
+        """One-time background migration for imports and older library entries."""
+        from reader import ReaderSource
+        counts = {}
+        for key, item in items:
+            try:
+                source = ReaderSource(item["path"])
+                try:
+                    counts[key] = len({page["chapter"] for page in source.pages})
+                finally:
+                    source.close()
+            except Exception:
+                # An unavailable file remains unknown, and can be retried next session.
+                continue
+        return counts
+
+    def save_chapter_counts(self, counts):
+        previous = self.entries.copy()
+        for key, count in counts.items():
+            item = self.entries.get(key)
+            if item is not None and item.get("chapter_count", -1) < 0 and count > 0:
+                self.entries[key] = dict(item, chapter_count=count)
+        if self.entries == previous:
+            return False
+        try:
+            self.save()
+        except Exception:
+            self.entries = previous
+            raise
+        return True
 
     def select(self, query="", favorites=False):
         query = query.strip().casefold()

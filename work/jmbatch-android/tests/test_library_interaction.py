@@ -142,7 +142,7 @@ assert 'if(moving){cancelMove();return true;}if(batchMode){setBatchMode(false);r
 assert 'if(!collection.isEmpty()){navigate("");return true;}' in method('back')
 assert 'if(!filter.equals(nextFilter)){selected.clear();filter=nextFilter;pendingViewState=new Bundle();}' in source
 assert 'resetCovers();acceptEntries(result);' in source
-assert 'row.bindChoice(batchMode&&!entry.isCollection(),selected.contains(entry.uri))' in source
+assert 'row.bindChoice(batchMode&&!entry.isCollection(),selected.contains(entry.uri),entry.uri.equals(row.boundUri))' in source
 print('Library interaction listener, back, filter, refresh and recycled-row wiring verified')
 main_source=(root/'app/src/main/java/app/jmbatch/android/MainActivity.java').read_text(encoding='utf-8')
 assert 'libraryScreen.show(state.getBundle("library"))' in main_source

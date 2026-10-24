@@ -7,7 +7,7 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public final class DownloadService extends Service {
-    public static final String START="start", SELECTED="selected", PAUSE="pause", PAUSE_ONE="pause_one", CANCEL="cancel";
+    public static final String START="start", SELECTED="selected", PAUSE="pause", PAUSE_ONE="pause_one", CANCEL="cancel", CLEANUP="cleanup";
     private final DownloadRate rate=new DownloadRate(()->Store.get(this).settings.downloadLimitKB);
     private static final String CHANNEL="downloads";
     private Store store;
@@ -16,7 +16,7 @@ public final class DownloadService extends Service {
     private ScheduledExecutorService monitor;
     private PowerManager.WakeLock wake;
     private final Handler main=new Handler(Looper.getMainLooper());
-    private boolean accepting, foreground, destroyed;
+    private boolean accepting, foreground, destroyed, startedDownloads;
     private long lastSave;
     private final Runnable dispatch=new Runnable(){public void run(){
         if(destroyed)return;
@@ -25,7 +25,7 @@ public final class DownloadService extends Service {
             accepting=false;pool.cancelAll("PAUSE");
             try{store.pauseQueued();}catch(Exception ignored){}
         }
-        if(accepting||pool.size()>0||!cleaningKeys.isEmpty())main.postDelayed(this,250);else finishQueue();
+        if(accepting||pool.size()>0||!cleaningKeys.isEmpty()||hasPendingCleanup())main.postDelayed(this,250);else finishQueue();
     }};
 
     public void onCreate(){
@@ -46,6 +46,10 @@ public final class DownloadService extends Service {
             try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}
             if(pool.size()==0&&cleaningKeys.isEmpty())finishQueue();
             return START_NOT_STICKY;
+        }
+        if(CLEANUP.equals(action)){
+            if(!foreground){startForeground(1,notification());foreground=true;}
+            main.removeCallbacks(dispatch);main.post(dispatch);return START_NOT_STICKY;
         }
         if(CANCEL.equals(action)){
             String key=intent.getStringExtra("key");DownloadJob job=pool.get(key);
@@ -68,7 +72,7 @@ public final class DownloadService extends Service {
             store.running=true;
         }
         try{if(!SELECTED.equals(action))store.resume();}catch(Exception error){store.note=error.getMessage();finishQueue();return START_NOT_STICKY;}
-        store.note="";accepting=true;
+        store.note="";accepting=true;startedDownloads=true;
         wake.acquire(6*60*60*1000L);
         main.removeCallbacks(dispatch);main.post(dispatch);return START_NOT_STICKY;
     }
@@ -92,6 +96,10 @@ public final class DownloadService extends Service {
         }
     }
 
+    private boolean hasPendingCleanup(){
+        for(Store.Task task:store.snapshot())if(task.discardRequested&&task.status.equals("cancelling"))return true;
+        return false;
+    }
     private void cleanCancelled(){
         synchronized(store){
             if(store.libraryBusy)return;
@@ -104,11 +112,11 @@ public final class DownloadService extends Service {
                     try{result=CancelledTaskCleanup.run(store,task);}
                     catch(Exception error){result=new CacheCleanup.Result();result.errors=1;task.error=Core.error(error,store.cookie);}
                     synchronized(store){
-                        if(result.errors==0){store.tasks.remove(task);store.cleanupNotice="JM"+task.id+" 已取消，文件和任务记录已删除；"+result.message(true);}
-                        else{task.status="cancel_failed";task.phase="取消清理未完成；再次取消可重试清理";store.cleanupNotice="JM"+task.id+" "+task.phase;}
+                        if(result.errors==0){store.tasks.remove(task);store.cleanupNotice="JM"+task.id+" 文件和任务记录已删除；"+result.message(true);}
+                        else{task.status="cancel_failed";task.phase="文件清理失败，再次删除可重试清理";store.cleanupNotice="JM"+task.id+" "+task.phase;}
                         try{store.save();}catch(Exception error){
                             if(!store.tasks.contains(task))store.tasks.add(task);
-                            task.status="cancel_failed";task.phase="记录保存失败；再次取消可重试";task.error=Core.error(error,store.cookie);
+                            task.status="cancel_failed";task.phase="记录保存失败，再次删除可重试清理";task.error=Core.error(error,store.cookie);
                         }
                         store.activeKeys.remove(task.key);cleaningKeys.remove(task.key);
                         if(destroyed&&store.activeKeys.isEmpty())store.running=false;
@@ -120,7 +128,7 @@ public final class DownloadService extends Service {
 
     private void finishQueue(){
         accepting=false;if(store.activeKeys.isEmpty())store.running=false;
-        try{store.pauseQueuedOnly();}catch(Exception error){store.note=error.getMessage();}
+        if(startedDownloads)try{store.pauseQueuedOnly();}catch(Exception error){store.note=error.getMessage();}
         if(wake.isHeld())wake.release();saveQuietly();
         if(foreground){stopForeground(true);foreground=false;}stopSelf();
     }
@@ -235,12 +243,12 @@ public final class DownloadService extends Service {
         destroyed=true;accepting=false;main.removeCallbacks(dispatch);pool.cancelAll("PAUSE");
         if(monitor!=null)monitor.shutdownNow();if(wake!=null&&wake.isHeld())wake.release();
         // Retain the busy guard until every old worker has left its cache files.
-        if(pool.size()>0||!cleaningKeys.isEmpty())new Thread(()->{
+        if(pool.size()>0||!cleaningKeys.isEmpty()||hasPendingCleanup())new Thread(()->{
             while(true){
                 synchronized(store){
                     for(String key:pool.reap())store.activeKeys.remove(key);
                     cleanCancelled();
-                    if(pool.size()==0&&cleaningKeys.isEmpty()){store.running=false;try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}break;}
+                    if(pool.size()==0&&cleaningKeys.isEmpty()&&!hasPendingCleanup()){store.running=false;if(startedDownloads)try{store.pauseQueued();}catch(Exception error){store.note=error.getMessage();}break;}
                 }
                 try{Thread.sleep(100);}catch(InterruptedException ignored){}
             }

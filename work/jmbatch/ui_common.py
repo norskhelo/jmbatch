@@ -147,11 +147,12 @@ def actions(parent, left, right, accept, cancel):
     return row
 
 
-def slide_sheet(panel,step=0):
+def slide_sheet(panel,step=0,bottom=None):
     if not panel.winfo_exists():return
     if step and panel.winfo_manager()!='place':return
-    height=int(panel.cget('height'));panel.place(x=1,rely=1,y=round(height*(1-step/12)**3)-1,relwidth=1,width=-2,anchor='sw');panel.lift()
-    if step<12:panel.after(16,lambda:slide_sheet(panel,step+1))
+    height=int(panel.cget('height'));offset=round(height*(1-step/12)**3)-1
+    panel.place(x=1,rely=1 if bottom is None else 0,y=offset if bottom is None else bottom()+offset,relwidth=1,width=-2,anchor='sw');panel.lift()
+    if step<12:panel.after(16,lambda:slide_sheet(panel,step+1,bottom))
 
 
 def icon_button(parent, kind, text='', command=None):

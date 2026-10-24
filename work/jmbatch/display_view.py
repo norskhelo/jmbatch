@@ -1,11 +1,13 @@
 """A shared Treeview model with a virtual, responsive cover-tile presentation."""
 import json
 import math
+import time
 import tkinter as tk
 from tkinter import ttk, font
 from PIL import ImageTk
 from covers import fit_cover
 from core import atomic_json
+from ui_selection import SelectionEffects
 
 
 def load_mode(home, key):
@@ -36,11 +38,52 @@ def mode_buttons(parent, variable, command):
     return bar
 
 
+class _MarqueeTitle(tk.Canvas):
+    """A clipped single line; the parent owns timing and card interaction."""
+    def __init__(self, parent):
+        super().__init__(parent, highlightthickness=0, borderwidth=0, takefocus=False)
+        self.text_item = self.create_text(0, 0, anchor='nw', fill='#1d1f26')
+        self.signature = None
+        self.started = time.monotonic()
+        self.overflow = 0
+        for sequence in ('<ButtonPress-1>', '<ButtonRelease-1>', '<B1-Motion>',
+                         '<MouseWheel>', '<Leave>'):
+            self.bind(sequence, lambda event, seq=sequence: self._forward(parent, seq, event))
+
+    def _forward(self, parent, sequence, event):
+        options = dict(x=event.x_root-parent.winfo_rootx(),
+                       y=event.y_root-parent.winfo_rooty(), state=event.state, time=event.time)
+        if sequence == '<MouseWheel>':
+            options['delta'] = event.delta
+        parent.event_generate(sequence, **options)
+        return 'break'
+
+    def show(self, text, width, text_font, background):
+        text = ' '.join(str(text).splitlines()).replace('\t', ' ')
+        width = max(1, int(width))
+        signature = (text, width, tuple(sorted(text_font.actual().items())))
+        self.configure(width=width, height=text_font.metrics('linespace'), background=background)
+        if signature != self.signature:
+            self.signature = signature
+            self.itemconfigure(self.text_item, text=text, font=text_font)
+            self.overflow = max(0, text_font.measure(text)+2-width)
+            self.started = time.monotonic()
+        self.animate(time.monotonic())
+
+    def animate(self, now):
+        # Pause at both ends so the beginning and final characters are readable.
+        distance = self.overflow
+        duration = distance/30 if distance else 0
+        phase = (now-self.started) % (duration+2)
+        offset = min(distance, max(0, (phase-1)*30)) if distance else 0
+        self.coords(self.text_item, 1-offset, 0)
+
+
 class DisplayView(ttk.Treeview):
     """Selection, order and images stay in one Treeview when presentation changes.
 
-    Only visible cards are painted. No per-comic widgets or extra image decoders
-    are created. Existing list gestures are also bound to the tile canvas.
+    Only visible cards and clipped title viewports are created. Existing list
+    gestures are also forwarded from the title viewports to the tile canvas.
     """
     def __init__(self, master, *, kind, **kwargs):
         super().__init__(master, **kwargs)
@@ -49,12 +92,19 @@ class DisplayView(ttk.Treeview):
                                 takefocus=True, yscrollincrement=1)
         self.columns, self.cell_width, self.cell_height = 1, 210, 238 if kind == 'library' else 270
         self.paint_timer = None
+        self.marquee_timer = None
+        self.title_views = {}
         self.tile_images = {}
+        self.selecting = False
+        self.selection_effects = SelectionEffects()
         self.extent = None
         self.scroll_callback = None
-        self.tile_font = font.Font(self, family='Microsoft YaHei UI', size=11)
+        self.tile_font = font.Font(self, family='Microsoft YaHei UI', size=10 if kind == 'library' else 11)
+        self.number_font = font.Font(self, family='Microsoft YaHei UI', size=9)
         self.canvas.configure(yscrollcommand=self._scrolled)
         self.canvas.bind('<Configure>', self._resize)
+        self.canvas.bind('<Map>', lambda event: self._schedule())
+        self.canvas.bind('<Unmap>', lambda event: self._stop_marquee())
         self.canvas.bind('<MouseWheel>', self._wheel)
         self.canvas.bind('<ButtonPress-1>', self._select_tile)
         for key, step in (('Left', -1), ('Right', 1), ('Up', -1), ('Down', 1)):
@@ -82,6 +132,7 @@ class DisplayView(ttk.Treeview):
         if event.widget == self:
             if self.paint_timer:
                 self.after_cancel(self.paint_timer)
+            self._clear_titles()
             self.canvas.destroy()
             self.tile_images.clear()
 
@@ -95,6 +146,7 @@ class DisplayView(ttk.Treeview):
         active.pack_forget()
         self.mode = mode
         if mode == 'list':
+            self._clear_titles()
             self.canvas.delete('all')
             self.tile_images.clear()
         (self.canvas if mode == 'tiles' else self).pack(**placement)
@@ -108,6 +160,28 @@ class DisplayView(ttk.Treeview):
         if self.mode == 'tiles' and self.paint_timer is None:
             self.paint_timer = self.after_idle(self._paint)
 
+    def _stop_marquee(self):
+        if self.marquee_timer is not None:
+            self.after_cancel(self.marquee_timer)
+            self.marquee_timer = None
+
+    def _clear_titles(self):
+        self._stop_marquee()
+        for title in self.title_views.values():
+            title.destroy()
+        self.title_views.clear()
+
+    def _animate_titles(self):
+        self.marquee_timer = None
+        if self.mode != 'tiles' or not self.canvas.winfo_ismapped():
+            return
+        active = [title for title in self.title_views.values() if title.overflow]
+        now = time.monotonic()
+        for title in active:
+            title.animate(now)
+        if active:
+            self.marquee_timer = self.after(33, self._animate_titles)
+
     def _scrolled(self, first, last):
         if self.mode == 'tiles' and callable(self.scroll_callback):
             self.scroll_callback(first, last)
@@ -119,9 +193,9 @@ class DisplayView(ttk.Treeview):
         self.columns = 4
         self.cell_width = width / self.columns
         if self.kind == 'library':
-            self.cover_width = max(1, int(self.cell_width-30))
+            self.cover_width = max(1, int(self.cell_width-22))
             self.cover_height = max(1, round(self.cover_width*4/3))
-            self.cell_height = self.cover_height + 3*self.tile_font.metrics('linespace') + 40
+            self.cell_height = self.cover_height + self.tile_font.metrics('linespace') + self.number_font.metrics('linespace') + 32
         self._extent()
         self.move_to_index(position)
         self._schedule()
@@ -291,22 +365,31 @@ class DisplayView(ttk.Treeview):
         self.paint_timer = None
         if self.mode != 'tiles':
             return
+        if self.kind == 'library' and not hasattr(self, 'cover_width'):
+            self._resize()
+            return
         self._extent()
         self.canvas.delete('all')
         keys = self.get_children()
         selected = set(self.selection())
+        self.selection_effects.begin(self.selecting)
         painted_images = {}
-        for key in self.visible_keys():
+        visible = self.visible_keys()
+        for key in tuple(self.title_views):
+            if key not in visible:
+                self.title_views.pop(key).destroy()
+        for key in visible:
             n = keys.index(key)
             x, y = (n % self.columns)*self.cell_width+5, (n//self.columns)*self.cell_height+5
             width = self.cell_width-10
             chosen = key in selected
-            __import__('ui_common').rounded(self.canvas,x,y,width,self.cell_height-10,8,fill='#eeeef1' if chosen else 'white',
-                outline='#73757c' if chosen or key == self.focus() else '#dadce1', width=2 if chosen else 1)
+            highlighted = chosen and self.kind != 'library'
+            __import__('ui_common').rounded(self.canvas,x,y,width,self.cell_height-10,8,fill='#eeeef1' if highlighted else 'white',
+                outline='#73757c' if highlighted else '#dadce1', width=2 if highlighted else 1)
             data = super().item(key)
             picture = data['image']
             if self.kind == 'library':
-                self.canvas.create_rectangle(x+10,y+10,x+10+self.cover_width,y+10+self.cover_height,
+                self.canvas.create_rectangle(x+6,y+6,x+6+self.cover_width,y+6+self.cover_height,
                                              fill='#e8edf1',outline='')
                 if picture:
                     cache_key = (picture[0], self.cover_width, self.cover_height)
@@ -318,23 +401,35 @@ class DisplayView(ttk.Treeview):
                         image = fit_cover(ImageTk.getimage(source), (self.cover_width, self.cover_height))
                         photo = ImageTk.PhotoImage(image, master=self)
                     painted_images[cache_key] = photo
-                    self.canvas.create_image(x+10+self.cover_width/2,y+10+self.cover_height/2,image=photo)
+                    self.canvas.create_image(x+6+self.cover_width/2,y+6+self.cover_height/2,image=photo)
             elif picture:
                 self.canvas.create_image(x+width/2,y+58,image=picture[0])
             values = [str(v) for v in data['values']]
             if self.kind == 'library':
                 favorite, number, title, fmt = values
-                subtitle = '' if fmt == '收藏夹' else f'编号 {number}'
+                subtitle = '' if fmt == '收藏夹' else number
                 if favorite:
-                    self.canvas.create_text(x+width-16,y+12,anchor='ne',text='★',fill='#d6a039',font=('Segoe UI',22))
-                text = self._lines(title,width-20,2)
+                    self.canvas.create_text(x+width-(38 if self.selecting and fmt != '收藏夹' else 16),y+12,anchor='ne',text='★',fill='#d6a039',font=('Segoe UI',22))
             else:
                 number,title,status,progress,size,fmt,resets = values
                 text = self._lines(title or number,width-20,2)+'\n'+self._lines(f'{number} · {fmt}',width-20,1)
                 text += '\n'+status+'\n'+self._lines(progress,width-20,1)+'\n'+self._lines(size,width-20,1)
-            text_top = self.cover_height+20 if self.kind == 'library' else 115
-            self.canvas.create_text(x+10,y+text_top,anchor='nw',text=text,font=self.tile_font,fill='#1d1f26')
-            if self.kind=='library':self.canvas.create_text(x+10,y+text_top+(text.count('\n')+1)*self.tile_font.metrics('linespace')+3,anchor='nw',text=self._lines(subtitle,width-20,1),font=self.tile_font,fill='#747780')
-            if chosen:
+            text_top = self.cover_height+12 if self.kind == 'library' else 115
+            if self.kind == 'library':
+                if key not in self.title_views:
+                    self.title_views[key] = _MarqueeTitle(self.canvas)
+                viewport = self.title_views[key]
+                viewport.show(title, width-12, self.tile_font, 'white')
+                self.canvas.create_window(x+6,y+text_top,anchor='nw',window=viewport)
+                self.canvas.create_text(x+6,y+text_top+self.tile_font.metrics('linespace')+3,anchor='nw',text=self._lines(subtitle,width-12,1),font=self.number_font,fill='#747780')
+            else:
+                self.canvas.create_text(x+10,y+text_top,anchor='nw',text=text,font=self.tile_font,fill='#1d1f26')
+            if self.kind == 'library' and self.selecting and fmt != '收藏夹':
+                self.selection_effects.draw(self.canvas,key,x+width-30,y+10,chosen)
+            elif chosen and self.kind != 'library':
                 self.canvas.create_text(x+width-10,y+8,anchor='ne',text='✓',fill='#73757c',font=self.tile_font)
         self.tile_images = painted_images
+        if self.selection_effects.end() and self.paint_timer is None:
+            self.paint_timer = self.after(16, self._paint)
+        if self.marquee_timer is None:
+            self._animate_titles()

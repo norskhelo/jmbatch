@@ -52,8 +52,8 @@ public class RedesignRuntimeTest extends BookmarkRuntimeTest {
             limit.set(1);JmApi.Control cancelled=new JmApi.Control();cancelled.cancel("PAUSE");try{rate.acquire(1024,cancelled);fail("pause must interrupt throttle");}catch(java.io.IOException expected){}
         }finally{jobs.shutdownNow();}
     }
-    @Test public void favoritesKeepRelativeOrderWhenReversed()throws Exception {
+    @Test public void favoritesSortAscendingBeforeOrdinaryComics()throws Exception {
         List<LibraryStore.Entry> entries=new ArrayList<>();for(int i=0;i<4;i++)entries.add(new LibraryStore.Entry(""+i,new String[]{"Z","B","A","C"}[i],"content://fixture/"+i,"","","zip",i%2==0));
-        List<LibraryStore.Entry> sorted=LibrarySort.sorted(context,entries,"name",true);assertEquals("0",sorted.get(0).id);assertEquals("2",sorted.get(1).id);assertEquals("3",sorted.get(2).id);assertEquals("1",sorted.get(3).id);
+        List<LibraryStore.Entry> sorted=LibrarySort.sorted(context,entries,"name");assertEquals("2",sorted.get(0).id);assertEquals("0",sorted.get(1).id);assertEquals("1",sorted.get(2).id);assertEquals("3",sorted.get(3).id);
     }
 }

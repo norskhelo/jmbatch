@@ -161,7 +161,7 @@ def delete_chapters(engine, key, selected, expected, cancelled=lambda: False, pr
         previous = library.entries.copy()
         affected = [(t, t.result) for t in engine.tasks if t.result and library.key(t.result) == key]
         try:
-            library.entries = {new_key if k == key else k: dict(v, path=str(target)) if k == key else v for k, v in previous.items()}
+            library.entries = {new_key if k == key else k: dict(v, path=str(target), chapter_count=len(current["chapters"]) - len(removed)) if k == key else v for k, v in previous.items()}
             library.save()
             for task, _ in affected:
                 task.result = str(target)

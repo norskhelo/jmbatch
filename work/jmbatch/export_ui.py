@@ -20,6 +20,9 @@ def show_export(library_window, keys):
     formats = ttk.Frame(panel); formats.pack(fill="x",pady=(4,16))
     for label, value in (("pdf", "pdf"), ("zip", "zip")):
         ttk.Radiobutton(formats, text=label, value=value, variable=fmt).pack(side="left", expand=True)
+    style = ttk.Style(dialog)
+    style.layout("Export.TCheckbutton", style.layout("TRadiobutton"))
+    ttk.Checkbutton(panel, text="只保留编号", variable=numeric, style="Export.TCheckbutton").pack(pady=(0, 4))
     def start():
         folder = Path(destination.get())
         if not folder.is_absolute():

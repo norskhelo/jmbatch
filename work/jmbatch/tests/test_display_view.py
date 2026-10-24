@@ -67,7 +67,9 @@ class DisplayViewTest(unittest.TestCase):
         self.view.item('40', values=('★', '40', 'Updated', 'ZIP'))
         self.root.update()
         painted=[self.view.canvas.itemcget(item, 'text') for item in self.view.canvas.find_all() if self.view.canvas.type(item)=='text']
-        self.assertTrue(any('Updated' in text and 'JM40' in text for text in painted))
+        title=self.view.title_views['40']
+        self.assertEqual(title.itemcget(title.text_item,'text'),'Updated')
+        self.assertIn('40',painted)
         self.view.set_mode('list')
         self.root.update()
         self.assertEqual(self.view.focus(), '43')
@@ -119,10 +121,10 @@ class DisplayViewTest(unittest.TestCase):
             for n, item in enumerate(painted):
                 left, top, right, bottom = self.view.canvas.bbox(item)
                 x,y,w,h = self.view.bbox(str(n))
-                self.assertGreaterEqual(left, x+14)
-                self.assertLessEqual(right, x+w-14)
-                self.assertGreaterEqual(top, y+14)
-                self.assertLessEqual(bottom, y+16+self.view.cover_height)
+                self.assertGreaterEqual(left, x+10)
+                self.assertLessEqual(right, x+w-10)
+                self.assertGreaterEqual(top, y+10)
+                self.assertLessEqual(bottom, y+12+self.view.cover_height)
                 self.assertEqual((right-left,bottom-top), (self.view.cover_width,self.view.cover_height))
             cached = dict(self.view.tile_images)
             self.view.item('0', values=('', '0', 'Refreshed', 'ZIP'))
