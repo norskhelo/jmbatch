@@ -8,6 +8,8 @@ BG, INK, MUTED, LINE, ACCENT, BLUE = '#f5f5f7', '#1d1f26', '#747780', '#dadce1',
 
 
 CONTROL_FONT = ('Microsoft YaHei UI', 12)
+BUTTON_FONT = ('Microsoft YaHei UI', 14)
+ADD_ACTION_FONT = ('Segoe UI', 28)
 
 
 def control_height(widget, font=CONTROL_FONT, ratio=2.25):
@@ -32,8 +34,8 @@ def install_styles(root):
         element = name + '.round'
         style.element_create(element, 'image', pictures[0], ('active', pictures[1]), border=6, padding=0, sticky='nswe')
         style.layout(name, [(element, {'sticky': 'nswe', 'children': [('Button.padding', {'sticky': 'nswe', 'children': [('Button.label', {'sticky': 'nswe'})]})]})])
-        extra = control_height(root) - tkfont.Font(root=root, font=CONTROL_FONT).metrics('linespace')
-        style.configure(name, foreground=text, background='white', padding=(6, extra//2, 6, extra-extra//2),font=CONTROL_FONT,width=0)
+        extra = control_height(root, BUTTON_FONT) - tkfont.Font(root=root, font=BUTTON_FONT).metrics('linespace')
+        style.configure(name, foreground=text, background='white', padding=(6, extra//2, 6, extra-extra//2),font=BUTTON_FONT,width=0)
         style.map(name, background=[('active','white'),('disabled','white')])
     style.configure('Page.TFrame', background=BG)
     style.configure('Page.TLabel', background=BG)
@@ -199,17 +201,18 @@ def slide_sheet(panel,step=0,bottom=None):
     if step<12:panel.after(16,lambda:slide_sheet(panel,step+1,bottom))
 
 
-def square_button(button):
-    face=tkfont.Font(root=button,font=CONTROL_FONT)
-    size=control_height(button)
+def square_button(button, font=BUTTON_FONT):
+    face=tkfont.Font(root=button,font=font)
+    size=control_height(button,font)
     content=button.image.width() if hasattr(button,'image') else face.measure(button.cget('text'))
-    horizontal=max(0,size-content);vertical=max(0,size-face.metrics('linespace'))
+    content_height=button.image.height() if hasattr(button,'image') else face.metrics('linespace')
+    horizontal=max(0,size-content);vertical=max(0,size-content_height)
     button.configure(width=0,padding=(horizontal//2,vertical//2,horizontal-horizontal//2,vertical-vertical//2))
     button.icon_only=True
     return button
 
 
-def icon_button(parent, kind, text='', command=None):
+def icon_button(parent, kind, text='', command=None, font=BUTTON_FONT, icon_ratio=None):
     """Small monochrome line icons drawn from the confirmed concept."""
     from PIL import Image,ImageDraw,ImageTk
     im=Image.new('RGBA',(72,72));d=ImageDraw.Draw(im);c=INK
@@ -220,10 +223,10 @@ def icon_button(parent, kind, text='', command=None):
         d.line((8,59,8,18,29,18,35,26,64,26,64,59,8,59),fill=c,width=4);d.line((36,33,36,51),fill=c,width=4);d.line((27,42,45,42),fill=c,width=4)
     elif kind=='share':
         d.line((18,34,18,62,56,62,56,34),fill=c,width=4);d.line((37,46,37,10),fill=c,width=4);d.line((23,24,37,10,51,24),fill=c,width=4)
-    size=tkfont.Font(root=parent,font=CONTROL_FONT).metrics('linespace')
+    size=round(control_height(parent,font)*icon_ratio) if icon_ratio is not None else tkfont.Font(root=parent,font=font).metrics('linespace')
     picture=ImageTk.PhotoImage(im.resize((size,size),Image.Resampling.LANCZOS),master=parent)
     button=ttk.Button(parent,text=('  '+text if text else ''),image=picture,compound='left' if text else 'none',command=command);button.image=picture
-    if not text:square_button(button)
+    if not text:square_button(button,font)
     return button
 
 

@@ -67,7 +67,7 @@ public final class ReaderActivity extends Activity {
 
     private int dp(int value){return (int)(value*getResources().getDisplayMetrics().density);}
     private void text(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
-    private Button button(String title,Runnable action){Button result=new ActionButton(this);result.setText(title);result.setTextSize(12);result.setOnClickListener(v->action.run());return result;}
+    private Button button(String title,Runnable action){Button result=new ActionButton(this);result.setText(title);result.setTextSize(14);result.setOnClickListener(v->action.run());return result;}
     private void row(LinearLayout body,View...views){body.addView(new ActionRow(this,views));}
     private void message(String text){if(!closed)new AlertDialog.Builder(this).setMessage(text).setPositiveButton("关闭",null).show();}
     @Override public void onCreate(Bundle saved){

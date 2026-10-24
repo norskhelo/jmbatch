@@ -39,6 +39,7 @@ public final class Ui {
     private static ViewGroup decor(Activity activity){Dialog dialog=surfaces.get(activity);return (ViewGroup)(dialog!=null&&dialog.isShowing()?dialog.getWindow():activity.getWindow()).getDecorView();}
     public static final int BG=Color.rgb(245,245,247), INK=Color.rgb(29,31,38), MUTED=Color.rgb(116,119,128),
         LINE=Color.rgb(218,220,225), ACCENT=Color.rgb(115,117,124), BLUE=Color.rgb(51,99,189);
+    public static final int ADD_ACTION_TEXT_SIZE=28;
     private Ui(){}
     public static int dp(Context c,int n){return Math.round(c.getResources().getDisplayMetrics().density*n);}
     private static int firstLineHeight(TextView view){return view.getLayout()==null?view.getLineHeight():view.getLayout().getLineBottom(0)-view.getLayout().getLineTop(0);}
@@ -55,13 +56,17 @@ public final class Ui {
     public static GradientDrawable shape(Context c,int color,int radius,boolean border){
         GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(c,radius));if(border)d.setStroke(dp(c,1),LINE);return d;
     }
+    public static GradientDrawable circle(int color){
+        GradientDrawable d=new GradientDrawable();d.setShape(GradientDrawable.OVAL);d.setColor(color);return d;
+    }
     public static LinearLayout column(Context c){LinearLayout v=new LinearLayout(c);v.setOrientation(LinearLayout.VERTICAL);return v;}
     public static TextView text(Context c,String value,int size){TextView v=new TextView(c);v.setText(value);v.setTextSize(size);v.setTextColor(INK);v.setLineSpacing(dp(c,2),1);return v;}
     public static void setText(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
     public static TextView heading(Context c,String value){TextView v=text(c,value,21);v.setTypeface(null,Typeface.BOLD);v.setPadding(0,dp(c,10),0,dp(c,12));return v;}
     public static Button square(Button button){((ActionButton)button).setIconOnly(true);return button;}
-    public static Button button(Context c,String title,Runnable action){Button b=new ActionButton(c);b.setText(title);b.setTextSize(14);b.setOnClickListener(v->action.run());if(title.equals("←"))square(b);return b;}
-    public static Button iconButton(Context c,String kind,String title,Runnable action){Button b=button(c,title,action);b.setContentDescription(title.isEmpty()?"分享":title);b.setCompoundDrawablePadding(dp(c,6));android.text.SpannableString symbol=new android.text.SpannableString("\ufffc"+(title.isEmpty()?"":"  "+title));Drawable image=icon(c,kind);int size=Math.round(b.getTextSize());image.setBounds(0,0,size,size);symbol.setSpan(new android.text.style.ImageSpan(image,android.text.style.ImageSpan.ALIGN_BASELINE),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);b.setText(symbol);if(title.isEmpty())square(b);return b;}
+    public static Button button(Context c,String title,Runnable action){Button b=new ActionButton(c);b.setText(title);b.setOnClickListener(v->action.run());if(title.equals("←"))square(b);return b;}
+    public static Button iconButton(Context c,String kind,String title,Runnable action){return iconButton(c,kind,title,16,action);}
+    public static Button iconButton(Context c,String kind,String title,int textSize,Runnable action){Button b=button(c,title,action);b.setTextSize(textSize);b.setContentDescription(title.isEmpty()?"分享":title);b.setCompoundDrawablePadding(dp(c,6));android.text.SpannableString symbol=new android.text.SpannableString("\ufffc"+(title.isEmpty()?"":"  "+title));Drawable image=icon(c,kind);int size=Math.round(b.getTextSize());image.setBounds(0,0,size,size);symbol.setSpan(new android.text.style.ImageSpan(image,android.text.style.ImageSpan.ALIGN_BASELINE),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);b.setText(symbol);if(title.isEmpty())square(b);return b;}
     public static Drawable icon(Context c,String kind){
         Drawable d=new Drawable(){
             final Paint p=new Paint(3);
@@ -107,7 +112,7 @@ public final class Ui {
     }
     public static void skin(AlertDialog dialog){
         if(dialog.getWindow()!=null)dialog.getWindow().setBackgroundDrawable(shape(dialog.getContext(),Color.WHITE,16,true));
-        for(int id:new int[]{-1,-2,-3}){Button b=dialog.getButton(id);if(b!=null){b.setTextColor(INK);b.setAllCaps(false);compact(b);ViewGroup.LayoutParams p=b.getLayoutParams();p.height=-2;b.setLayoutParams(p);}}
+        for(int id:new int[]{-1,-2,-3}){Button b=dialog.getButton(id);if(b!=null){b.setTextColor(INK);b.setTextSize(16);b.setAllCaps(false);compact(b);ViewGroup.LayoutParams p=b.getLayoutParams();p.height=-2;b.setLayoutParams(p);}}
     }
     public static void notice(Activity a,String message){
         ViewGroup decor=decor(a);TextView label=text(a,message,14);label.setGravity(Gravity.CENTER);int p=dp(a,14);label.setPadding(p,p,p,p);label.setBackground(shape(a,Color.WHITE,12,true));label.setElevation(dp(a,6));

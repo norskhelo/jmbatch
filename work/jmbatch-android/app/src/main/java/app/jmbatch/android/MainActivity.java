@@ -22,7 +22,7 @@ public final class MainActivity extends Activity {
     private Store store;
     private GithubUpdates updates;
     private DownloadCovers downloadCovers;
-    private LinearLayout layout;
+    private LinearLayout layout,taskActions;
     private LinearLayout queue;
     private InputFocusLayout inputFocus;
     private LinearLayout shell;
@@ -66,22 +66,22 @@ public final class MainActivity extends Activity {
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
         inputFocus=new InputFocusLayout(this);inputFocus.setBackgroundColor(BG);setContentView(inputFocus);
         shell=column();shell.setPadding(dp(16),dp(12),dp(16),dp(12));inputFocus.addView(shell,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout header=horizontal(),brandBox=column();TextView brand=text("JM Batch",26,INK);brand.setTypeface(null,Typeface.BOLD);brandBox.addView(brand);brandBox.addView(text("ver "+Core.VERSION,12,MUTED));header.addView(brandBox,new LinearLayout.LayoutParams(0,-2,1));Button settingsButton=button("⚙",v->settings());settingsButton.setContentDescription("设置");settingsButton.setTooltipText("设置");settingsButton.setTextSize(24);Ui.square(settingsButton);header.addView(settingsButton,new LinearLayout.LayoutParams(-2,-2));shell.addView(header);
+        LinearLayout header=horizontal(),brandBox=column();TextView brand=text("JM Batch",26,INK);brand.setTypeface(null,Typeface.BOLD);brandBox.addView(brand);brandBox.addView(text("ver "+Core.VERSION,12,MUTED));header.addView(brandBox,new LinearLayout.LayoutParams(0,-2,1));Button settingsButton=button("⚙",v->settings());settingsButton.setContentDescription("设置");settingsButton.setTooltipText("设置");settingsButton.setTextSize(28);Ui.square(settingsButton);header.addView(settingsButton,new LinearLayout.LayoutParams(-2,-2));shell.addView(header);
         Button updateButton=button("检查更新",v->{});updates=new GithubUpdates(this,updateButton);handler.postDelayed(()->updates.startup(),1500);
         pages=new FrameLayout(this);LinearLayout.LayoutParams pageParams=new LinearLayout.LayoutParams(-1,0,1);pageParams.topMargin=dp(12);shell.addView(pages,pageParams);
-        pageOffset=Math.max(dp(124),(int)(getResources().getDisplayMetrics().heightPixels*.14))+dp(68);
+        pageOffset=Math.max(dp(124),(int)(getResources().getDisplayMetrics().heightPixels*.14))+dp(28);
         pages.setBackground(Ui.shape(this,BG,18,false));pages.setClipToOutline(true);
         FrameLayout panel=downloadPanel=new FrameLayout(this);downloadPage=panel;panel.setBackground(pageBackground(false));pages.addView(panel,new FrameLayout.LayoutParams(-1,-1));
         layout=column();layout.setPadding(dp(14),dp(10),dp(14),dp(12));panel.addView(layout,new FrameLayout.LayoutParams(-1,-1));layout.addView(Ui.heading(this,"下载页面"));
         start=buttonAccent("开始全部",v->{if(store.running)send(DownloadService.PAUSE,null);else startQueue();});pause=button("暂停全部",v->send(DownloadService.PAUSE,null));
-        LinearLayout taskActions=horizontal();taskActions.addView(start,new LinearLayout.LayoutParams(-2,-2));Button clear=Ui.iconButton(this,"trash","清除下载记录",()->confirmRemoval(this::clearHistory));LinearLayout.LayoutParams clearParams=new LinearLayout.LayoutParams(-2,-2);clearParams.leftMargin=dp(8);taskActions.addView(clear,clearParams);layout.addView(taskActions);
+        taskActions=horizontal();taskActions.addView(start,new LinearLayout.LayoutParams(-2,-2));Button clear=Ui.iconButton(this,"trash","清除下载记录",()->confirmRemoval(this::clearHistory));LinearLayout.LayoutParams clearParams=new LinearLayout.LayoutParams(-2,-2);clearParams.leftMargin=dp(8);taskActions.addView(clear,clearParams);layout.addView(taskActions);
         summary=text("",12,MUTED);global=text("",12,MUTED);
         FrameLayout listPanel=new FrameLayout(this);listPanel.setBackground(Ui.shape(this,Color.WHITE,18,true));LinearLayout.LayoutParams listParams=new LinearLayout.LayoutParams(-1,0,1);listParams.topMargin=dp(16);listParams.bottomMargin=dp(12);layout.addView(listPanel,listParams);
         LinearLayout listBody=column();listBody.setPadding(dp(18),dp(10),dp(18),dp(22));listPanel.addView(listBody,new FrameLayout.LayoutParams(-1,-1));TextView listTitle=Ui.heading(this,"下载列表");listTitle.setTextSize(17);listBody.addView(listTitle);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setOnScrollChangeListener((view,x,y,oldX,oldY)->{refreshDownloadCovers();if(y>oldY&&y+scroll.getHeight()>=queue.getHeight()-dp(50)&&limit<store.snapshot().size()){limit+=50;render();}});
         queue=column();scroll.addView(queue);listBody.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));more=button("显示更多任务",v->{limit+=50;render();});
         TextView hint=text("点击任务停止 · 长按批量操作",12,MUTED);hint.setGravity(Gravity.CENTER);hint.setPadding(0,dp(16),0,dp(4));listBody.addView(hint);
-        Button add=buttonAccent("＋",v->addDownload());add.setTextSize(28);Ui.square(add);add.setContentDescription("添加下载");add.setBackground(Ui.shape(this,ACCENT,9,false));add.setElevation(dp(5));FrameLayout.LayoutParams fab=new FrameLayout.LayoutParams(-2,Ui.controlHeight(add),Gravity.BOTTOM|Gravity.RIGHT);fab.setMargins(0,0,dp(16),dp(14));listPanel.addView(add,fab);hint.setPadding(0,dp(16),Ui.controlHeight(add)+dp(16),dp(4));
+        Button add=buttonAccent("＋",v->addDownload());add.setTextSize(Ui.ADD_ACTION_TEXT_SIZE);Ui.square(add);add.setContentDescription("添加下载");add.setBackground(Ui.circle(ACCENT));add.setElevation(dp(5));FrameLayout.LayoutParams fab=new FrameLayout.LayoutParams(-2,Ui.controlHeight(add),Gravity.BOTTOM|Gravity.RIGHT);fab.setMargins(0,0,dp(16),dp(14));listPanel.addView(add,fab);hint.setPadding(0,dp(16),Ui.controlHeight(add)+dp(16),dp(4));
         taskSheet=column();taskSheet.setPadding(dp(18),dp(20),dp(18),dp(24));taskSheet.setBackground(Ui.shape(this,Color.WHITE,18,true));taskSheet.setElevation(dp(10));selectedCount=text("",16,INK);selectedCount.setGravity(Gravity.CENTER);selectedCount.setTypeface(null,Typeface.BOLD);taskSheet.addView(selectedCount);Ui.gap(taskSheet,20);taskSheet.addView(Ui.pair(this,buttonAccent("删除任务",v->removeSelected()),button("返回",v->exitSelection())));FrameLayout.LayoutParams sheetParams=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);panel.addView(taskSheet,sheetParams);taskSheet.setVisibility(View.GONE);
         libraryHost=new FrameLayout(this);libraryHost.setBackground(pageBackground(false));pages.addView(libraryHost,new FrameLayout.LayoutParams(-1,-1));
         pageSwitch=new View(this){
@@ -96,7 +96,8 @@ public final class MainActivity extends Activity {
                     boundary=(swapped?pageExchange.incoming:pageExchange.outgoing).getTranslationY();
                     opacity=pageExchange.outgoing.getAlpha();
                 }
-                int bottom=Math.min(getHeight(),Math.round(boundary)),band=Math.min(dp(54),bottom),edge=dp(14),top=bottom-band;
+                int header=(rear==libraryHost&&libraryScreen!=null?libraryScreen.headerBottom():taskActions.getBottom())+Math.round(rear.getTranslationY());
+                int bottom=Math.min(getHeight(),Math.round(boundary)),band=Math.max(0,Math.min(dp(54),bottom-header-dp(4))),edge=dp(14),top=bottom-band;
                 if(rear.getWidth()<2||band<1)return;
                 // Only this narrow seam is sampled. The two full pages remain live views.
                 int w=Math.max(1,getWidth()/8),h=Math.max(1,band/8);
@@ -145,7 +146,9 @@ public final class MainActivity extends Activity {
     private void showLibrary(){setFrontPage(true,true);}
     private void layoutPages(){
         int height=pages.getHeight();if(height<2)return;
-        pageOffset=Math.min(pageOffset,height/2);
+        int compact=Math.max(dp(124),(int)(getResources().getDisplayMetrics().heightPixels*.14))+dp(28);
+        int header=Math.max(taskActions.getBottom(),libraryScreen==null?0:libraryScreen.headerBottom());
+        pageOffset=Math.min(Math.max(compact,header+dp(16)),height/2);
         for(FrameLayout card:new FrameLayout[]{downloadPanel,libraryHost}){
             FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)card.getLayoutParams();p.height=height+dp(28);p.topMargin=0;card.setLayoutParams(p);
         }
@@ -435,7 +438,7 @@ public final class MainActivity extends Activity {
     private TextView text(String value,int size,int color){TextView v=new TextView(this);v.setText(value);v.setTextSize(size);v.setTextColor(color);v.setLineSpacing(dp(2),1);return v;}
     private EditText editLegacy(String hint,boolean number){EditText v=new EditText(this);v.setTextSize(15);v.setTextColor(INK);v.setHintTextColor(MUTED);v.setHint(hint);v.setSingleLine(number);if(number)v.setInputType(InputType.TYPE_CLASS_NUMBER);v.setSelectAllOnFocus(false);return v;}
     private EditText edit(String hint,boolean number){return Ui.input(this,hint,number);}
-    private Button button(String label,View.OnClickListener click){Button v=new ActionButton(this);v.setText(label);v.setTextSize(13);v.setTextColor(INK);v.setOnClickListener(click);return v;}
+    private Button button(String label,View.OnClickListener click){Button v=new ActionButton(this);v.setText(label);v.setTextSize(15);v.setTextColor(INK);v.setOnClickListener(click);return v;}
     private Button buttonAccent(String label,View.OnClickListener click){Button v=button(label,click);Ui.primary(v);return v;}
     private void add(View view,int top,int bottom){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(top);p.bottomMargin=dp(bottom);layout.addView(view,p);}
 }

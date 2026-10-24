@@ -15,7 +15,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.37 / Android 0.6.20 — 控件尺寸与阅读器对齐\n\n发布日期：2026-10-24\n\nWindows 0.3.36 → 0.3.37；Android 0.6.19 → 0.6.20（versionCode 620）。沿用原包名、Android 签名及更新公钥，可覆盖安装。\n\n• 阅读器顶部四个按钮共用两列等宽布局，上下两行总宽一致；书签弹窗及尖角中心对齐“书签”按钮，窄屏自动收窄以保持在屏幕内。\n• 输入框与普通按钮按当前字号调整为约 2.25 倍高度；收紧左右留白，减少多余固定宽度和整行拉伸。\n• 多按钮菜单优先居中、等宽等距和均衡排列，窄屏自动调整行列；纯图标按钮统一为圆角正方形。\n• 漫画库顶部左侧排列“检查更新”和“排序方式”，右侧放置“新建收藏夹”；分享图标在菜单中居中。\n• 为添加按钮预留底部提示空间，窄屏提示可换行，避免遮挡文字。\n• 编号输入框单行保持紧凑，多行或自动换行时增高，删回单行后恢复；弹窗随内容调整。\n• 修正 Android 权限页黑底导致正文不可辨的问题，保存目录继续完整换行显示。\n\n沿用本地修订阶段已完成的 Windows 实际界面和 BlueStacks 5 / Android 9 页面验证。本次按用户要求直接升版、构建、签名、推送及发布，未重新运行测试；未测试实体手机。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.38 / Android 0.6.21 — 收藏夹图标与页面间距\n\n发布日期：2026-10-25\n\nWindows 0.3.37 → 0.3.38；Android 0.6.20 → 0.6.21（versionCode 621）。沿用原包名、Android 签名及更新公钥，可覆盖安装。\n\n• 新建收藏夹按钮放大到与添加下载按钮相同大小，内部文件夹加号图案进一步放大，保留圆角正方形外框。\n• 缩小漫画库与下载页面的叠放距离，按工具栏高度预留空间，交界虚化避开按钮；修正首次布局时虚化位置未及时更新的问题。\n• 添加下载按钮恢复圆形，保留原有直径和加号大小。\n• 其他操作按钮的文字和图案适当放大，保留菜单等宽、居中布局及阅读器书签面板对齐；设置侧栏适配放大后的返回按钮。\n\n本地修订已通过 Windows 实际界面及最终 EXE 模块检查，并在 BlueStacks 5 / Android 9 验证常用尺寸、窄屏和放大字体下的布局、新建收藏夹、添加下载与双向页面切换。本次发布核对最终构建、源码一致性、原签名及安装包校验；未测试实体手机。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

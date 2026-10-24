@@ -130,11 +130,11 @@ def build(app):
         if float(first)>0 or float(last)<1:scroll.pack(side='right',fill='y')
         else:scroll.pack_forget()
     app.tree.configure(yscrollcommand=scrolled);app.tree.pack(fill='both',expand=True);app.tree.set_mode('tiles')
-    fab_size=control_height(list_panel,('Segoe UI',28))
+    fab_size=control_height(list_panel,ADD_ACTION_FONT)
     footer.pack_configure(padx=(0,fab_size+12))
     fab_width=fab_size
     fab=tk.Canvas(list_panel,width=fab_width,height=fab_size,bg='white',highlightthickness=0,takefocus=True,cursor='hand2')
-    rounded(fab,1,1,fab_width-2,fab_size-2,10,fill=ACCENT,outline=ACCENT);fab.create_text(fab_width/2,fab_size/2,text='＋',font=('Segoe UI',28),fill='white');app.add_button=fab
+    fab.create_oval(1,1,fab_width-1,fab_size-1,fill=ACCENT,outline=ACCENT);fab.create_text(fab_width/2,fab_size/2,text='＋',font=ADD_ACTION_FONT,fill='white');app.add_button=fab
     fab.place(relx=1,rely=1,x=-26,y=-25,anchor='se');fab.bind('<Button-1>',lambda e:add_dialog(app));fab.bind('<Return>',lambda e:add_dialog(app));fab.bind('<space>',lambda e:add_dialog(app))
     app.task_sheet=Panel(app.download_panel,padding=20,height=160);app.selection_count=tk.StringVar();ttk.Label(app.task_sheet.body,textvariable=app.selection_count,anchor='center',font=('Microsoft YaHei UI',12,'bold')).pack(fill='x')
     actions(app.task_sheet.body,'删除任务','返回',lambda:remove_selected(app),lambda:exit_selection(app))
@@ -148,6 +148,8 @@ def build(app):
     app.seam_canvas.bind('<ButtonRelease-1>',lambda e:show_library(app) if not app.library_visible else hide_library(app,back=False))
     bind_page_switch(app,app.download_panel,False)
     bind_page_switch(app,app.library_window.window,True)
+    app.library_window.sort_button.master.bind('<Configure>',lambda e:align_page_exchange(app))
+    app.download_toolbar.bind('<Configure>',lambda e:align_page_exchange(app))
     app.root.after_idle(lambda:layout_live_pages(app))
 
 
@@ -234,11 +236,18 @@ def native_page_alpha(widget,alpha):
     widget._page_alpha=alpha
 
 
+def page_header_bottom(app, library):
+    page=app.library_window.window if library else app.download_panel
+    toolbar=app.library_window.sort_button.master if library else app.download_toolbar
+    return toolbar.winfo_rooty()-page.winfo_rooty()+toolbar.winfo_reqheight()
+
+
 def layout_live_pages(app):
     if not hasattr(app,'library_window'):return
     width,height=app.pages.winfo_width(),app.pages.winfo_height()
     if width<2 or height<2:return
-    app.page_offset=min(app.page_offset,height//2)
+    header=max(page_header_bottom(app,True),page_header_bottom(app,False))
+    app.page_offset=min(max(int(app.root.winfo_height()*.18),header+16),height//2)
     app.page_size=(width,height)
     for page,surface in ((app.download_panel,app.download_panel),(app.library_window.window,app.library_window.surface)):
         page.place(x=0,width=width,height=height+28,relwidth=0,relheight=0)
@@ -265,17 +274,18 @@ def settle_live_pages(app):
 
 
 def paint_live_seam(app):
-    # Only the stationary 54 px seam uses a filtered sample. Page motion is native.
+    # Fit the seam below the rear toolbar so compact spacing keeps its icons clear.
     if not hasattr(app,'seam_canvas') or getattr(app,'page_exchange',None) is not None:return
     # Keep the last valid seam while the home page is offscreen behind settings.
     if getattr(app,'settings_page',None) is not None:return
     from PIL import Image,ImageGrab,ImageFilter,ImageTk,ImageDraw
+    app.seam_canvas.place_forget();app.root.update_idletasks()
+    if getattr(app,'page_exchange',None) is not None:return
     width,height=app.pages.winfo_width(),app.pages.winfo_height()
     if width<30 or height<60:return
     rear=app.download_panel if app.library_visible else app.library_window.window
-    band=min(54,app.page_offset);top=app.page_offset-band
-    app.seam_canvas.place_forget();app.root.update_idletasks()
-    if getattr(app,'page_exchange',None) is not None:return
+    band=max(0,min(54,app.page_offset-page_header_bottom(app,not app.library_visible)-4));top=app.page_offset-band
+    if band<1:return
     picture=ImageGrab.grab(window=rear.winfo_id()).crop((14,top,width-14,app.page_offset)).convert('RGB')
     mask=Image.new('L',picture.size);draw=ImageDraw.Draw(mask)
     for y in range(band):draw.line((0,y,picture.width,y),fill=round(255*y/max(1,band-1)))
@@ -333,7 +343,9 @@ def finish_page_exchange(app):
 def align_page_exchange(app):
     if not hasattr(app,'library_window'):return
     size=(app.pages.winfo_width(),app.pages.winfo_height())
-    if size!=getattr(app,'page_size',None):
+    header=max(page_header_bottom(app,True),page_header_bottom(app,False))
+    offset=min(max(int(app.root.winfo_height()*.18),header+16),size[1]//2)
+    if size!=getattr(app,'page_size',None) or offset!=app.page_offset:
         finish_page_exchange(app);layout_live_pages(app)
 
 

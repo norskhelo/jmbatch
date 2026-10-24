@@ -76,7 +76,7 @@ public final class LibraryScreen {
     private int dp(int n){return (int)(n*activity.getResources().getDisplayMetrics().density);}
     private boolean visible(){return page!=null&&page.getParent()!=null&&!activity.isFinishing()&&!activity.isDestroyed()&&(dialog==null||dialog.isShowing());}
     private String title(LibraryStore.Entry e){return e.id.isEmpty()?e.title:"JM"+e.id+" · "+e.title;}
-    private Button button(String text,Runnable action){Button b=new ActionButton(activity);b.setText(text);b.setTextSize(12);b.setOnClickListener(v->{if(!busy&&!loading)action.run();});return b;}
+    private Button button(String text,Runnable action){Button b=new ActionButton(activity);b.setText(text);b.setTextSize(14);b.setOnClickListener(v->{if(!busy&&!loading)action.run();});return b;}
     private void row(LinearLayout body,Button... buttons){body.addView(new ActionRow(activity,buttons));}
     public boolean isOpen(){return visible();}
     public void close(){if(dialog!=null){dialog.dismiss();return;}dispose();if(page!=null&&page.getParent()!=null)((ViewGroup)page.getParent()).removeView(page);}
@@ -103,6 +103,8 @@ public final class LibraryScreen {
         for(int i=0;i<entries.size();i++)if(entries.get(i).uri.equals(anchor)){first=i;break;}
         list.restorePosition(first,state.getInt("top"));
     }
+    private LinearLayout toolbar;
+    int headerBottom(){return toolbar==null?0:toolbar.getBottom();}
     public void show(){show(null);}
     public void show(Bundle saved){
         if(visible())return;
@@ -110,7 +112,7 @@ public final class LibraryScreen {
         LinearLayout root=Ui.column(activity);root.setPadding(dp(12),dp(8),dp(12),dp(8));root.setFocusableInTouchMode(true);page.addView(root,new FrameLayout.LayoutParams(-1,-1));
         root.addView(Ui.heading(activity,"漫画库"));
         hint=new TextView(activity);hint.setTextSize(12);query=new EditText(activity);favorites=new CheckBox(activity);modeButton=button("批量处理",()->setBatchMode(!batchMode));displaySelector=new RadioGroup(activity);selectionControls=Ui.column(activity);
-        sortButton=button("排序方式",this::sortMenu);Button newCollection=Ui.iconButton(activity,"folder","",()->editCollection(null));newCollection.setTextSize(12);newCollection.setContentDescription("新建收藏夹");LinearLayout toolbar=new LinearLayout(activity),leftTools=new LinearLayout(activity);leftTools.setGravity(Gravity.TOP);leftTools.addView(button("检查更新",this::checkAllUpdates));LinearLayout.LayoutParams sortSpace=new LinearLayout.LayoutParams(-2,-2);sortSpace.leftMargin=dp(8);leftTools.addView(sortButton,sortSpace);toolbar.addView(leftTools,new LinearLayout.LayoutParams(0,-2,1));toolbar.addView(newCollection,new LinearLayout.LayoutParams(-2,-2));root.addView(toolbar);
+        sortButton=button("排序方式",this::sortMenu);Button newCollection=Ui.button(activity,"",()->editCollection(null));newCollection.setTextSize(Ui.ADD_ACTION_TEXT_SIZE);Ui.square(newCollection);newCollection.setForeground(new android.graphics.drawable.InsetDrawable(Ui.icon(activity,"folder"),.1f,.1f,.1f,.1f));newCollection.setContentDescription("新建收藏夹");toolbar=new LinearLayout(activity);LinearLayout leftTools=new LinearLayout(activity);leftTools.setGravity(Gravity.TOP);leftTools.addView(button("检查更新",this::checkAllUpdates));LinearLayout.LayoutParams sortSpace=new LinearLayout.LayoutParams(-2,-2);sortSpace.leftMargin=dp(8);leftTools.addView(sortButton,sortSpace);toolbar.addView(leftTools,new LinearLayout.LayoutParams(0,-2,1));toolbar.addView(newCollection,new LinearLayout.LayoutParams(-2,-2));root.addView(toolbar);
         breadcrumb=Ui.text(activity,"漫画库",12);breadcrumb.setTextColor(Ui.MUTED);backButton=button("返回漫画库",()->navigate(""));
         status=Ui.text(activity,"",12);status.setTextColor(Ui.MUTED);
         Ui.gap(root,20);tiles=true;list=new LibraryGridView(activity);list.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);list.setHorizontalSpacing(dp(8));list.setVerticalSpacing(dp(8));list.setNumColumns(4);list.setChoiceMode(ListView.CHOICE_MODE_NONE);adapter=new CoverAdapter();list.setAdapter(adapter);root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
@@ -120,7 +122,7 @@ public final class LibraryScreen {
         sheet=Ui.column(activity);sheet.setPadding(dp(16),dp(18),dp(16),dp(20));sheet.setBackground(Ui.shape(activity,android.graphics.Color.WHITE,18,true));sheet.setElevation(dp(12));selectionTitle=Ui.text(activity,"",16);selectionTitle.setTypeface(null,android.graphics.Typeface.BOLD);selectionTitle.setGravity(Gravity.CENTER);sheet.addView(selectionTitle);Ui.gap(sheet,14);
         batchActions=Ui.column(activity);sheet.addView(batchActions);
         Button export=button("导出",()->{List<LibraryStore.Entry> items=selection();if(!items.isEmpty())new ExportScreen(activity,store,items,this::load).show();}),delete=button("删除",()->confirmRemove(true)),share=Ui.iconButton(activity,"share","",this::shareSelection),favorite=button("收藏",()->{List<LibraryStore.Entry> items=selection();boolean all=true;for(LibraryStore.Entry e:items)all&=e.favorite;favorite(!all);}),move=button("移动",this::beginMove),cancel=button("取消",()->setBatchMode(false));
-        share.setTextSize(12);batchButtons.addAll(Arrays.asList(export,delete,share,favorite,move));batchActions.addView(new ActionRow(activity,3,export,share,delete,favorite,move,cancel));
+        share.setTextSize(14);batchButtons.addAll(Arrays.asList(export,delete,share,favorite,move));batchActions.addView(new ActionRow(activity,3,export,share,delete,favorite,move,cancel));
         moveBar=Ui.column(activity);moveBar.addView(Ui.pair(activity,button("确认",this::commitMove),button("返回",this::cancelMove)));moveBar.setVisibility(View.GONE);sheet.addView(moveBar);page.addView(sheet,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));sheet.setVisibility(View.GONE);
         stop=button("停止操作",this::cancel);stop.setEnabled(false);
         if(activity instanceof MainActivity){page.setBackgroundColor(Color.TRANSPARENT);((MainActivity)activity).libraryHost().addView(page,new FrameLayout.LayoutParams(-1,-1));}

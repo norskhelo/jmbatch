@@ -15,7 +15,9 @@ def build(view,parent):
     surface=view.surface=Panel(view.window,padding=18,connected_top=view.embedded);surface.pack(fill='both',expand=True);body=surface.body
     header=ttk.Frame(body);header.pack(fill='x');ttk.Label(header,text='漫画库',font=('Microsoft YaHei UI',22,'bold')).pack(side='left')
     bar=ttk.Frame(body);bar.pack(fill='x',pady=14);bar.columnconfigure(2,weight=1)
-    ttk.Button(bar,text='检查更新',command=lambda:check_all(view)).grid(row=0,column=0,sticky='nw',padx=(0,4));view.sort_button=ttk.Button(bar,text='排序方式',command=lambda:sort_menu(view));view.sort_button.grid(row=0,column=1,sticky='nw',padx=4);icon_button(bar,'folder',command=lambda:new_collection(view)).grid(row=0,column=3,sticky='ne',padx=(4,0))
+    ttk.Button(bar,text='检查更新',command=lambda:check_all(view)).grid(row=0,column=0,sticky='nw',padx=(0,4));view.sort_button=ttk.Button(bar,text='排序方式',command=lambda:sort_menu(view));view.sort_button.grid(row=0,column=1,sticky='nw',padx=4)
+    view.new_collection_button=icon_button(bar,'folder',command=lambda:new_collection(view),font=ADD_ACTION_FONT,icon_ratio=.8)
+    view.new_collection_button.grid(row=0,column=3,sticky='ne',padx=(4,0))
 
     view.query=tk.StringVar();view.only_favorites=tk.BooleanVar();view.hint=tk.StringVar();view.breadcrumb=tk.StringVar()
     hidden=ttk.Frame(body);view.back_button=ttk.Button(hidden);view.mode_button=ttk.Button(hidden);view.selection_controls=ttk.Frame(hidden);view.stop_button=ttk.Button(hidden);view.display_mode=tk.StringVar(value='tiles')
