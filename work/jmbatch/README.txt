@@ -1,6 +1,8 @@
-JM Batch 0.3.33 — Windows 使用说明
+JM Batch 0.3.34 — Windows 使用说明
 
 本版双页交互：下载页与漫画库同时加载，点击后方露出的页面切换。淡化 0.33 秒、下滑 0.66 秒，切换期间锁定两页操作，结束后恢复。
+
+设置入口仅保留齿轮图标；点击进入独立设置页，左右滑动进出并保留原页面状态。导出可开启“只保留编号”。
 
 1. 在设置中选择保存目录，点击主页面右下角“＋”，输入编号或区间并选择 PDF、ZIP 或文件夹格式；点击“添加”后新任务自动开始。格式选择会保存，已有任务继续或重试时保持原格式。
 2. 默认同时下载 2 本。在“下载设置”中将“同时下载任务数”设为 1–4；“每任务图片线程数”控制单本图片并发。
@@ -8,11 +10,11 @@ JM Batch 0.3.33 — Windows 使用说明
 4. 文件夹和 ZIP 只含图片：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。导出和文件删除前请暂停下载并等待请求退出。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
-安装包下载（2026-10-23）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.33-0.6.16/JMBatch-0.3.33-Windows-x64.zip
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.33-0.6.16/JMBatch-0.3.33-Windows-x64.zip
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.33-0.6.16/JMBatch-0.3.33-Windows-x64.zip
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.33-0.6.16/SHA256-release-0.3.33-0.6.16.txt
+安装包下载（2026-10-24）
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.34-0.6.17/JMBatch-0.3.34-Windows-x64.zip
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.34-0.6.17/JMBatch-0.3.34-Windows-x64.zip
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.34-0.6.17/JMBatch-0.3.34-Windows-x64.zip
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.34-0.6.17/SHA256-release-0.3.34-0.6.17.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
