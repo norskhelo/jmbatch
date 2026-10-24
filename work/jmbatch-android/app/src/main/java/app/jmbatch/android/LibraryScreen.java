@@ -31,10 +31,11 @@ public final class LibraryScreen {
     private TextView selectionTitle;
     private Button sortButton;
     private String sort="name";private boolean moving;
-    private boolean chapterScanning;
-    private final Set<String> chapterScanAttempted=new HashSet<>();
+    private boolean metadataScanning;
+    private final Set<String> metadataScanAttempted=new HashSet<>();
     private List<LibraryStore.Entry> movingItems;
     private String moveOrigin="";
+    private Bundle moveViewport;
     private boolean checkingAll;
     private final ExecutorService updateWorker=Executors.newSingleThreadExecutor();
     public boolean back(){if(moving){cancelMove();return true;}if(batchMode){setBatchMode(false);return true;}if(!collection.isEmpty()){navigate("");return true;}return false;}
@@ -152,12 +153,15 @@ public final class LibraryScreen {
         if(busy||position<0||position>=entries.size()||!list.isEnabled())return;
         LibraryStore.Entry entry=entries.get(position);
         if(entry.isCollection()){navigate(entry.uri);return;}
-        if(moving)return;
+        // AbsListView toggles its choice before delivering the click. Destination
+        // browsing must keep the original move selection, even when a comic is tapped.
+        if(moving){list.setItemChecked(position,selected.contains(entry.uri));return;}
         if(!batchMode){read(entry);return;}
         if(!selected.add(entry.uri))selected.remove(entry.uri);
         list.setItemChecked(position,selected.contains(entry.uri));counts();
     }
     private boolean itemLongClick(int position){
+        if(moving)return true;
         if(!busy&&position>=0&&position<entries.size()&&list.isEnabled()){
             if(entries.get(position).isCollection()){manageCollection(entries.get(position).uri);return true;}
             if(!batchMode)setBatchMode(true);
@@ -210,8 +214,11 @@ public final class LibraryScreen {
         public int getCount(){return entries.size();}public Object getItem(int position){return entries.get(position);}public long getItemId(int position){return position;}
         public View getView(int position,View recycled,ViewGroup parent){
             CoverRow row=recycled instanceof CoverRow&&((CoverRow)recycled).tile==tiles?(CoverRow)recycled:new CoverRow();LibraryStore.Entry entry=entries.get(position);
-            if(!entry.title.contentEquals(row.text.getText()))row.text.setText(entry.title);row.number.setText(entry.isCollection()?"":entry.id);row.number.setVisibility(entry.isCollection()?View.GONE:View.VISIBLE);row.star.setVisibility(entry.favorite?View.VISIBLE:View.GONE);
-            row.bindChoice(batchMode&&!entry.isCollection(),selected.contains(entry.uri),entry.uri.equals(row.boundUri));row.boundUri=entry.uri;
+            if(!entry.title.contentEquals(row.text.getText()))row.text.setText(entry.title);row.number.setText(entry.isCollection()?"":entry.id);
+            // GridView fills rows from opposite edges when scrolling back. Keep the
+            // ID line's height for folders too so mixed rows cannot shift at the top.
+            row.number.setVisibility(entry.isCollection()?View.INVISIBLE:View.VISIBLE);row.star.setVisibility(entry.favorite?View.VISIBLE:View.GONE);
+            row.bindChoice((batchMode||moving)&&!entry.isCollection(),selected.contains(entry.uri),entry.uri.equals(row.boundUri));row.boundUri=entry.uri;
             row.text.setSelected(true);
             Cover cover=coverCache.get(entry.uri);Bitmap bitmap=cover==null?null:cover.bitmap;
             row.image.setImageBitmap(bitmap);row.image.setContentDescription(entry.isCollection()?"收藏夹内漫画封面预览":bitmap==null?"暂无封面":"第一页封面");row.placeholder.setText(entry.isCollection()?"收藏夹":"暂无\n封面");row.placeholder.setVisibility(bitmap==null?View.VISIBLE:View.GONE);
@@ -231,14 +238,15 @@ public final class LibraryScreen {
     private List<LibraryStore.Entry> selection(){List<LibraryStore.Entry> result=new ArrayList<>();for(LibraryStore.Entry e:entries)if(!e.isCollection()&&selected.contains(e.uri))result.add(e);return result;}
     private void acceptEntries(List<LibraryStore.Entry> result){
         loading=false;entries=result;Set<String> present=new HashSet<>();list.clearChoices();
-        for(LibraryStore.Entry e:result)if(!e.isCollection())present.add(e.uri);selected.retainAll(present);
+        for(LibraryStore.Entry e:result)if(!e.isCollection())present.add(e.uri);if(!moving)selected.retainAll(present);
         for(int i=0;i<entries.size();i++)list.setItemChecked(i,selected.contains(entries.get(i).uri));
         adapter.notifyDataSetChanged();restoreViewport(pendingViewState);pendingViewState=null;list.setEnabled(true);counts();
     }
-    private void load(){
+    private void load(){load(true);}
+    private void load(boolean refreshCovers){
         if(!visible()||busy)return;
         final int ticket=++generation;String search=query.getText().toString();boolean only=favorites.isChecked();String requestedCollection=collection;String nextFilter=search+"|"+only+"|"+collection;
-        if(!filter.equals(nextFilter)){selected.clear();filter=nextFilter;pendingViewState=new Bundle();}
+        if(!filter.equals(nextFilter)){if(!moving)selected.clear();filter=nextFilter;pendingViewState=new Bundle();}
         else if(pendingViewState==null)pendingViewState=viewportState();
         loading=true;counts();status.setText("正在读取…");list.setEnabled(false);
         worker.execute(()->{
@@ -246,7 +254,7 @@ public final class LibraryScreen {
                 library=LibraryStore.get(activity);library.sync(store.snapshot());
                 String folder=library.collectionName(requestedCollection)==null?"":requestedCollection;
                 List<LibraryStore.Entry> result=LibrarySort.sorted(activity,library.browse(search,only,folder),sort);Map<String,List<LibraryStore.Entry>> previews=library.collectionPreviews();String name=library.collectionName(folder);
-                main.post(()->{if(!visible()||ticket!=generation)return;collection=folder;breadcrumb.setText(folder.isEmpty()?"漫画库（默认收藏夹）":"漫画库 / "+name);collectionPreviews=previews;resetCovers();acceptEntries(result);prepareChapterCounts();});
+                main.post(()->{if(!visible()||ticket!=generation)return;collection=folder;breadcrumb.setText(folder.isEmpty()?"漫画库（默认收藏夹）":"漫画库 / "+name);collectionPreviews=previews;if(refreshCovers)resetCovers();acceptEntries(result);prepareMetadata();});
             }catch(Exception error){main.post(()->{if(visible()&&ticket==generation){loading=false;list.setEnabled(true);counts();status.setText(error.getMessage());}});}
         });
     }
@@ -262,7 +270,7 @@ public final class LibraryScreen {
         if(!moving)setBatchMode(false);collection=key;pendingViewState=new Bundle();
         // Suppress intermediate text/filter loads while resetting navigation.
         busy=true;query.setText("");favorites.setChecked(false);busy=false;
-        query.clearFocus();list.requestFocus();load();
+        query.clearFocus();list.requestFocus();load(!moving);
     }
     private void editCollection(String key){
         LinearLayout body=Ui.column(activity);TextView title=Ui.heading(activity,key==null?"新建收藏夹":"重命名收藏夹");title.setGravity(Gravity.CENTER);body.addView(title);EditText name=Ui.input(activity,"请输入名称",false);name.setSingleLine(true);if(key!=null)name.setText(library.collectionName(key));body.addView(name);Ui.gap(body,18);AlertDialog modal=Ui.modal(activity,body,false);Button accept=Ui.button(activity,"确认",()->{String value=name.getText().toString().trim();if(value.isEmpty()||value.length()>40){name.setError("请输入 1–40 个字符");return;}modal.dismiss();perform(()->{if(key==null)library.createCollection(value);else library.renameCollection(key,value);return "收藏夹已保存";},null);});Ui.primary(accept);body.addView(Ui.pair(activity,accept,Ui.button(activity,"取消",modal::dismiss)));modal.show();
@@ -311,34 +319,49 @@ public final class LibraryScreen {
     }
     private void sortCached(){
         try{
-            pendingViewState=viewportState();
+            if(pendingViewState==null)pendingViewState=viewportState();
             acceptEntries(LibrarySort.sorted(activity,library.browse(query.getText().toString(),favorites.isChecked(),collection),sort));
         }catch(Exception error){message(error.getMessage());}
     }
-    private void prepareChapterCounts(){
-        if(chapterScanning||!visible())return;
+    private void prepareMetadata(){
+        if(metadataScanning||!visible())return;
         List<LibraryStore.Entry> pending=new ArrayList<>();
-        try{for(LibraryStore.Entry item:library.list("",false))if(item.chapterCount<0&&chapterScanAttempted.add(item.uri))pending.add(item);}
+        try{for(LibraryStore.Entry item:library.list("",false))if((item.chapterCount<0||item.sizeBytes<0)&&metadataScanAttempted.add(item.uri))pending.add(item);}
         catch(Exception error){status.setText(error.getMessage());return;}
-        if(pending.isEmpty())return;chapterScanning=true;
+        if(pending.isEmpty())return;metadataScanning=true;
         worker.execute(()->{
             boolean changed=false;String failure=null;
-            try{changed=library.fillChapterCounts(pending);}catch(Exception error){failure=error.getMessage();}
+            try{changed=library.fillSizes(pending);changed|=library.fillChapterCounts(pending);}catch(Exception error){failure=error.getMessage();}
             final boolean updated=changed;final String problem=failure;
             main.post(()->{
-                chapterScanning=false;if(!visible())return;
-                if(problem!=null){status.setText("章节信息保存失败："+problem);return;}
-                if(updated&&sort.equals("chapters")&&!busy&&!loading)sortCached();
-                prepareChapterCounts();
+                metadataScanning=false;if(!visible())return;
+                if(problem!=null){status.setText("漫画信息保存失败："+problem);return;}
+                if(updated&&(sort.equals("chapters")||sort.equals("size"))&&!busy&&!loading)sortCached();
+                prepareMetadata();
             });
         });
     }
-    private void sortMenu(){PopupMenu menu=new PopupMenu(activity,sortButton);String[] names={"名称","时间","大小","章节数"},values={"name","time","size","chapters"};for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,i,names[i]);menu.setOnMenuItemClickListener(item->{sort=values[item.getItemId()];if(sort.equals("chapters")||sort.equals("name"))sortCached();else load();return true;});menu.show();}
+    private void sortMenu(){PopupMenu menu=new PopupMenu(activity,sortButton);String[] names={"名称","时间","大小","章节数"},values={"name","time","size","chapters"};for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,i,names[i]);menu.setOnMenuItemClickListener(item->{sort=values[item.getItemId()];pendingViewState=new Bundle();if(!sort.equals("time"))sortCached();else load();return true;});menu.show();}
 
     private void shareSelection(){List<LibraryStore.Entry> items=selection();ArrayList<Uri> uris=new ArrayList<>();for(LibraryStore.Entry item:items){if(item.format.equals("images")){message("图片文件夹请先导出为 pdf 或 zip 后分享");return;}uris.add(Uri.parse(item.uri));}if(uris.isEmpty())return;Intent intent=new Intent(Intent.ACTION_SEND_MULTIPLE).setType("application/octet-stream").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM,uris);android.content.ClipData clip=android.content.ClipData.newRawUri("漫画",uris.get(0));for(int i=1;i<uris.size();i++)clip.addItem(new android.content.ClipData.Item(uris.get(i)));intent.setClipData(clip);try{activity.startActivity(Intent.createChooser(intent,"分享"));}catch(Exception error){message("没有支持分享的应用");}}
-    private void beginMove(){movingItems=selection();if(movingItems.isEmpty())return;moveOrigin=collection;moving=true;batchMode=false;selected.clear();list.clearChoices();batchActions.setVisibility(View.GONE);selectionTitle.setVisibility(View.GONE);moveBar.setVisibility(View.VISIBLE);collection="";load();}
-    private void cancelMove(){moving=false;movingItems=null;collection=moveOrigin;sheet.setVisibility(View.GONE);load();}
-    private void commitMove(){List<LibraryStore.Entry> items=movingItems;if(items==null)return;String target=collection;perform(()->"已移动 "+library.moveToCollection(items,target)+" 本漫画",()->{moving=false;movingItems=null;sheet.setVisibility(View.GONE);});}
+    private void beginMove(){
+        movingItems=selection();if(movingItems.isEmpty())return;
+        moveOrigin=collection;moveViewport=viewportState();moving=true;batchMode=false;
+        batchActions.setVisibility(View.GONE);selectionTitle.setVisibility(View.GONE);moveBar.setVisibility(View.VISIBLE);Ui.sheet(sheet);
+        // In the default library only the menu changes. Keep the live grid and
+        // its decoded covers instead of replacing them with loading placeholders.
+        collection="";if(moveOrigin.isEmpty())counts();else load(false);
+    }
+    private void cancelMove(){
+        if(busy||loading)return;
+        boolean sameCollection=collection.equals(moveOrigin);
+        moving=false;movingItems=null;collection=moveOrigin;batchMode=true;
+        filter=query.getText().toString()+"|"+favorites.isChecked()+"|"+collection;
+        pendingViewState=moveViewport;moveViewport=null;
+        batchActions.setVisibility(View.VISIBLE);selectionTitle.setVisibility(View.VISIBLE);moveBar.setVisibility(View.GONE);Ui.sheet(sheet);
+        if(sameCollection){restoreViewport(pendingViewState);pendingViewState=null;counts();}else load(false);
+    }
+    private void commitMove(){List<LibraryStore.Entry> items=movingItems;if(items==null)return;String target=collection;perform(()->"已移动 "+library.moveToCollection(items,target)+" 本漫画",()->{moving=false;movingItems=null;moveViewport=null;selected.clear();list.clearChoices();list.setChoiceMode(ListView.CHOICE_MODE_NONE);sheet.setVisibility(View.GONE);});}
     private void checkAllUpdates(){
         if(checkingAll){Ui.notice(activity,"正在检查章节更新");return;}checkingAll=true;Ui.notice(activity,"开始检查章节更新");Store.Settings options=new Store.Settings(store.settings.json());String cookie=store.cookie;
         updateWorker.execute(()->{List<LibraryStore.Entry> changed=new ArrayList<>();Map<String,ChapterUpdates.Result> results=new LinkedHashMap<>();int failures=0;JmApi.Control control=new JmApi.Control();updateControl=control;

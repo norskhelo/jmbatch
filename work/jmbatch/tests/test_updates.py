@@ -61,7 +61,7 @@ class UpdateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             home=Path(folder);(home/'announcement-seen.txt').write_text('0.3.0',encoding='utf-8')
             app=SimpleNamespace(home=home,root=Mock(),update_button=Mock())
-            with patch('core.VERSION','0.3.3'):
+            with patch('core.VERSION','0.3.3'), patch('ui_common.notice'):
                 first=UpdateUI(app);first.automatic=False;first.show_notes=Mock()
                 first.startup()
                 self.assertEqual(first.upgrade_from,'0.3.0')
@@ -207,7 +207,7 @@ class UpdateTests(unittest.TestCase):
         ui=UpdateUI.__new__(UpdateUI)
         ui.repo=ui.checked_repo="owner/app";ui.bulletin=cached
         ui.checker=SimpleNamespace(poll=lambda:("skipped",None))
-        ui.app=SimpleNamespace(update_button=SimpleNamespace(configure=lambda **kwargs:None))
+        ui.app=SimpleNamespace(root=None,update_button=SimpleNamespace(configure=lambda **kwargs:None))
         ui.refresh=lambda:None
         ui.poll()
         self.assertIs(ui.bulletin,cached)

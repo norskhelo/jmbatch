@@ -110,7 +110,7 @@ def show(app):
     for label,value in [('左右翻页','paged'),('上下翻页','vertical'),('上下滚动','scroll')]:ttk.Radiobutton(row,text=label,value=value,variable=mode,command=reading).pack(side='left',expand=True,anchor='w')
     ttk.Label(body,text='多章节观看模式').pack(anchor='w');row=ttk.Frame(body);row.pack(fill='x',pady=(10,4))
     for label,value in [('多章节合一',1),('分章节观看',2)]:ttk.Radiobutton(row,text=label,value=value,variable=chapter,command=save).pack(side='left',padx=(0,24))
-    row=section('更新');ttk.Button(row,text='检查更新',command=app.updates.show_and_check).pack(side='left',padx=(16,8));ttk.Button(row,text='更新日志',command=app.updates.show_notes).pack(side='left')
+    row=section('更新');update_button=ttk.Button(row,text='检查更新');update_button.pack(side='left',padx=(16,8));app.updates.bind_settings_button(update_button);ttk.Button(row,text='更新日志',command=app.updates.show_notes).pack(side='left')
     section('软件说明');description=ttk.Label(body,text='本软件主要为作者自用，维护与开发均由 AI 进行',wraplength=425);description.pack(anchor='w');body.bind('<Configure>',lambda e:description.configure(wraplength=max(120,e.width-32)),add='+');ttk.Label(body,text='详情请见：').pack(anchor='w');repo=ttk.Label(body,text='github.com/norskhelo/jmbatch',foreground=BLUE,cursor='hand2');repo.pack(anchor='w');repo.bind('<Button-1>',lambda e:__import__('webbrowser').open('https://github.com/norskhelo/jmbatch'))
     initializing[0]=False;app.close_settings=lambda:save(True)
     slide(app,True,back.focus_set);page.after_idle(lambda:scroll(*canvas.yview()))

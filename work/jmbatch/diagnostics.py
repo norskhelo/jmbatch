@@ -247,9 +247,9 @@ def check_manual_update_ui(application, directory):
                 assert widget.winfo_rootx() + widget.winfo_width() <= window.winfo_rootx() + window.winfo_width()
             ui.show_notes()
             root.update()
-            assert ui.notes_check_button.winfo_ismapped()
+            assert ui.notes_area.winfo_ismapped()
         with patch("updates.fetch_bulletin", side_effect=OSError("offline")):
-            ui.notes_check_button.invoke()
+            ui.check()
             wait_done()
             assert "保留本地日志" in ui.status and "重试" in ui.status
             assert "manual check full announcement" in ui.notes_area.get("1.0", "end")
@@ -259,7 +259,7 @@ def check_manual_update_ui(application, directory):
             ui.check_button.invoke()
             wait_done()
             assert network.call_count == 1 and "当前已是" in ui.status
-            assert str(ui.notes_check_button["state"]) == "normal"
+            assert ui.notes_window.winfo_exists()
         gate.clear()
         with patch("updates.fetch_bulletin", side_effect=fetch):
             ui.check_button.invoke()

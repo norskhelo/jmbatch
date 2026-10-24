@@ -49,6 +49,33 @@ public class LibrarySortRuntimeTest {
         comics.add(e);return e;
     }
     List<String> titles(List<LibraryStore.Entry> entries){List<String> result=new ArrayList<>();for(LibraryStore.Entry e:entries)result.add(e.title);return result;}
+    @Test public void pinyinComparesEveryCharacterAndPreservesSyllableBoundaries() {
+        List<String> names=new ArrayList<>(Arrays.asList("安中白","白安","安中阿","安波","安","安阿"));
+        names.sort((a,b)->NameSort.compare(NameSort.key(a),NameSort.key(b)));
+        assertEquals(Arrays.asList("安","安阿","安波","安中阿","安中白","白安"),names);
+        names=new ArrayList<>(Arrays.asList("先安","西中","先","西安","西"));
+        names.sort((a,b)->NameSort.compare(NameSort.key(a),NameSort.key(b)));
+        assertEquals(Arrays.asList("西","西安","西中","先","先安"),names);
+        names=new ArrayList<>(Arrays.asList("安白","鞍阿","安阿"));
+        names.sort((a,b)->NameSort.compare(NameSort.key(a),NameSort.key(b)));
+        assertEquals(Arrays.asList("鞍阿","安阿","安白"),names);
+        assertArrayEquals(new String[]{"he","a"},NameSort.key("𠀀阿"));
+        assertArrayEquals(new String[]{"𠮷","a"},NameSort.key("𠮷阿"));
+        assertArrayEquals(new String[]{"nv"},NameSort.key("女"));
+        assertArrayEquals(new String[]{"fan","ti"},NameSort.key("繁體"));
+        assertTrue(NameSort.compare(NameSort.key("\ue000"),NameSort.key("😀"))<0);
+        names=new ArrayList<>(Arrays.asList("A2","a10","A1","a","[安]","","安"));
+        names.sort((a,b)->NameSort.compare(NameSort.key(a),NameSort.key(b)));
+        assertEquals(Arrays.asList("","[安]","a","A1","a10","A2","安"),names);
+    }
+    @Test public void pinyinSortsAllGroupsAndBreaksMetadataTies()throws Exception {
+        library.createCollection("白安");library.createCollection("安阿");
+        book("安白",false,1,"");book("安阿",false,1,"");
+        book("白安",true,1,"");book("安阿",true,1,"");library.importFound(comics);
+        List<LibraryStore.Entry> source=library.browse("",false,"");
+        for(String mode:new String[]{"name","size","time","chapters"})
+            assertEquals(mode,Arrays.asList("安阿","白安","安阿","白安","安阿","安白"),titles(LibrarySort.sorted(context,source,mode)));
+    }
     @Test public void allModesSortEveryGroupAndAllFolderMembers()throws Exception {
         String a=library.createCollection("A folder"),z=library.createCollection("Z folder"),empty=library.createCollection("Empty");
         book("B ordinary",false,1,"");book("A ordinary",false,2,"");
@@ -57,10 +84,11 @@ public class LibrarySortRuntimeTest {
         book("member z",true,2,z);
         library.importFound(comics);
         assertTrue(library.fillChapterCounts(library.list("",false)));
+        assertTrue(library.fillSizes(library.list("",false)));
         List<LibraryStore.Entry> source=library.browse("",false,"");
         assertEquals(Arrays.asList("A folder","Empty","Z folder","C favorite","D favorite","A ordinary","B ordinary"),titles(LibrarySort.sorted(context,source,"name")));
         for(String mode:new String[]{"size","time","chapters"}) {
-            List<String> expected=Arrays.asList("Empty","Z folder","A folder","D favorite","C favorite","B ordinary","A ordinary");
+            List<String> expected=Arrays.asList("A folder","Z folder","Empty","C favorite","D favorite","A ordinary","B ordinary");
             assertEquals(mode,expected,titles(LibrarySort.sorted(context,source,mode)));
             assertEquals(mode,expected,titles(LibrarySort.sorted(context,source,mode)));
         }
@@ -115,10 +143,10 @@ public class LibrarySortRuntimeTest {
         for(LibraryStore.Entry entry:comics){File file=AlbumStorage.local(context,android.net.Uri.parse(entry.uri));assertTrue(file.renameTo(new File(file.getParentFile(),file.getName()+"-moved")));}
         Field instance=LibraryStore.class.getDeclaredField("instance");instance.setAccessible(true);instance.set(null,null);library=LibraryStore.get(context);
         assertFalse(library.fillChapterCounts(library.list("",false)));
-        for(int i=0;i<3;i++)assertEquals(Arrays.asList("Z one","A many"),titles(LibrarySort.sorted(context,library.list("",false),"chapters")));
+        for(int i=0;i<3;i++)assertEquals(Arrays.asList("A many","Z one"),titles(LibrarySort.sorted(context,library.list("",false),"chapters")));
     }
 
-    @Test public void chapterMenuSortsImmediatelyWhileMetadataWorkerIsOccupied()throws Exception {
+    @Test public void chapterAndSizeMenusSortImmediatelyWhileMetadataWorkerIsOccupied()throws Exception {
         book("Z one",false,1,"");book("A many",false,3,"");library.importFound(comics);library.fillChapterCounts(library.list("",false));
         controller=Robolectric.buildActivity(Activity.class);Activity activity=controller.get();activity.setTheme(android.R.style.Theme_Material_Light_NoActionBar);controller.setup();
         screen=new LibraryScreen(activity,Store.get(activity));screen.show();settle();
@@ -126,11 +154,67 @@ public class LibrarySortRuntimeTest {
         ((ExecutorService)field(screen,"worker")).submit(()->{entered.countDown();try{release.await(10,TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}});
         assertTrue(entered.await(5,TimeUnit.SECONDS));
         try{
-            Button sort=(Button)field(screen,"sortButton");sort.performClick();PopupMenu popup=ShadowPopupMenu.getLatestPopupMenu();
-            shadowOf(popup).getOnMenuItemClickListener().onMenuItemClick(popup.getMenu().getItem(3));popup.dismiss();
-            assertFalse((Boolean)field(screen,"loading"));
-            @SuppressWarnings("unchecked") List<LibraryStore.Entry> entries=(List<LibraryStore.Entry>)field(screen,"entries");
-            assertEquals(Arrays.asList("Z one","A many"),titles(entries));
+            for(int choice:new int[]{2,3,2}){
+                Button sort=(Button)field(screen,"sortButton");sort.performClick();PopupMenu popup=ShadowPopupMenu.getLatestPopupMenu();
+                shadowOf(popup).getOnMenuItemClickListener().onMenuItemClick(popup.getMenu().getItem(choice));popup.dismiss();
+                assertFalse((Boolean)field(screen,"loading"));
+                @SuppressWarnings("unchecked") List<LibraryStore.Entry> entries=(List<LibraryStore.Entry>)field(screen,"entries");
+                assertEquals(Arrays.asList("A many","Z one"),titles(entries));
+            }
         }finally{release.countDown();}
+    }
+
+    @Test public void sizeCacheSurvivesFavoriteMoveSyncAndRestartWithoutReadingFiles()throws Exception {
+        book("A small",false,1,"");book("Z large",false,3,"");library.importFound(comics);
+        assertTrue(library.fillSizes(library.list("",false)));
+        // Filling the chapter cache later must retain already cached sizes.
+        assertTrue(library.fillChapterCounts(library.list("",false)));
+        String folder=library.createCollection("saved");library.moveToCollection(library.list("",false),folder);
+        library.setFavorites(library.list("",false),true);library.favorite(library.list("",false).get(0));library.setFavorites(library.list("",false),true);
+        Store.Task renamed=new Store.Task("A small",new Store.Settings());renamed.status="done";renamed.title="B small";renamed.resultUri=comics.get(0).uri;library.sync(Collections.singletonList(renamed));
+        for(LibraryStore.Entry entry:comics){File file=AlbumStorage.local(context,android.net.Uri.parse(entry.uri));assertTrue(file.renameTo(new File(file.getParentFile(),file.getName()+"-moved")));}
+        Field instance=LibraryStore.class.getDeclaredField("instance");instance.setAccessible(true);instance.set(null,null);library=LibraryStore.get(context);
+        assertFalse(library.fillSizes(library.list("",false)));
+        for(LibraryStore.Entry entry:library.list("",false)){assertTrue(entry.favorite);assertEquals(folder,entry.collection);assertEquals(entry.title.equals("Z large")?9:3,entry.sizeBytes);}
+        for(int i=0;i<3;i++)assertEquals(Arrays.asList("Z large","B small"),titles(LibrarySort.sorted(context,library.browse("",false,folder),"size")));
+    }
+
+    @Test public void sizeCacheMigratesLegacyRecordsAndRetriesMissingFiles()throws Exception {
+        File root=AlbumStorage.root(context);root.mkdirs();File missing=new File(root,"JM123-size.zip");
+        LibraryStore.Entry item=new LibraryStore.Entry("123","cached",ExportProvider.uri(context,missing).toString(),"","","zip",false,"",1);
+        org.json.JSONObject legacy=item.json();legacy.remove("sizeBytes");assertEquals(-1,new LibraryStore.Entry(legacy).sizeBytes);
+        library.importFound(Collections.singletonList(new LibraryStore.Entry(legacy)));
+        assertFalse(library.fillSizes(library.list("",false)));assertEquals(-1,library.list("",false).get(0).sizeBytes);
+        assertTrue(missing.createNewFile());assertTrue(library.fillSizes(library.list("",false)));assertEquals(0,library.list("",false).get(0).sizeBytes);
+    }
+
+    public static class SizeProvider extends android.content.ContentProvider {
+        int queries;Long bytes;CountDownLatch entered,release;
+        @Override public boolean onCreate(){return true;}
+        @Override public android.database.Cursor query(android.net.Uri uri,String[] columns,String selection,String[] args,String order){
+            queries++;if(entered!=null){entered.countDown();try{release.await(5,TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}}
+            android.database.MatrixCursor cursor=new android.database.MatrixCursor(columns);cursor.addRow(new Object[]{bytes});return cursor;
+        }
+        @Override public String getType(android.net.Uri uri){return "application/zip";}
+        @Override public android.net.Uri insert(android.net.Uri uri,android.content.ContentValues values){throw new UnsupportedOperationException();}
+        @Override public int delete(android.net.Uri uri,String s,String[] args){throw new UnsupportedOperationException();}
+        @Override public int update(android.net.Uri uri,android.content.ContentValues v,String s,String[] args){throw new UnsupportedOperationException();}
+    }
+    @Test public void providerSizeIsPrefetchedWithoutBlockingCachedSortOrCachingUnknownAsZero()throws Exception {
+        SizeProvider provider=new SizeProvider();android.content.pm.ProviderInfo info=new android.content.pm.ProviderInfo();info.authority="sizes.test";provider.attachInfo(context,info);
+        org.robolectric.shadows.ShadowContentResolver.registerProviderInternal(info.authority,provider);
+        library.importFound(Collections.singletonList(new LibraryStore.Entry("123","remote","content://sizes.test/book.zip","","","zip",false,"",1)));
+        List<LibraryStore.Entry> pending=library.list("",false);LibrarySort.sorted(context,pending,"size");assertEquals(0,provider.queries);
+        assertFalse(library.fillSizes(pending));assertEquals(-1,library.list("",false).get(0).sizeBytes);
+        provider.bytes=12345L;provider.entered=new CountDownLatch(1);provider.release=new CountDownLatch(1);
+        ExecutorService io=Executors.newFixedThreadPool(2);
+        try{
+            Future<Boolean> fill=io.submit(()->library.fillSizes(pending));assertTrue(provider.entered.await(5,TimeUnit.SECONDS));
+            assertEquals(1,io.submit(()->LibrarySort.sorted(context,library.list("",false),"size")).get(2,TimeUnit.SECONDS).size());
+            provider.release.countDown();assertTrue(fill.get(5,TimeUnit.SECONDS));
+        }finally{provider.release.countDown();io.shutdownNow();}
+        int reads=provider.queries;provider.bytes=null;
+        for(int i=0;i<4;i++)assertEquals(12345,LibrarySort.sorted(context,library.list("",false),"size").get(0).sizeBytes);
+        assertFalse(library.fillSizes(library.list("",false)));assertEquals(reads,provider.queries);
     }
 }

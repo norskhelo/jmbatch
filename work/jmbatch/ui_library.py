@@ -86,6 +86,7 @@ def sort_menu(view):
 
 
 def sorted_items(view,items):
+    from name_sort import name_key
     facts=({key:item.get('chapter_count',-1) for key,item in view.library.entries.items()}
            if view.sort_mode=='chapters' else dict(view.sort_facts))
     if view.sort_mode!='name':
@@ -99,7 +100,7 @@ def sorted_items(view,items):
     def key(pair):
         identity,item=pair
         group=0 if item.get('format')=='collection' else 1 if item.get('favorite') else 2
-        title=item['title'].casefold()
+        title=name_key(item['title'])
         return group,title if view.sort_mode=='name' else facts.get(identity,0),title
     return sorted(items,key=key)
 

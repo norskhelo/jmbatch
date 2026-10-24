@@ -53,12 +53,14 @@ public class ChapterDeletionRuntimeTest {
         return item;
     }
     String delete(LibraryStore.Entry entry,Integer... removed)throws Exception {
+        library.fillSizes(library.list("",false));
         return ChapterDeletion.delete(context,store,entry,ChapterDeletion.inspect(context,entry,()->false),new HashSet<>(Arrays.asList(removed)),()->false,t->{});
     }
     void assertUpdated(LibraryStore.Entry old,boolean saf)throws Exception {
         List<LibraryStore.Entry> all=library.list("",false);assertEquals(1,all.size());LibraryStore.Entry next=all.get(0);assertTrue(next.favorite);assertNotEquals(old.uri,next.uri);assertEquals(next.uri,store.tasks.get(0).resultUri);
         assertEquals(4,ChapterDeletion.inspect(context,next,()->false).chapters.size());
         assertEquals(2,next.chapterCount);
+        assertEquals(-1,next.sizeBytes);assertTrue(library.fillSizes(library.list("",false)));assertTrue(library.list("",false).get(0).sizeBytes>0);
         store.tasks.get(0).selectedChapters=Arrays.asList(new ChapterRules.Chapter("1",1,"one"),new ChapterRules.Chapter("2",2,"two"),new ChapterRules.Chapter("3",3,"three"));
         library.sync(store.snapshot());assertEquals(2,library.list("",false).get(0).chapterCount);
         JSONObject state=new JSONObject(context.getSharedPreferences("reader-history",0).getString(next.uri,"{}"));assertEquals(2,state.getInt("page"));assertEquals("[0,2,3]",state.getJSONArray("bookmarks").toString());assertEquals("paged",state.getString("mode"));

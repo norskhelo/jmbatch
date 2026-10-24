@@ -48,6 +48,18 @@ class LibrarySortTest(TestCase):
         self.items = [pair for pair in self.items if pair[0].startswith('fav')]
         self.assertEqual(self.keys(), ['fav-c', 'fav-z'])
 
+    def test_pinyin_names_apply_inside_all_groups_and_metadata_ties(self):
+        self.items = [(str(i), dict(title=title, favorite=group==1,
+                                  format='collection' if group==0 else 'images'))
+                      for i, (group, title) in enumerate([
+                          (2, '安白'), (1, '白安'), (0, '白安'),
+                          (2, '安阿'), (1, '安阿'), (0, '安阿')])]
+        for mode in ('name', 'size', 'time', 'chapters'):
+            with self.subTest(mode=mode):
+                self.view.sort_mode = mode
+                self.view.library.entries = {}
+                self.assertEqual(self.keys(), ['5', '2', '4', '1', '3', '0'])
+
     def test_selecting_same_mode_twice_keeps_ascending(self):
         self.view.window = Mock()
         self.view.sort_button = Mock()

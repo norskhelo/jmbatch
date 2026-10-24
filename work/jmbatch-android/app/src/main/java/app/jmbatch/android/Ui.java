@@ -85,5 +85,16 @@ public final class Ui {
         FrameLayout.LayoutParams params=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.CENTER_HORIZONTAL);params.topMargin=dp(a,32);params.leftMargin=params.rightMargin=dp(a,24);decor.addView(label,params);
         label.setAlpha(0);label.animate().alpha(1).setDuration(160).start();new Handler(Looper.getMainLooper()).postDelayed(()->decor.removeView(label),3000);
     }
-    public static void sheet(View view){view.setVisibility(View.VISIBLE);view.post(()->{view.setTranslationY(view.getHeight());view.animate().translationY(0).setDuration(220).start();});}
+    public static void sheet(View view){
+        view.animate().cancel();view.setVisibility(View.VISIBLE);
+        // Position the measured sheet before its first frame. Posting this work
+        // lets the expanded menu flash in place before the slide begins.
+        view.getViewTreeObserver().addOnPreDrawListener(new android.view.ViewTreeObserver.OnPreDrawListener(){
+            public boolean onPreDraw(){
+                view.getViewTreeObserver().removeOnPreDrawListener(this);
+                if(view.getVisibility()==View.VISIBLE){view.setTranslationY(view.getHeight());view.animate().translationY(0).setDuration(220).start();}
+                return true;
+            }
+        });
+    }
 }

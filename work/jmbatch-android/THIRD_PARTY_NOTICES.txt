@@ -7,3 +7,6 @@ Copyright and MIT license are preserved in app/src/main/assets/jmcomic-LICENSE.t
 This Android application does not package the Python runtime or the jmcomic Python package.
 It uses the Android platform's HTTPS, cryptography, bitmap, ZIP and PDF-rendering APIs.
 The PDF writer and Android application code are provided in the accompanying source archive.
+
+Offline character-by-character name sorting uses mozillazg/pinyin-data (MIT).
+Source revision and license: app/src/main/assets/pinyin-data-LICENSE.txt.

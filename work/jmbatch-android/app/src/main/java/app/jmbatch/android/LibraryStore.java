@@ -21,6 +21,7 @@ public final class LibraryStore {
         public final String id,title,uri,tree,label,format,collection;
         public final boolean favorite;
         public final int chapterCount;
+        public final long sizeBytes;
         Entry(String id,String title,String uri,String tree,String label,String format,boolean favorite) {
             this(id,title,uri,tree,label,format,favorite,"");
         }
@@ -28,17 +29,21 @@ public final class LibraryStore {
             this(id,title,uri,tree,label,format,favorite,collection,-1);
         }
         Entry(String id,String title,String uri,String tree,String label,String format,boolean favorite,String collection,int chapterCount) {
-            this.id=id;this.title=title;this.uri=uri;this.tree=tree;this.label=label;this.format=format;this.favorite=favorite;this.collection=collection;this.chapterCount=chapterCount;
+            this(id,title,uri,tree,label,format,favorite,collection,chapterCount,-1);
+        }
+        Entry(String id,String title,String uri,String tree,String label,String format,boolean favorite,String collection,int chapterCount,long sizeBytes) {
+            this.id=id;this.title=title;this.uri=uri;this.tree=tree;this.label=label;this.format=format;this.favorite=favorite;this.collection=collection;this.chapterCount=chapterCount;this.sizeBytes=sizeBytes;
         }
         Entry(JSONObject j)throws JSONException {
-            this(j.getString("id"),j.getString("title"),j.getString("uri"),j.getString("tree"),j.getString("label"),j.getString("format"),j.getBoolean("favorite"),j.optString("collection",""),j.optInt("chapterCount",-1));
+            this(j.getString("id"),j.getString("title"),j.getString("uri"),j.getString("tree"),j.getString("label"),j.getString("format"),j.getBoolean("favorite"),j.optString("collection",""),j.optInt("chapterCount",-1),j.optLong("sizeBytes",-1));
             if(uri.isEmpty()||(!format.equals("images")&&!format.equals("pdf")&&!format.equals("zip")))throw new JSONException("漫画记录无效");
         }
         JSONObject json()throws JSONException {
-            return new JSONObject().put("id",id).put("title",title).put("uri",uri).put("tree",tree).put("label",label).put("format",format).put("favorite",favorite).put("collection",collection).put("chapterCount",chapterCount);
+            return new JSONObject().put("id",id).put("title",title).put("uri",uri).put("tree",tree).put("label",label).put("format",format).put("favorite",favorite).put("collection",collection).put("chapterCount",chapterCount).put("sizeBytes",sizeBytes);
         }
-        Entry inCollection(String value){return new Entry(id,title,uri,tree,label,format,favorite,value,chapterCount);}
-        Entry withChapterCount(int value){return new Entry(id,title,uri,tree,label,format,favorite,collection,value);}
+        Entry inCollection(String value){return new Entry(id,title,uri,tree,label,format,favorite,value,chapterCount,sizeBytes);}
+        Entry withChapterCount(int value){return new Entry(id,title,uri,tree,label,format,favorite,collection,value,sizeBytes);}
+        Entry withSize(long value){return new Entry(id,title,uri,tree,label,format,favorite,collection,chapterCount,value);}
         boolean isCollection(){return format.equals("collection");}
     }
     private final Context context;
@@ -87,7 +92,7 @@ public final class LibraryStore {
             Entry old=next.get(task.resultUri);
             if(old!=null&&old.title.equals(task.title)&&old.id.equals(task.id))continue;
             int count=old==null?(task.selectedChapters.isEmpty()?-1:task.selectedChapters.size()):old.chapterCount;
-            next.put(task.resultUri,new Entry(task.id,task.title,task.resultUri,task.settings.outputUri,task.settings.outputLabel,task.settings.format,old!=null&&old.favorite,old==null?"":old.collection,count));changed=true;
+            next.put(task.resultUri,new Entry(task.id,task.title,task.resultUri,task.settings.outputUri,task.settings.outputLabel,task.settings.format,old!=null&&old.favorite,old==null?"":old.collection,count,old==null?-1:old.sizeBytes));changed=true;
         }
         if(changed)persist(next);
     }
@@ -107,6 +112,41 @@ public final class LibraryStore {
             if(changed)persist(next);return changed;
         }
     }
+    boolean fillSizes(List<Entry> snapshot)throws IOException {
+        Map<String,Long> sizes=new HashMap<>();
+        // File/provider I/O stays outside the lock used by cached sorting.
+        for(Entry item:snapshot)if(item.sizeBytes<0&&!item.isCollection()) {
+            try{long size=readSize(item);if(size>=0)sizes.put(item.uri,size);}
+            catch(Exception ignored){/* Keep unavailable sizes unknown; retry next session. */}
+        }
+        synchronized(this){
+            writable();LinkedHashMap<String,Entry> next=new LinkedHashMap<>(entries);boolean changed=false;
+            for(Map.Entry<String,Long> size:sizes.entrySet()){
+                Entry current=next.get(size.getKey());
+                if(current!=null&&current.sizeBytes<0){next.put(current.uri,current.withSize(size.getValue()));changed=true;}
+            }
+            if(changed)persist(next);return changed;
+        }
+    }
+    private long readSize(Entry item)throws Exception {
+        Uri uri=Uri.parse(item.uri);File local=AlbumStorage.local(context,uri);
+        if(local!=null)return localSize(local);
+        if(item.format.equals("images")){
+            long size=0;
+            for(AlbumStorage.Image image:AlbumStorage.load(context,uri).images){if(image.size<0)return -1;size=Math.addExact(size,image.size);}
+            return size;
+        }
+        try(Cursor cursor=context.getContentResolver().query(uri,new String[]{"_size"},null,null,null)){
+            return cursor!=null&&cursor.moveToFirst()&&!cursor.isNull(0)?cursor.getLong(0):-1;
+        }
+    }
+    private static long localSize(File file)throws IOException {
+        java.nio.file.attribute.BasicFileAttributes attrs=java.nio.file.Files.readAttributes(file.toPath(),java.nio.file.attribute.BasicFileAttributes.class,java.nio.file.LinkOption.NOFOLLOW_LINKS);
+        if(attrs.isSymbolicLink())throw new IOException("拒绝访问链接");
+        if(!attrs.isDirectory())return attrs.size();
+        File[] children=file.listFiles();if(children==null)throw new IOException("无法读取漫画目录大小");
+        long sum=0;for(File child:children)if(!java.nio.file.Files.isSymbolicLink(child.toPath()))sum=Math.addExact(sum,localSize(child));return sum;
+    }
     public synchronized List<Entry> list(String query,boolean favorites)throws IOException {
         writable();ArrayList<Entry> result=new ArrayList<>();
         for(Entry item:entries.values())if(LibraryRules.matches(item.id,item.title,item.uri,item.favorite,query,favorites))result.add(item);
@@ -115,7 +155,7 @@ public final class LibraryStore {
     public synchronized void favorite(Entry item)throws IOException {
         writable();Entry current=entries.get(item.uri);if(current==null)throw new IOException("记录已移除，请刷新");
         LinkedHashMap<String,Entry> next=new LinkedHashMap<>(entries);
-        next.put(current.uri,new Entry(current.id,current.title,current.uri,current.tree,current.label,current.format,!current.favorite,current.collection,current.chapterCount));persist(next);
+        next.put(current.uri,new Entry(current.id,current.title,current.uri,current.tree,current.label,current.format,!current.favorite,current.collection,current.chapterCount,current.sizeBytes));persist(next);
     }
     private File appFile(Entry item)throws IOException {
         Uri uri=Uri.parse(item.uri);
@@ -194,7 +234,7 @@ public final class LibraryStore {
         writable();LinkedHashMap<String,Entry> next=new LinkedHashMap<>(entries);Set<String> changed=new HashSet<>();
         for(Entry item:selected){
             Entry current=next.get(item.uri);if(current==null)throw new IOException("部分记录已移除，请刷新后重试");
-            next.put(current.uri,new Entry(current.id,current.title,current.uri,current.tree,current.label,current.format,favorite,current.collection,current.chapterCount));changed.add(current.uri);
+            next.put(current.uri,new Entry(current.id,current.title,current.uri,current.tree,current.label,current.format,favorite,current.collection,current.chapterCount,current.sizeBytes));changed.add(current.uri);
         }
         if(!changed.isEmpty())persist(next);return changed.size();
     }
