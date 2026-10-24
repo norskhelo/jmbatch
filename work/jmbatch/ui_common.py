@@ -1,8 +1,20 @@
 """Shared grayscale surfaces, anchored panels and short-lived notices."""
+import math
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk
 
 BG, INK, MUTED, LINE, ACCENT, BLUE = '#f5f5f7', '#1d1f26', '#747780', '#dadce1', '#73757c', '#3363bd'
+
+
+CONTROL_FONT = ('Microsoft YaHei UI', 12)
+
+
+def control_height(widget, font=CONTROL_FONT, ratio=2.25):
+    face = tkfont.Font(root=widget, font=font)
+    size = face.actual('size')
+    pixels = size * float(widget.tk.call('tk', 'scaling')) if size > 0 else -size
+    return max(math.ceil(pixels * ratio), face.metrics('linespace') + 2)
 
 
 def install_styles(root):
@@ -13,14 +25,15 @@ def install_styles(root):
     for name, fill, text in [('TButton', 'white', INK), ('Accent.TButton', ACCENT, 'white')]:
         pictures = []
         for color in (fill, '#e8e8ec' if fill == 'white' else '#62646c'):
-            image = Image.new('RGBA', (30, 30))
-            ImageDraw.Draw(image).rounded_rectangle((0, 0, 29, 29), radius=8, fill=color, outline=LINE if fill == 'white' else color)
+            image = Image.new('RGBA', (16, 16))
+            ImageDraw.Draw(image).rounded_rectangle((0, 0, 15, 15), radius=6, fill=color, outline=LINE if fill == 'white' else color)
             pictures.append(ImageTk.PhotoImage(image, master=root))
         root._button_surfaces.extend(pictures)
         element = name + '.round'
-        style.element_create(element, 'image', pictures[0], ('active', pictures[1]), border=8, sticky='nswe')
+        style.element_create(element, 'image', pictures[0], ('active', pictures[1]), border=6, padding=0, sticky='nswe')
         style.layout(name, [(element, {'sticky': 'nswe', 'children': [('Button.padding', {'sticky': 'nswe', 'children': [('Button.label', {'sticky': 'nswe'})]})]})])
-        style.configure(name, foreground=text, background='white', padding=(12, 6),font=('Microsoft YaHei UI',12),width=0)
+        extra = control_height(root) - tkfont.Font(root=root, font=CONTROL_FONT).metrics('linespace')
+        style.configure(name, foreground=text, background='white', padding=(6, extra//2, 6, extra-extra//2),font=CONTROL_FONT,width=0)
         style.map(name, background=[('active','white'),('disabled','white')])
     style.configure('Page.TFrame', background=BG)
     style.configure('Page.TLabel', background=BG)
@@ -77,14 +90,35 @@ class Input(tk.Canvas):
     """The concept's lightly filled rounded input, with a native editable interior."""
     def __init__(self,parent,textvariable=None,multiline=False,height=None,**kwargs):
         self.multiline=multiline
-        super().__init__(parent,height=height or (100 if multiline else 46),highlightthickness=0,bg='white',**kwargs)
-        options=dict(bg=BG,fg=INK,relief='flat',bd=0,font=('Microsoft YaHei UI',11))
-        self.editor=tk.Text(self,wrap='word',**options) if multiline else tk.Entry(self,textvariable=textvariable,**options)
-        self.item=self.create_window(14,8,window=self.editor,anchor='nw')
+        self.base_height=control_height(parent)
+        super().__init__(parent,height=height or self.base_height,highlightthickness=0,bg='white',**kwargs)
+        options=dict(bg=BG,fg=INK,relief='flat',bd=0,highlightthickness=0,font=CONTROL_FONT)
+        self.editor=tk.Text(self,wrap='word',height=1,padx=0,pady=0,**options) if multiline else tk.Entry(self,textvariable=textvariable,**options)
+        self.inset=max(1,(self.base_height-tkfont.Font(root=self,font=CONTROL_FONT).metrics('linespace'))//2)
+        self.item=self.create_window(12,self.inset,window=self.editor,anchor='nw')
+        self.fit_job=None
+        if multiline:
+            self.editor.bind('<<Modified>>',self.content_changed)
+            self.editor.bind('<Configure>',self.schedule_fit)
         self.bind('<Configure>',self.resize)
     def resize(self,event):
         super().delete('surface');rounded(self,1,1,event.width-2,event.height-2,8,fill=BG,outline=LINE,tags='surface');self.tag_lower('surface')
-        self.itemconfigure(self.item,width=max(1,event.width-28),height=max(1,event.height-16))
+        self.itemconfigure(self.item,width=max(1,event.width-24),height=max(1,event.height-2*self.inset))
+    def content_changed(self,event=None):
+        if self.editor.edit_modified():
+            self.editor.edit_modified(False);self.schedule_fit()
+    def schedule_fit(self,event=None):
+        if self.fit_job is None:self.fit_job=self.after_idle(self.fit_content)
+    def fit_content(self):
+        self.fit_job=None
+        if not self.winfo_exists():return
+        count=self.editor.count('1.0','end-1c','displaylines')
+        lines=(count[0] if count else 0)+1
+        line_height=tkfont.Font(root=self,font=self.editor.cget('font')).metrics('linespace')
+        height=self.base_height+(lines-1)*line_height
+        if int(self.cget('height'))!=height:
+            self.configure(height=height)
+            self.winfo_toplevel().event_generate('<<InputSizeChanged>>',when='tail')
     def get(self,*args):return self.editor.get(*args)
     def focus_set(self):return self.editor.focus_set()
     def insert(self,*args):return self.editor.insert(*args)
@@ -110,13 +144,18 @@ def modal(owner, width=440, height=None, blur=False):
     window.configure(bg=LINE)
     body = ttk.Frame(window, padding=22, style='Card.TFrame')
     body.pack(fill='both', expand=True, padx=1, pady=1)
-    def show():
+    def layout():
         window.update_idletasks()
         w, h = min(width,host.winfo_width()-32), height or body.winfo_reqheight()+2
         x = host.winfo_rootx()+(host.winfo_width()-w)//2
         y = host.winfo_rooty()+max(12,(host.winfo_height()-h)//2)
         window.geometry(f'{w}x{h}+{x}+{y}')
-        window.deiconify(); window.lift(); window.grab_set(); window.focus_set()
+    clipped_size=[None]
+    def clip(event):
+        if event.widget is not window:return
+        size=(event.width,event.height)
+        if size==clipped_size[0]:return
+        clipped_size[0]=size
         # Clip only this borderless Tk dialog to the rounded outline in the concept.
         try:
             import ctypes
@@ -126,21 +165,26 @@ def modal(owner, width=440, height=None, blur=False):
             ctypes.windll.user32.GetParent.restype=wintypes.HWND
             ctypes.windll.user32.SetWindowRgn.argtypes=[wintypes.HWND,ctypes.c_void_p,wintypes.BOOL]
             ctypes.windll.gdi32.DeleteObject.argtypes=[ctypes.c_void_p]
-            region=ctypes.windll.gdi32.CreateRoundRectRgn(0,0,w+1,h+1,22,22)
+            region=ctypes.windll.gdi32.CreateRoundRectRgn(0,0,event.width+1,event.height+1,22,22)
             hwnd=ctypes.windll.user32.GetParent(window.winfo_id()) or window.winfo_id()
             if not ctypes.windll.user32.SetWindowRgn(hwnd,region,True):ctypes.windll.gdi32.DeleteObject(region)
         except (AttributeError,OSError):pass
+    def show():
+        layout()
+        window.deiconify(); window.lift(); window.grab_set(); window.focus_set()
     def destroyed(event):
         if event.widget is window and shade is not None:
             shade.destroy()
     window.bind('<Destroy>',destroyed,add='+')
+    window.bind('<Configure>',clip,add='+')
     window.bind('<Escape>',lambda e: window.destroy())
+    window.bind('<<InputSizeChanged>>',lambda e:window.after_idle(layout))
     window.after_idle(show)
     return window, body
 
 
 def actions(parent, left, right, accept, cancel):
-    row=ttk.Frame(parent,style='Card.TFrame');row.pack(fill='x',pady=(18,0))
+    row=ttk.Frame(parent,style='Card.TFrame');row.pack(anchor='center',pady=(18,0))
     row.columnconfigure((0,1),weight=1,uniform='action')
     ttk.Button(row,text=left,style='Accent.TButton',command=accept).grid(row=0,column=0,sticky='ew',padx=(0,5))
     ttk.Button(row,text=right,command=cancel).grid(row=0,column=1,sticky='ew',padx=(5,0))
@@ -155,6 +199,16 @@ def slide_sheet(panel,step=0,bottom=None):
     if step<12:panel.after(16,lambda:slide_sheet(panel,step+1,bottom))
 
 
+def square_button(button):
+    face=tkfont.Font(root=button,font=CONTROL_FONT)
+    size=control_height(button)
+    content=button.image.width() if hasattr(button,'image') else face.measure(button.cget('text'))
+    horizontal=max(0,size-content);vertical=max(0,size-face.metrics('linespace'))
+    button.configure(width=0,padding=(horizontal//2,vertical//2,horizontal-horizontal//2,vertical-vertical//2))
+    button.icon_only=True
+    return button
+
+
 def icon_button(parent, kind, text='', command=None):
     """Small monochrome line icons drawn from the confirmed concept."""
     from PIL import Image,ImageDraw,ImageTk
@@ -166,8 +220,10 @@ def icon_button(parent, kind, text='', command=None):
         d.line((8,59,8,18,29,18,35,26,64,26,64,59,8,59),fill=c,width=4);d.line((36,33,36,51),fill=c,width=4);d.line((27,42,45,42),fill=c,width=4)
     elif kind=='share':
         d.line((18,34,18,62,56,62,56,34),fill=c,width=4);d.line((37,46,37,10),fill=c,width=4);d.line((23,24,37,10,51,24),fill=c,width=4)
-    picture=ImageTk.PhotoImage(im.resize((21,21),Image.Resampling.LANCZOS),master=parent)
-    button=ttk.Button(parent,text=('  '+text if text else ''),image=picture,compound='left',command=command);button.image=picture
+    size=tkfont.Font(root=parent,font=CONTROL_FONT).metrics('linespace')
+    picture=ImageTk.PhotoImage(im.resize((size,size),Image.Resampling.LANCZOS),master=parent)
+    button=ttk.Button(parent,text=('  '+text if text else ''),image=picture,compound='left' if text else 'none',command=command);button.image=picture
+    if not text:square_button(button)
     return button
 
 
@@ -195,3 +251,4 @@ def placeholder(entry, text):
         if value or entry.focus_get() is entry:label.place_forget()
         else:label.place(x=1,y=0)
     entry.bind('<FocusIn>',refresh,add='+');entry.bind('<FocusOut>',refresh,add='+');entry.bind('<KeyRelease>',refresh,add='+')
+    if isinstance(entry,tk.Text):entry.bind('<<Modified>>',refresh,add='+')

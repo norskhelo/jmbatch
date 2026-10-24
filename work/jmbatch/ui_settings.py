@@ -57,7 +57,7 @@ def show(app):
     if getattr(app,'settings_page',None) is not None or getattr(app,'page_exchange',None) is not None or getattr(app,'settings_transition',None) is not None:return
     page=app.settings_page=tk.Frame(app.root,bg='white')
     nav=tk.Frame(page,bg='#edf0f5',width=166);nav.pack(side='left',fill='y');nav.pack_propagate(False)
-    back=ttk.Button(nav,text='←',width=3,command=lambda:save(True));back.pack(anchor='w',padx=16,pady=(16,0))
+    back=square_button(ttk.Button(nav,text='←',command=lambda:save(True)));back.pack(anchor='w',padx=16,pady=(16,0))
     tk.Label(nav,text='设置',bg='#edf0f5',fg=INK,font=('Microsoft YaHei UI',20,'bold'),anchor='w').pack(fill='x',padx=16,pady=(16,18))
     page.bind('<Configure>',lambda e:nav.configure(width=max(100,min(166,e.width//4))) if e.widget is page else None)
     holder=ttk.Frame(page,style='Card.TFrame');holder.pack(fill='both',expand=True)
@@ -101,20 +101,14 @@ def show(app):
         label=tk.Label(nav,text=title,bg='#edf0f5',fg=INK,padx=16,pady=12,anchor='w',font=('Microsoft YaHei UI',12),cursor='hand2');label.pack(fill='x',padx=10,pady=2);label.bind('<Button-1>',lambda e:canvas.yview_moveto(row.winfo_y()/max(1,body.winfo_height())));links.append(label)
         return row
     def number(key,label):
-        row=ttk.Frame(body);row.pack(fill='x',pady=5);ttk.Label(row,text=label,width=16).pack(side='left');value=tk.StringVar(value=str(getattr(app.engine.settings,key)));field=Input(row,textvariable=value,height=38,width=110);field.pack(side='right',fill='x',expand=True,padx=(12,0));field.editor.bind('<FocusOut>',lambda e:save());fields[key]=value
+        row=ttk.Frame(body);row.pack(fill='x',pady=5);ttk.Label(row,text=label,width=16).pack(side='left');value=tk.StringVar(value=str(getattr(app.engine.settings,key)));field=Input(row,textvariable=value,width=110);field.pack(side='right',fill='x',expand=True,padx=(12,0));field.editor.bind('<FocusOut>',lambda e:save());fields[key]=value
     section('下载');number('timeout','任务超时时间');number('concurrent_tasks','同时下载任务数');number('download_limit_kbps','下载限速')
     row=ttk.Frame(body);row.pack(fill='x',pady=8);ttk.Label(row,text='默认下载全部章节').pack(side='left');ttk.Checkbutton(row,variable=all_chapters,command=save).pack(side='left',padx=12)
-    row=ttk.Frame(body);row.pack(fill='x',pady=8);ttk.Label(row,text='保存目录').pack(side='left');path=Input(row,multiline=True,height=38,width=80);path.editor.configure(state='disabled',wrap='char',fg=MUTED);path.pack(side='left',fill='x',expand=True,padx=8);ttk.Button(row,text='选择目录',command=lambda:(app.choose_dir(),save())).pack(side='right')
-    def fit_path():
-        if not path.winfo_exists():return
-        lines=path.editor.count('1.0','end-1c','displaylines')
-        height=max(38,((lines[0] if lines else 0)+1)*tkfont.Font(font=path.editor.cget('font')).metrics('linespace')+20)
-        if int(path.cget('height'))!=height:path.configure(height=height)
+    row=ttk.Frame(body);row.pack(fill='x',pady=8);ttk.Label(row,text='保存目录').pack(side='left');path=Input(row,multiline=True,width=80);path.editor.configure(state='disabled',wrap='char',fg=MUTED);path.pack(side='left',fill='x',expand=True,padx=8);ttk.Button(row,text='选择目录',command=lambda:(app.choose_dir(),save())).pack(side='right')
     def refresh_path(*_):
         value=app.output_var.get().strip()
         display=str(Path(value).expanduser().absolute()) if value else ''
-        path.editor.configure(state='normal');path.editor.delete('1.0','end');path.editor.insert('1.0',display);path.editor.configure(state='disabled');path.after_idle(fit_path)
-    path.editor.bind('<Configure>',lambda e:path.after_idle(fit_path))
+        path.editor.configure(state='normal');path.editor.delete('1.0','end');path.editor.insert('1.0',display);path.editor.configure(state='disabled');path.schedule_fit()
     path_trace=app.output_var.trace_add('write',refresh_path)
     page.bind('<Destroy>',lambda e:app.output_var.trace_remove('write',path_trace) if e.widget is page else None,add='+')
     refresh_path()

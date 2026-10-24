@@ -7,7 +7,7 @@ from ui_common import modal, actions, placeholder, BG, INK, notice, Input, round
 def controls(reader, top, bottom, title):
     ttk.Label(top, text=title, anchor='center', font=('Microsoft YaHei UI', 16, 'bold'), wraplength=700).pack(fill='x', pady=(0, 12))
     grid = ttk.Frame(top)
-    grid.pack(fill='x')
+    grid.pack(anchor='center')
     reader.chapter_box = ttk.Combobox(top, state='readonly')  # chapter model, hidden
     reader.jump = tk.StringVar(value='1')
     reader.favorite_button = ttk.Button(grid, command=reader.favorite)
@@ -18,7 +18,7 @@ def controls(reader, top, bottom, title):
         grid.columnconfigure(i % 2, weight=1, uniform='reader')
         button.grid(row=i // 2, column=i % 2, sticky='ew', padx=5, pady=4)
     reader.page_buttons = ttk.Frame(bottom)
-    row=ttk.Frame(reader.page_buttons);row.pack(fill='x',pady=(8,0));row.columnconfigure((0,1),weight=1,uniform='pages')
+    row=ttk.Frame(reader.page_buttons);row.pack(anchor='center',pady=(8,0));row.columnconfigure((0,1),weight=1,uniform='pages')
     ttk.Button(row,text='上一页',command=lambda:reader.step(-1)).grid(row=0,column=0,sticky='ew',padx=(0,5))
     ttk.Button(row,text='下一页',command=lambda:reader.step(1)).grid(row=0,column=1,sticky='ew',padx=(5,0))
 
@@ -47,7 +47,8 @@ def bookmark(reader):
     surface=tk.Canvas(panel,bg='#ff00ff',highlightthickness=0);surface.pack(fill='both',expand=True)
     body = ttk.Frame(surface, padding=16);item=surface.create_window(1,13,anchor='nw',window=body)
     def shape(event):
-        surface.delete('outline');rounded(surface,0,12,event.width-1,event.height-13,10,fill='white',outline=LINE,tags='outline');surface.create_polygon(24,13,34,1,44,13,fill='white',outline=LINE,tags='outline');surface.create_line(25,13,43,13,fill='white',width=2,tags='outline');surface.tag_lower('outline');surface.itemconfigure(item,width=event.width-2,height=event.height-15)
+        center = event.width / 2
+        surface.delete('outline');rounded(surface,0,12,event.width-1,event.height-13,10,fill='white',outline=LINE,tags='outline');surface.create_polygon(center-10,13,center,1,center+10,13,fill='white',outline=LINE,tags='outline');surface.create_line(center-9,13,center+9,13,fill='white',width=2,tags='outline');surface.tag_lower('outline');surface.itemconfigure(item,width=event.width-2,height=event.height-15)
     surface.bind('<Configure>',shape)
     name = Input(body); name.pack(fill='x'); placeholder(name, '请输入名称')
     page = reader.current
@@ -60,8 +61,11 @@ def bookmark(reader):
     actions(body, '添加', '取消', add, panel.destroy)
     panel.update_idletasks()
     button = reader.mark_button
-    width = min(360, reader.window.winfo_width() - 32)
-    x = min(button.winfo_rootx(), reader.window.winfo_rootx() + reader.window.winfo_width() - width - 16)
+    center = button.winfo_rootx() + button.winfo_width() / 2
+    left = reader.window.winfo_rootx() + 16
+    right = reader.window.winfo_rootx() + reader.window.winfo_width() - 16
+    width = max(1, min(360, int(2 * min(center - left, right - center))))
+    x = round(center - width / 2)
     panel.geometry(f'{width}x{body.winfo_reqheight()+16}+{x}+{button.winfo_rooty()+button.winfo_height()-2}')
     panel.deiconify();panel.lift();panel.grab_set();name.focus_set();panel.bind('<Escape>', lambda e: panel.destroy())
 

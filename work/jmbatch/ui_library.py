@@ -14,8 +14,8 @@ def build(view,parent):
         view.window=ttk.Frame(parent,style='Card.TFrame');view.window.place(x=0,y=0,relwidth=1,relheight=1)
     surface=view.surface=Panel(view.window,padding=18,connected_top=view.embedded);surface.pack(fill='both',expand=True);body=surface.body
     header=ttk.Frame(body);header.pack(fill='x');ttk.Label(header,text='漫画库',font=('Microsoft YaHei UI',22,'bold')).pack(side='left')
-    bar=ttk.Frame(body);bar.pack(fill='x',pady=14);bar.columnconfigure((0,1,2),weight=1,uniform='tools')
-    ttk.Button(bar,text='检查更新',command=lambda:check_all(view)).grid(row=0,column=0,sticky='ew',padx=(0,4));view.sort_button=ttk.Button(bar,text='排序方式',command=lambda:sort_menu(view));view.sort_button.grid(row=0,column=1,sticky='ew',padx=4);icon_button(bar,'folder',command=lambda:new_collection(view)).grid(row=0,column=2,sticky='ew',padx=(4,0))
+    bar=ttk.Frame(body);bar.pack(fill='x',pady=14);bar.columnconfigure(2,weight=1)
+    ttk.Button(bar,text='检查更新',command=lambda:check_all(view)).grid(row=0,column=0,sticky='nw',padx=(0,4));view.sort_button=ttk.Button(bar,text='排序方式',command=lambda:sort_menu(view));view.sort_button.grid(row=0,column=1,sticky='nw',padx=4);icon_button(bar,'folder',command=lambda:new_collection(view)).grid(row=0,column=3,sticky='ne',padx=(4,0))
 
     view.query=tk.StringVar();view.only_favorites=tk.BooleanVar();view.hint=tk.StringVar();view.breadcrumb=tk.StringVar()
     hidden=ttk.Frame(body);view.back_button=ttk.Button(hidden);view.mode_button=ttk.Button(hidden);view.selection_controls=ttk.Frame(hidden);view.stop_button=ttk.Button(hidden);view.display_mode=tk.StringVar(value='tiles')
@@ -35,10 +35,10 @@ def build(view,parent):
     view.tree.bind('<<TreeviewSelect>>',view.details)
     footer=ttk.Frame(body);view.detail=tk.StringVar();view.path_text=tk.StringVar();view.status=tk.StringVar();view.path_entry=ttk.Entry(hidden,textvariable=view.path_text)
     view.sheet_surface=Panel(view.window,padding=22,height=218);view.sheet=view.sheet_surface.body;view.selection_count=tk.StringVar();view.selection_label=ttk.Label(view.sheet,textvariable=view.selection_count,anchor='center',font=('Microsoft YaHei UI',12,'bold'));view.selection_label.pack(fill='x',pady=(0,16))
-    view.batch_area=ttk.Frame(view.sheet);view.batch_area.pack(fill='x');view.action_buttons={};view.batch_rows=[]
-    choices=[('导出',lambda:view.action('export'),'export'),('删除',lambda:delete_selection(view),'delete'),('⇧',lambda:share(view),'share'),('收藏',lambda:favorite(view),'favorite'),('移动',lambda:begin_move(view),'collection'),('取消',view.exit_batch,'cancel')]
+    view.batch_area=ttk.Frame(view.sheet);view.batch_area.pack(anchor='center');view.action_buttons={};view.batch_rows=[]
+    choices=[('导出',lambda:view.action('export'),'export'),('⇧',lambda:share(view),'share'),('删除',lambda:delete_selection(view),'delete'),('收藏',lambda:favorite(view),'favorite'),('移动',lambda:begin_move(view),'collection'),('取消',view.exit_batch,'cancel')]
     for index,(label,command,key) in enumerate(choices):
-        button=icon_button(view.batch_area,'share',command=command) if key=='share' else ttk.Button(view.batch_area,text=label,command=command);button.grid(row=index//3,column=index%3,sticky='ew',padx=4,pady=4);view.batch_area.columnconfigure(index%3,weight=1,uniform='buttons')
+        button=icon_button(view.batch_area,'share',command=command) if key=='share' else ttk.Button(view.batch_area,text=label,command=command);button.grid(row=index//3,column=index%3,sticky='' if key=='share' else 'ew',padx=4,pady=4);view.batch_area.columnconfigure(index%3,weight=1,uniform='buttons')
         if key!='cancel':view.action_buttons[key]=button
     view.move_area=ttk.Frame(view.sheet);actions(view.move_area,'确认','返回',lambda:commit_move(view),lambda:cancel_move(view))
     view.refresh();view.update_mode();view.cover_timer=view.window.after(100,view.poll_covers);view.window.bind('<Destroy>',view.cover_destroyed,add='+')
@@ -52,7 +52,7 @@ def update_mode(view):
         new_sheet=not view.sheet_surface.winfo_ismapped();view.sheet_surface.configure(height=118 if view.moving else 218);view.sheet_surface.place(x=1,rely=0,y=bottom()-1,relwidth=1,width=-2,anchor='sw');view.sheet_surface.lift()
         if new_sheet:slide_sheet(view.sheet_surface,bottom=bottom)
         if view.moving:view.batch_area.pack_forget();view.selection_label.pack_forget();view.move_area.pack(fill='x')
-        else:view.move_area.pack_forget();view.batch_area.pack(fill='x');view.selection_label.pack(fill='x',before=view.batch_area)
+        else:view.move_area.pack_forget();view.batch_area.pack(anchor='center');view.selection_label.pack(fill='x',before=view.batch_area)
     else:view.sheet_surface.place_forget()
 
 

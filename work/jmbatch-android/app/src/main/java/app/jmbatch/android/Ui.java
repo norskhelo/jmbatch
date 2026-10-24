@@ -11,6 +11,23 @@ import android.widget.*;
 
 /** Shared visual vocabulary for the October 2026 redesign. */
 public final class Ui {
+    private static final class CompactInput extends EditText {
+        CompactInput(Context context){super(context);}
+        @Override protected void onMeasure(int width,int height){
+            // A long hint must not expand an empty field; entered text can wrap freely.
+            int lines=length()==0?1:Integer.MAX_VALUE;
+            if(getMaxLines()!=lines)setMaxLines(lines);
+            android.text.TextUtils.TruncateAt ellipsis=length()==0?android.text.TextUtils.TruncateAt.END:null;
+            if(getEllipsize()!=ellipsis)setEllipsize(ellipsis);
+            compact(this);
+            super.onMeasure(width,height);
+            if(compact(this))super.onMeasure(width,height);
+            // Older Android releases include the full hint in the desired height,
+            // even after text is entered. Size from the actual text layout instead.
+            int content=getLayout().getHeight()+getPaddingTop()+getPaddingBottom();
+            setMeasuredDimension(getMeasuredWidth(),resolveSize(Math.max(controlHeight(this),content),height));
+        }
+    }
     private static final class Modal extends AlertDialog {
         Runnable cleanup;
         Modal(Activity activity){super(activity);}
@@ -24,6 +41,17 @@ public final class Ui {
         LINE=Color.rgb(218,220,225), ACCENT=Color.rgb(115,117,124), BLUE=Color.rgb(51,99,189);
     private Ui(){}
     public static int dp(Context c,int n){return Math.round(c.getResources().getDisplayMetrics().density*n);}
+    private static int firstLineHeight(TextView view){return view.getLayout()==null?view.getLineHeight():view.getLayout().getLineBottom(0)-view.getLayout().getLineTop(0);}
+    public static int controlHeight(TextView view){return controlHeight(view,2.25f);}
+    public static int controlHeight(TextView view,float ratio){return Math.max((int)Math.ceil(view.getTextSize()*ratio),firstLineHeight(view)+2);}
+    public static boolean compact(TextView view){
+        view.setIncludeFontPadding(false);
+        int height=controlHeight(view),extra=height-firstLineHeight(view),top=extra/2,bottom=extra-top;
+        if(view.getMinHeight()!=height)view.setMinHeight(height);
+        if(view.getMinimumHeight()!=height)view.setMinimumHeight(height);
+        if(view.getPaddingTop()!=top||view.getPaddingBottom()!=bottom){view.setPadding(view.getPaddingLeft(),top,view.getPaddingRight(),bottom);return true;}
+        return false;
+    }
     public static GradientDrawable shape(Context c,int color,int radius,boolean border){
         GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(c,radius));if(border)d.setStroke(dp(c,1),LINE);return d;
     }
@@ -31,8 +59,9 @@ public final class Ui {
     public static TextView text(Context c,String value,int size){TextView v=new TextView(c);v.setText(value);v.setTextSize(size);v.setTextColor(INK);v.setLineSpacing(dp(c,2),1);return v;}
     public static void setText(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
     public static TextView heading(Context c,String value){TextView v=text(c,value,21);v.setTypeface(null,Typeface.BOLD);v.setPadding(0,dp(c,10),0,dp(c,12));return v;}
-    public static Button button(Context c,String title,Runnable action){Button b=new ActionButton(c);b.setText(title);b.setTextSize(14);b.setOnClickListener(v->action.run());return b;}
-    public static Button iconButton(Context c,String kind,String title,Runnable action){Button b=button(c,title,action);b.setContentDescription(title.isEmpty()?"分享":title);b.setCompoundDrawablePadding(dp(c,6));android.text.SpannableString symbol=new android.text.SpannableString("\ufffc"+(title.isEmpty()?"":"  "+title));symbol.setSpan(new android.text.style.ImageSpan(icon(c,kind)),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);b.setText(symbol);return b;}
+    public static Button square(Button button){((ActionButton)button).setIconOnly(true);return button;}
+    public static Button button(Context c,String title,Runnable action){Button b=new ActionButton(c);b.setText(title);b.setTextSize(14);b.setOnClickListener(v->action.run());if(title.equals("←"))square(b);return b;}
+    public static Button iconButton(Context c,String kind,String title,Runnable action){Button b=button(c,title,action);b.setContentDescription(title.isEmpty()?"分享":title);b.setCompoundDrawablePadding(dp(c,6));android.text.SpannableString symbol=new android.text.SpannableString("\ufffc"+(title.isEmpty()?"":"  "+title));Drawable image=icon(c,kind);int size=Math.round(b.getTextSize());image.setBounds(0,0,size,size);symbol.setSpan(new android.text.style.ImageSpan(image,android.text.style.ImageSpan.ALIGN_BASELINE),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);b.setText(symbol);if(title.isEmpty())square(b);return b;}
     public static Drawable icon(Context c,String kind){
         Drawable d=new Drawable(){
             final Paint p=new Paint(3);
@@ -46,9 +75,9 @@ public final class Ui {
         };d.setBounds(0,0,dp(c,20),dp(c,20));return d;
     }
     public static void primary(Button b){b.setTextColor(Color.WHITE);b.setBackgroundTintList(null);b.setBackground(shape(b.getContext(),ACCENT,9,false));}
-    public static EditText input(Context c,String hint,boolean number){EditText e=new EditText(c);e.setTextColor(INK);e.setTextSize(14);e.setHintTextColor(MUTED);e.setHint(hint);e.setPadding(dp(c,12),dp(c,12),dp(c,12),dp(c,12));e.setBackground(shape(c,BG,8,true));e.setSingleLine(number);if(number)e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);return e;}
+    public static EditText input(Context c,String hint,boolean number){EditText e=new CompactInput(c);e.setTextColor(INK);e.setTextSize(14);e.setHintTextColor(MUTED);e.setHint(hint);e.setPadding(dp(c,12),0,dp(c,12),0);e.setBackground(shape(c,BG,8,true));e.setSingleLine(number);if(number)e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);return e;}
     public static void gap(LinearLayout parent,int height){View gap=new View(parent.getContext());parent.addView(gap,new LinearLayout.LayoutParams(1,dp(parent.getContext(),height)));}
-    public static LinearLayout pair(Context c,View...views){LinearLayout row=new LinearLayout(c);row.setGravity(Gravity.CENTER_VERTICAL);for(View v:views){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,-2,1);if(row.getChildCount()>0)p.leftMargin=dp(c,8);row.addView(v,p);}return row;}
+    public static ActionRow pair(Context c,View...views){return new ActionRow(c,views);}
     public static AlertDialog modal(Activity a,View content,boolean blur){
         LinearLayout panel=column(a);int p=dp(a,20);panel.setPadding(p,p,p,p);panel.setBackground(shape(a,Color.WHITE,16,false));panel.addView(content);
         Modal d=new Modal(a);d.setView(panel);d.setOnShowListener(x->{
@@ -78,7 +107,7 @@ public final class Ui {
     }
     public static void skin(AlertDialog dialog){
         if(dialog.getWindow()!=null)dialog.getWindow().setBackgroundDrawable(shape(dialog.getContext(),Color.WHITE,16,true));
-        for(int id:new int[]{-1,-2,-3}){Button b=dialog.getButton(id);if(b!=null){b.setTextColor(INK);b.setAllCaps(false);}}
+        for(int id:new int[]{-1,-2,-3}){Button b=dialog.getButton(id);if(b!=null){b.setTextColor(INK);b.setAllCaps(false);compact(b);ViewGroup.LayoutParams p=b.getLayoutParams();p.height=-2;b.setLayoutParams(p);}}
     }
     public static void notice(Activity a,String message){
         ViewGroup decor=decor(a);TextView label=text(a,message,14);label.setGravity(Gravity.CENTER);int p=dp(a,14);label.setPadding(p,p,p,p);label.setBackground(shape(a,Color.WHITE,12,true));label.setElevation(dp(a,6));

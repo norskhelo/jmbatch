@@ -103,7 +103,7 @@ def build(app):
     outer=app.main_page=ttk.Frame(app.root,padding=12,style='Page.TFrame');outer.pack(fill='both',expand=True)
     header=ttk.Frame(outer,style='Page.TFrame');header.pack(fill='x',pady=(0,16))
     brand=ttk.Frame(header,style='Page.TFrame');brand.pack(side='left');ttk.Label(brand,text='JM Batch',font=('Segoe UI',26,'bold'),style='Page.TLabel').pack(anchor='w');ttk.Label(brand,text=f'ver {VERSION}',foreground=MUTED,style='Page.TLabel').pack(anchor='w')
-    app.settings_button=ttk.Button(header,text='⚙',width=3,command=app.settings_dialog);app.settings_button.pack(side='right',anchor='s')
+    app.settings_button=square_button(ttk.Button(header,text='⚙',command=app.settings_dialog));app.settings_button.pack(side='right',anchor='s')
     app.update_button=ttk.Button(header);app.cleanup_button=ttk.Button(header)
     app.output_var=tk.StringVar(value=app.engine.settings.output);app.format_var=tk.StringVar(value=app.engine.settings.format)
     app.range_start=tk.StringVar();app.range_end=tk.StringVar()
@@ -114,12 +114,12 @@ def build(app):
     app.download_panel=Panel(app.pages,connected_top=True);body=app.download_panel.body
     ttk.Label(body,text='下载页面',font=('Microsoft YaHei UI',20,'bold')).pack(anchor='w',pady=(0,12))
     bar=app.download_toolbar=ttk.Frame(body);bar.pack(fill='x')
-    app.start_button=ttk.Button(bar,text='开始全部',style='Accent.TButton',command=lambda:app.pause() if app.engine.running else app.start());app.start_button.pack(side='left',ipadx=20)
+    app.start_button=ttk.Button(bar,text='开始全部',style='Accent.TButton',command=lambda:app.pause() if app.engine.running else app.start());app.start_button.pack(side='left')
     icon_button(bar,'trash','清除下载记录',lambda:clear_history(app)).pack(side='left',padx=10)
     app.pause_button=ttk.Button(bar);app.cancel_button=ttk.Button(bar)
     app.summary=tk.StringVar();app.speed_text=tk.StringVar()
     list_panel=Panel(body,padding=22);list_panel.configure(bg='white');list_panel.pack(fill='both',expand=True,pady=(18,12));ttk.Label(list_panel.body,text='下载列表',font=('Microsoft YaHei UI',14,'bold')).pack(anchor='w',pady=(0,12))
-    footer=ttk.Frame(list_panel.body);footer.pack(side='bottom',fill='x',pady=(8,14));ttk.Label(footer,text='点击任务停止 · 长按批量操作',foreground=MUTED,anchor='center').pack(fill='x',ipady=16)
+    footer=ttk.Frame(list_panel.body);footer.pack(side='bottom',fill='x',pady=(8,14));hint=ttk.Label(footer,text='点击任务停止 · 长按批量操作',foreground=MUTED,anchor='center',justify='center');hint.pack(fill='x',ipady=16);hint.bind('<Configure>',lambda e:hint.configure(wraplength=max(1,e.width)))
     holder=ttk.Frame(list_panel.body);holder.pack(fill='both',expand=True)
     columns=('id','title','status','progress','size','format','resets');app.tree=DownloadList(holder,app,columns=columns,show='tree headings',selectmode='none')
     from download_covers import DownloadCovers
@@ -130,8 +130,11 @@ def build(app):
         if float(first)>0 or float(last)<1:scroll.pack(side='right',fill='y')
         else:scroll.pack_forget()
     app.tree.configure(yscrollcommand=scrolled);app.tree.pack(fill='both',expand=True);app.tree.set_mode('tiles')
-    fab=tk.Canvas(list_panel,width=62,height=62,bg='white',highlightthickness=0,takefocus=True,cursor='hand2')
-    fab.create_oval(2,2,60,60,fill=ACCENT,outline=ACCENT);fab.create_text(31,30,text='＋',font=('Segoe UI',28),fill='white')
+    fab_size=control_height(list_panel,('Segoe UI',28))
+    footer.pack_configure(padx=(0,fab_size+12))
+    fab_width=fab_size
+    fab=tk.Canvas(list_panel,width=fab_width,height=fab_size,bg='white',highlightthickness=0,takefocus=True,cursor='hand2')
+    rounded(fab,1,1,fab_width-2,fab_size-2,10,fill=ACCENT,outline=ACCENT);fab.create_text(fab_width/2,fab_size/2,text='＋',font=('Segoe UI',28),fill='white');app.add_button=fab
     fab.place(relx=1,rely=1,x=-26,y=-25,anchor='se');fab.bind('<Button-1>',lambda e:add_dialog(app));fab.bind('<Return>',lambda e:add_dialog(app));fab.bind('<space>',lambda e:add_dialog(app))
     app.task_sheet=Panel(app.download_panel,padding=20,height=160);app.selection_count=tk.StringVar();ttk.Label(app.task_sheet.body,textvariable=app.selection_count,anchor='center',font=('Microsoft YaHei UI',12,'bold')).pack(fill='x')
     actions(app.task_sheet.body,'删除任务','返回',lambda:remove_selected(app),lambda:exit_selection(app))
@@ -158,13 +161,12 @@ def back(app):
 
 def add_dialog(app):
     window,body=modal(app.root,width=540)
-    entry=Input(body,multiline=True,height=96);entry.pack(fill='x',pady=(10,8));placeholder(entry,'请输入数字编号，多个编号请用空格隔开')
+    entry=Input(body,multiline=True);entry.pack(fill='x',pady=(10,8));placeholder(entry,'请输入数字编号，多个编号请用空格隔开')
     row=ttk.Frame(body);row.pack(fill='x',pady=(18,18))
     for label,value in [('pdf','pdf'),('zip','zip'),('文件夹','images')]:ttk.Radiobutton(row,text=label,value=value,variable=app.format_var).pack(side='left',expand=True)
     def accept():
         if app._add(entry.get('1.0','end')):window.destroy();app.engine.running=True;app.engine.tick();app.render()
-    buttons=actions(body,'添加','返回',accept,window.destroy)
-    for button in buttons.winfo_children():button.configure(width=12);button.grid_configure(sticky='')
+    actions(body,'添加','返回',accept,window.destroy)
 
 
 def show_selection(app):

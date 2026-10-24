@@ -31,7 +31,7 @@ public class PermissionActivity extends Activity {
     @Override public void onCreate(Bundle state){
         super.onCreate(state);store=Store.get(this);
         taskDirectory=getIntent().hasExtra("directory");targetUri=taskDirectory?getIntent().getStringExtra("directory"):store.settings.outputUri;
-        LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);int pad=dp(16);body.setPadding(pad,pad,pad,pad);
+        LinearLayout body=new LinearLayout(this);body.setOrientation(LinearLayout.VERTICAL);body.setBackgroundColor(Ui.BG);int pad=dp(16);body.setPadding(pad,pad,pad,pad);
         addText(body,"权限与联网检测",23);addText(body,"权限与系统设置仅在你选择对应操作时申请或打开；从设置返回后会自动刷新。",14);
         internet=section(body,"联网");button(body,"应用联网设置",()->openSettings(PermissionAccess.appSettings(this)));
         notifications=section(body,"下载通知");notificationButton=button(body,"申请通知权限",()->notificationAction());
@@ -131,5 +131,5 @@ public class PermissionActivity extends Activity {
     private TextView addText(LinearLayout parent,String text,int size){TextView v=new TextView(this);v.setText(text);v.setTextSize(size);v.setPadding(0,dp(6),0,dp(6));parent.addView(v);return v;}
     private TextView section(LinearLayout parent,String title){addText(parent,title,18);return addText(parent,"",14);}
     private Button action(String text,Runnable callback){Button b=new ActionButton(this);b.setText(text);b.setOnClickListener(v->callback.run());return b;}
-    private Button button(LinearLayout parent,String text,Runnable callback){Button b=action(text,callback);parent.addView(b,new LinearLayout.LayoutParams(-1,-2));return b;}
+    private Button button(LinearLayout parent,String text,Runnable callback){Button b=action(text,callback);parent.addView(b,new LinearLayout.LayoutParams(-2,-2));return b;}
 }
