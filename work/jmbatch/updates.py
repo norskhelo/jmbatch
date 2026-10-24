@@ -14,7 +14,7 @@ PAGE_SIZE = 100
 MAX_PAGES = 10
 TIMEOUT = 8
 DEFAULT_REPOSITORY = "norskhelo/jmbatch"
-CURRENT_NOTES = 'Windows 0.3.35 / Android 0.6.18 — 名称排序与更新界面优化\n\n发布日期：2026-10-24\n\nWindows 0.3.34 → 0.3.35；Android 0.6.17 → 0.6.18（versionCode 618）。保留原包名、Android 签名和更新公钥，可覆盖安装。\n\n更新界面\n\n• 检测到软件新版本后，设置页的“检查更新”自动变为“更新”。再次点击直接打开已发现版本的更新确认，取消后或重新进入设置仍可继续更新。\n• 检查期间显示“检查中…”并禁用重复检查；无新版或检查失败后恢复“检查更新”。\n• 更新日志界面移除“检查更新／更新”按钮，保留日志、状态显示和关闭入口。\n\n名称排序\n\n• 双端从名称左边第一个字开始，按每个字的完整拼音 A→Z 比较；前一字相同或同音时继续比较下一字，公共前缀相同则短名称在前。\n• 内置相同的离线拼音字表，不依赖系统语言或网络。忽略声调和英文字母大小写；多音字使用字表首选读音，ü 按 v，数字逐位比较，空格和标点保留位置。\n• 保留收藏夹 → 收藏漫画 → 普通漫画的分组，各组内应用名称排序；其他排序值相等时使用同一名称规则。\n\nAndroid 漫画库\n\n• 修复收藏夹与漫画混排时滚回顶部产生位移。排序按名称 A→Z、大小从大到小、章节数从多到少、时间从新到旧；切换排序后从列表顶部展示。\n• 大小与章节数在后台预读并保存，切换大小排序直接使用缓存；收藏夹大小由成员缓存合计，收藏、移动和重启保留缓存，删除章节后重新计算。\n• 移动漫画时保留选中标记；浏览目标收藏夹不清空选择，返回恢复原收藏夹、滚动位置和批量选择。\n• 移动菜单及返回后的批量菜单复用长按菜单的底部滑入动画，在第一帧绘制前定位；保留已有列表和封面，减少闪烁。\n\n使用与验证\n\n• 包含本轮已完成的 Windows 实际界面和 Android BlueStacks 5 / Android 9 页面交互验证；正式版本重新构建并核对签名、源码和交付文件一致性。\n• 未测试实体手机；模拟新版仅用于检查界面状态，没有下载或安装该模拟版本。\n'
+CURRENT_NOTES = 'Windows 0.3.36 / Android 0.6.19 — 实际保存目录与更新进度\n\n发布日期：2026-10-24\n\nWindows 0.3.35 → 0.3.36；Android 0.6.18 → 0.6.19（versionCode 619）。保留原包名、Android 签名和更新公钥，可覆盖安装。\n\n保存目录\n\n• 设置页显示程序实际使用的完整保存路径；Android 默认目录直接读取下载模块的位置，系统回退至内部存储时也显示实际位置。\n• Android 自选本地目录按系统存储卷解析；无法映射为本地路径的文档目录保留完整授权地址。\n• 双端长路径完整换行、可选择复制，选择新目录或重新进入设置时刷新。不移动已有漫画，也不改变已创建任务的保存目标。\n\n软件更新\n\n• 在更新确认弹窗点击“确认”后，直接在同一弹窗显示下载进度条、百分比和当前状态。\n• 取消、失败重试及校验后的安装入口集中在当前弹窗，移除旧更新界面；设置页更新入口与独立更新日志保留。\n• 准备和校验时显示等待进度，下载时按实际字节更新，切换镜像重新计数；保留签名和完整性校验。\n\n验证说明\n\n• 已完成 Windows 实际界面及 Android BlueStacks 5 / Android 9 的相关检查；正式包重新构建并核对源码、签名和交付文件。\n• 自选目录解析使用合成地址，实际检查系统选择器打开和取消；更新进度采用离线传输样例。未测试实体手机、SD 卡或云文档服务。\n'
 
 
 def update_settings(data):
@@ -276,6 +276,8 @@ class UpdateUI:
         self.notes_window = None
         self.settings_button = None
         self.downloading, self.ready = False, None
+        self.download_started = False
+        self.download_fraction = None
         self.checking = False
         self.cancel = threading.Event()
         self.download_events = queue.Queue()
@@ -341,7 +343,7 @@ class UpdateUI:
     def show_and_check(self):
         """Check once, then offer the already discovered update."""
         if self.ready or self.downloading:
-            self.show()
+            self.confirm_update()
         elif self.latest:
             self.confirm_update()
         else:
@@ -354,12 +356,48 @@ class UpdateUI:
         self.refresh()
 
     def confirm_update(self):
-        from ui_common import confirm
+        import tkinter as tk
+        from tkinter import ttk
+        from ui_common import modal, actions, BG, ACCENT
+        if self.dialog is not None and self.dialog.winfo_exists():
+            self.dialog.lift()
+            self.refresh()
+            return
+        if not self.latest and not self.ready:
+            return
         owner = getattr(self.app, 'settings_window', None)
         if owner is None or not owner.winfo_exists():
             owner = self.app.root
-        confirm(owner, "检测到新版本 " + self.latest["version"] + "\n是否更新",
-                lambda: (self.show(), self.download()))
+        window, body = modal(owner, blur=True)
+        self.dialog = window
+        content = ttk.Frame(body, height=142, style='Card.TFrame')
+        content.pack(fill='x')
+        content.pack_propagate(False)
+        self.update_title = ttk.Label(content, anchor='center', justify='center', wraplength=380,
+                                      font=('Microsoft YaHei UI', 12, 'bold'))
+        self.update_title.pack(fill='x', expand=True)
+        self.progress_area = ttk.Frame(content, style='Card.TFrame')
+        ttk.Style(window).configure('Update.Horizontal.TProgressbar', background=ACCENT, troughcolor=BG,
+                                    lightcolor=ACCENT, darkcolor=ACCENT, bordercolor=BG, borderwidth=0, thickness=8)
+        self.progress_bar = ttk.Progressbar(self.progress_area, maximum=100, style='Update.Horizontal.TProgressbar')
+        self.progress_bar.pack(fill='x', pady=(4, 12))
+        self.status_var = tk.StringVar(value=self.status)
+        ttk.Label(self.progress_area, textvariable=self.status_var, anchor='center', justify='center',
+                  wraplength=380).pack(fill='x')
+        row = actions(body, '确认', '取消', self.download, self.close_update)
+        self.download_button, self.dismiss_button = row.winfo_children()
+        window.bind('<Escape>', lambda e: self.close_update())
+        window.protocol('WM_DELETE_WINDOW', self.close_update)
+        self.refresh()
+
+    def close_update(self):
+        if self.downloading:
+            self.cancel.set()
+            self.status = "正在取消下载，请稍候…"
+            self.refresh()
+        elif self.dialog is not None and self.dialog.winfo_exists():
+            self.progress_bar.stop()
+            self.dialog.destroy()
 
     def check(self):
         if self.downloading or self.ready:
@@ -417,14 +455,27 @@ class UpdateUI:
         action_text = "检查中…" if self.checking else "更新" if self.latest or self.downloading or self.ready else "检查更新"
         if self.settings_button is not None and self.settings_button.winfo_exists():
             self.settings_button.configure(text=action_text, state="disabled" if self.checking else "normal")
-        check_enabled = not (self.checking or self.downloading or self.ready)
         if self.dialog is not None and self.dialog.winfo_exists():
+            active = self.download_started or self.downloading or self.ready
+            target = self.latest['version'] if self.latest else ''
+            self.update_title.configure(text=("更新 " + target if active else "检测到新版本 " + target + "\n是否更新"))
+            if active:
+                self.update_title.pack_configure(expand=False, pady=(0, 10))
+                self.progress_area.pack(fill='x')
             self.status_var.set(self.status)
-            self.check_button.configure(state="normal" if check_enabled else "disabled",
-                                        text=action_text)
-            self.download_button.configure(state="normal" if not self.checking and (self.latest or self.downloading or self.ready) else "disabled",
-                                           text="取消下载" if self.downloading else "安装并重启" if self.ready else "下载更新")
-            self.replace_notes(self.announcement_area, self.notes_text())
+            indeterminate = self.downloading and self.download_fraction is None
+            mode = 'indeterminate' if indeterminate else 'determinate'
+            if str(self.progress_bar['mode']) != mode:
+                self.progress_bar.stop()
+                self.progress_bar.configure(mode=mode)
+                if indeterminate:
+                    self.progress_bar.start(20)
+            if not indeterminate:
+                self.progress_bar.configure(value=100 if self.ready else self.download_fraction or 0)
+            self.download_button.configure(state="disabled" if self.downloading or self.checking else "normal",
+                                           text="下载中…" if self.downloading else "安装并重启" if self.ready else "重试" if self.download_started else "确认")
+            self.dismiss_button.configure(text="取消下载" if self.downloading else "关闭" if active else "取消",
+                                          state="disabled" if self.downloading and self.cancel.is_set() else "normal")
         if self.notes_window is not None and self.notes_window.winfo_exists():
             self.notes_status_var.set(self.status)
             self.replace_notes(self.notes_area, self.notes_text())
@@ -474,9 +525,6 @@ class UpdateUI:
         if self.checking:
             return
         if self.downloading:
-            self.cancel.set()
-            self.status = "正在取消下载，请稍候…"
-            self.refresh()
             return
         if self.ready:
             if not messagebox.askyesno("安装更新", "更新将暂停下载任务、保存设置并重启程序。是否继续？", parent=self.dialog):
@@ -492,12 +540,16 @@ class UpdateUI:
         if not self.latest:
             return
         self.downloading = True
+        self.download_started = True
+        self.download_fraction = None
         self.cancel.clear()
         self.status = "正在准备更新…"
         release = dict(self.latest)
         def worker():
             try:
-                ready = prepare(self.app.home, release, VERSION, self.cancel, lambda s: self.download_events.put(("progress", s)))
+                ready = prepare(self.app.home, release, VERSION, self.cancel,
+                                lambda s: self.download_events.put(("progress", s)),
+                                lambda n, total: self.download_events.put(("bytes", (n, total))))
                 self.download_events.put(("ready", ready))
             except Exception as error:
                 self.download_events.put(("error", f"{type(error).__name__}: {error}"))
@@ -510,68 +562,20 @@ class UpdateUI:
             while True:
                 kind, value = self.download_events.get_nowait()
                 if kind == "progress":
-                    self.status = value
+                    if not self.cancel.is_set():
+                        self.status = value
+                        self.download_fraction = None
+                elif kind == "bytes":
+                    self.download_fraction = min(100, max(0, value[0] * 100 / value[1]))
                 elif kind == "ready":
                     self.downloading = False
                     self.ready = value
                     self.status = "更新包校验通过，可安装并重启。"
                 else:
                     self.downloading = False
-                    self.status = "更新未完成：" + value
+                    self.status = "已取消更新下载，可点击重试。" if self.cancel.is_set() else "更新未完成：" + value
         except queue.Empty:
             pass
         self.refresh()
         if self.downloading:
             self.app.root.after(100, self.poll_download)
-
-    def show(self):
-        import tkinter as tk
-        from tkinter import ttk, messagebox
-        from core import VERSION, atomic_json
-        if self.dialog is not None and self.dialog.winfo_exists():
-            self.dialog.lift()
-            return
-        dialog = self.dialog = tk.Toplevel(self.app.root)
-        dialog.title("软件更新")
-        dialog.transient(self.app.root)
-        frame = ttk.Frame(dialog, padding=24)
-        frame.pack(fill="both", expand=True)
-        ttk.Label(frame, text=f"当前 Windows 版本：{VERSION}").pack(anchor="w")
-        ttk.Label(frame, text="更新来源（GitHub 用户名/仓库名，留空可停用更新检查）").pack(anchor="w", pady=(16, 6))
-        repo_var = tk.StringVar(value=self.repo)
-        ttk.Entry(frame, textvariable=repo_var, width=60).pack(fill="x")
-        auto_var = tk.BooleanVar(value=self.automatic)
-        ttk.Checkbutton(frame, text="启动时自动检查更新", variable=auto_var).pack(anchor="w", pady=12)
-        self.status_var = tk.StringVar(value=self.status)
-        ttk.Label(frame, textvariable=self.status_var).pack(anchor="w", pady=6)
-        from tkinter.scrolledtext import ScrolledText
-        ttk.Label(frame, text="更新日志（支持离线查看）").pack(anchor="w", pady=(8, 4))
-        self.announcement_area = ScrolledText(frame, width=72, height=10, wrap="word")
-        self.announcement_area.pack(fill="both", expand=True)
-        ttk.Label(frame, text="修改更新来源后请先保存。关闭自动检查后，仍可手动检查。\n更新包通过签名和完整性校验后即可安装，安装时会暂停任务并重启应用。\n检查更新不会发送漫画编号或 Cookie。", justify="left").pack(anchor="w", pady=12)
-        def save():
-            if self.downloading or self.ready:
-                messagebox.showinfo("更新进行中", "当前更新完成前不能更改仓库，请安装更新或重启程序。", parent=dialog)
-                return
-            try:
-                repo = normalize_repo(repo_var.get())
-                atomic_json(self.path, {"repository": repo, "automatic": auto_var.get(), "repository_default_v1": True})
-                if repo != self.repo:
-                    self.latest = None
-                    self.upgrade_from = VERSION
-                self.repo, self.automatic = repo, auto_var.get()
-                self.save_history_state()
-                if not self.checking:
-                    self.status = "设置已保存" if repo else "未设置更新来源"
-                self.refresh()
-            except (ValueError, OSError) as error:
-                messagebox.showerror("无法保存更新设置", str(error), parent=dialog)
-        actions = ttk.Frame(frame)
-        actions.pack(fill="x")
-        ttk.Button(actions, text="保存", command=save).pack(side="left")
-        self.check_button = ttk.Button(actions, text="检查更新", command=self.show_and_check)
-        self.check_button.pack(side="left", padx=8)
-        ttk.Button(actions, text="完整更新日志", command=self.show_notes).pack(side="left", padx=4)
-        self.download_button = ttk.Button(actions, text="下载更新", command=self.download)
-        self.download_button.pack(side="right")
-        self.refresh()

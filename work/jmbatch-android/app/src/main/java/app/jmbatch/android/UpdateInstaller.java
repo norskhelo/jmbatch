@@ -15,7 +15,10 @@ import org.json.*;
 
 /** Downloads signed release assets. Installation is always confirmed by Android. */
 public final class UpdateInstaller {
-    public interface Progress { void update(String value); }
+    public interface Progress {
+        void update(String value);
+        default void download(String route,long bytes,long total){update("下载更新 · "+route+" · "+(bytes*100/total)+"% · "+(bytes/1024)+"/"+(total/1024)+" KB");}
+    }
     public static final AtomicBoolean busy=new AtomicBoolean();
     public static File apk(Context context){return new File(context.getCacheDir(),"app-update/update.apk");}
     public static final class Ready {
@@ -48,10 +51,13 @@ public final class UpdateInstaller {
         if(size<=0||size>512L*1024*1024||!hash.matches("[0-9a-f]{64}"))throw new SecurityException("更新包大小或摘要无效");
         File file=apk(context);file.getParentFile().mkdirs();
         try{
-            UpdateDownload.transfer(url,()->new FileOutputStream(file),size,cancel,(route,n)->progress.update("下载更新 · "+route+" · "+(n*100/size)+"% · "+(n/1024)+"/"+(size/1024)+" KB"));
+            UpdateDownload.transfer(url,()->new FileOutputStream(file),size,cancel,(route,n)->progress.download(route,n,size));
+            progress.update("正在校验更新包和应用签名…");
             UpdateCrypto.verifyFile(file,size,hash);
             if(cancel.get())throw new InterruptedIOException("已取消更新下载");
-            Ready ready=new Ready(file,version,hash,size);verifyApk(context,ready);return ready;
+            Ready ready=new Ready(file,version,hash,size);verifyApk(context,ready);
+            if(cancel.get())throw new InterruptedIOException("已取消更新下载");
+            return ready;
         }catch(Exception error){file.delete();throw error;}
     }
     @SuppressWarnings("deprecation")

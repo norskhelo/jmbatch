@@ -120,7 +120,7 @@ public final class MainActivity extends Activity {
         }});
         pages.addView(pageSwitch,new FrameLayout.LayoutParams(-1,pageOffset));
         pages.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob)->{if(r-l!=or-ol||b-t!=ob-ot){finishPageExchange();layoutPages();}});
-        output=text(store.settings.outputLabel,14,INK);inputFocus.requestFocus();
+        output=text(OutputDirectory.display(this,store.settings.outputUri),14,INK);inputFocus.requestFocus();
         if(!store.note.isEmpty())toast(store.note);
         GalleryPrivacy.start(this,store);
         libraryScreen=new LibraryScreen(this,store);libraryScreen.show(state==null?null:state.getBundle("library"));
@@ -381,13 +381,13 @@ public final class MainActivity extends Activity {
             Uri uri=data.getData();int flags=data.getFlags()&(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
             // Choosing our read-only system-browser root means the app's normal export folder.
             if((getPackageName()+".documents").equals(uri.getAuthority())){
-                store.settings.outputUri="";store.settings.outputLabel="应用下载目录";save();output.setText(store.settings.outputLabel);return;
+                store.settings.outputUri="";store.settings.outputLabel="应用下载目录";save();output.setText(OutputDirectory.display(this,store.settings.outputUri));return;
             }
             if((flags&Intent.FLAG_GRANT_WRITE_URI_PERMISSION)==0)throw new IOException("所选目录没有写入权限");
             getContentResolver().takePersistableUriPermission(uri,flags);
             String label=DocumentsContract.getTreeDocumentId(uri);Uri doc=DocumentsContract.buildDocumentUriUsingTree(uri,DocumentsContract.getTreeDocumentId(uri));
             try(Cursor cursor=getContentResolver().query(doc,new String[]{DocumentsContract.Document.COLUMN_DISPLAY_NAME},null,null,null)){if(cursor!=null&&cursor.moveToFirst())label=cursor.getString(0)+"（"+label+"）";}
-            store.settings.outputUri=uri.toString();store.settings.outputLabel=label;save();output.setText(label);
+            store.settings.outputUri=uri.toString();store.settings.outputLabel=label;save();output.setText(OutputDirectory.display(this,store.settings.outputUri));
             GalleryPrivacy.start(this,store);
         }catch(Exception error){showError("无法保留目录授权："+error.getMessage());}
     }

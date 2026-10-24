@@ -147,7 +147,6 @@ def check_update_history_ui(root, directory):
     with patch.object(core, "VERSION", "0.0.1"):
         before = UpdateUI(app)
         before.automatic = False
-        before.show()
         before.show_notes()
         popup = before.notes_window
         before.show_notes()
@@ -157,18 +156,18 @@ def check_update_history_ui(root, directory):
         before.checker = SimpleNamespace(poll=lambda: ("ok", cached))
         before.poll()
         root.update()
-        for area in (before.announcement_area, before.notes_area):
+        for area in (before.notes_area,):
             text = area.get("1.0", "end")
             assert all(row["body"] in text for row in rows)
         assert current in before.notes_status_var.get()
         before.seen_path.write_text("0.0.1", encoding="utf-8")
         before.notes_window.destroy()
-        before.dialog.destroy()
     # New process/version: migrate the old seen marker and preserve its cached range.
     after = UpdateUI(app)
     after.automatic = False
     assert after.upgrade_from == "0.0.1"
     after.startup()
+    after.show_notes()
     root.update()
     text = after.notes_area.get("1.0", "end")
     assert "本次升级" in text and all(row["body"] in text for row in rows)
@@ -192,116 +191,8 @@ def check_update_history_ui(root, directory):
 
 
 def check_manual_update_ui(application, directory):
-    """Click real entry points; mock only the public network response."""
-    import json
-    import threading
-    from unittest.mock import patch
-    from core import VERSION, atomic_json
-    from updates import select_release
-    root, ui = application.root, application.updates
-    ui.automatic = False
-    atomic_json(ui.path, {"repository": ui.repo, "automatic": False, "repository_default_v1": True})
-    saved_settings = ui.path.read_bytes()
-    ui.seen_path.write_text(VERSION, encoding="utf-8")
-    gate = threading.Event()
-    calls = []
-    name = "JMBatch-9.0.0-Windows-x64.zip"
-    answer = select_release([dict(body="manual check full announcement", assets=[dict(
-        name=name, size=100, state="uploaded", browser_download_url=
-        "https://github.com/norskhelo/jmbatch/releases/download/test/" + name)])], ui.repo, VERSION, True)
-    def fetch(repo, current):
-        calls.append((repo, current))
-        gate.wait(5)
-        return answer
-    def wait_done():
-        deadline = time.monotonic() + 3
-        while ui.checking and time.monotonic() < deadline:
-            root.update()
-            time.sleep(.01)
-        assert not ui.checking, "Manual update check did not complete"
-    try:
-        with patch("updates.fetch_bulletin", side_effect=fetch):
-            ui.startup()
-            assert not calls  # Turning automatic checks off is respected.
-            application.update_button.invoke()
-            assert ui.checking and ui.dialog.winfo_exists()
-            application.update_button.invoke()
-            ui.check_button.invoke()
-            root.update()
-            assert str(ui.check_button["state"]) == "disabled"
-            assert ui.check_button["text"] == "检查中…"
-            assert "正在检查更新" in ui.status_var.get()
-            assert str(ui.download_button["state"]) == "disabled"
-            gate.set()
-            wait_done()
-            assert len(calls) == 1, calls
-            assert "9.0.0" in ui.status_var.get()
-            assert "manual check full announcement" in ui.announcement_area.get("1.0", "end")
-            assert str(ui.download_button["state"]) == "normal"
-            assert ui.path.read_bytes() == saved_settings and not ui.automatic
-            # Window layout is usable at the app's minimum size.
-            application.root.geometry("1020x820")
-            root.update()
-            for widget, window in ((application.update_button, root), (ui.check_button, ui.dialog)):
-                assert widget.winfo_ismapped()
-                assert widget.winfo_rootx() + widget.winfo_width() <= window.winfo_rootx() + window.winfo_width()
-            ui.show_notes()
-            root.update()
-            assert ui.notes_area.winfo_ismapped()
-        with patch("updates.fetch_bulletin", side_effect=OSError("offline")):
-            ui.check()
-            wait_done()
-            assert "保留本地日志" in ui.status and "重试" in ui.status
-            assert "manual check full announcement" in ui.notes_area.get("1.0", "end")
-            assert str(ui.check_button["state"]) == "normal"
-            assert str(ui.download_button["state"]) == "disabled"
-        with patch("updates.fetch_bulletin", return_value=None) as network:
-            ui.check_button.invoke()
-            wait_done()
-            assert network.call_count == 1 and "当前已是" in ui.status
-            assert ui.notes_window.winfo_exists()
-        gate.clear()
-        with patch("updates.fetch_bulletin", side_effect=fetch):
-            ui.check_button.invoke()
-            deadline, channel = ui.checker.pending
-            ui.checker.pending = (time.monotonic() - 1, channel)
-            wait_done()
-            assert "重试" in ui.status and str(ui.check_button["state"]) == "normal"
-            ui.check_button.invoke()
-            assert "尚未结束" in ui.status and not ui.checking
-            gate.set()
-            ui.checker.thread.join(1)
-            assert not ui.checker.thread.is_alive()
-        with patch("updates.fetch_bulletin", return_value=None):
-            ui.check_button.invoke()
-            ui.dialog.destroy()
-            ui.notes_window.destroy()
-            wait_done()
-            ui.show()
-            assert "当前已是" in ui.status_var.get()
-        repo = ui.repo
-        ui.repo = ""
-        with patch("updates.fetch_bulletin") as network:
-            ui.check_button.invoke()
-            assert not network.called and "请先填写" in ui.status
-        ui.repo = repo
-        with patch("updates.fetch_bulletin") as network:
-            ui.downloading = True
-            application.update_button.invoke()
-            assert not network.called
-            ui.downloading = False
-            ui.ready = object()
-            application.update_button.invoke()
-            assert not network.called
-            ui.ready = None
-        assert json.loads(ui.path.read_text(encoding="utf-8"))["automatic"] is False
-    finally:
-        gate.set()
-        ui.downloading, ui.ready = False, None
-        if ui.notes_window is not None and ui.notes_window.winfo_exists():
-            ui.notes_window.destroy()
-        if ui.dialog is not None and ui.dialog.winfo_exists():
-            ui.dialog.destroy()
+    from update_ui_checks import check_manual
+    check_manual(application, directory)
 
 
 def run_tile_self_test(directory: Path):
@@ -750,13 +641,12 @@ def run_self_test(directory: Path):
         from core import VERSION
         from unittest.mock import patch
         application.updates.automatic = False
-        application.updates.show()
+        application.updates.show_notes()
         root.update()
-        announcement = application.updates.announcement_area.get("1.0", "end")
+        announcement = application.updates.notes_area.get("1.0", "end")
         from updates import CURRENT_NOTES
         assert VERSION in announcement and announcement.strip() == CURRENT_NOTES.strip()
-        assert str(application.updates.download_button["state"]) == "disabled"
-        with patch.object(application.updates, "show_notes") as shown:
+        with patch("ui_common.notice") as shown:
             application.updates.seen_path.unlink(missing_ok=True)
             application.updates.startup()
             application.updates.startup()
@@ -767,7 +657,7 @@ def run_self_test(directory: Path):
         report["checks"].append("Multi-version upgrade startup and restart retain every cached release after successful recheck")
         report["checks"].append("Failed checks preserve upgrade notes and refresh status; closed popup is safe")
         check_manual_update_ui(application, directory)
-        report["checks"].append("Manual check works from main/update/announcement buttons with automatic checks off and settings unchanged")
+        report["checks"].append("Manual check opens the inline confirmation; independent notes remain available")
         report["checks"].append("Manual check coalesces clicks, shows async result, preserves offline notes and allows failure retry")
         report["checks"].append("Check controls fit minimum window; empty repo and update install/download prevent requests")
         from cleanup_checks import check_cleanup_ui

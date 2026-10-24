@@ -465,6 +465,10 @@ def main():
         index = sys.argv.index("--self-test-tiles")
         run_tile_self_test(Path(sys.argv[index + 1]).resolve())
         return
+    if "--self-test-update-dialog" in sys.argv:
+        from update_ui_checks import run
+        run(Path(sys.argv[sys.argv.index("--self-test-update-dialog") + 1]).resolve())
+        return
     if "--self-test-chapter-updates" in sys.argv:
         from chapter_update_checks import run
         run(Path(sys.argv[sys.argv.index("--self-test-chapter-updates") + 1]).resolve())

@@ -48,7 +48,7 @@ def verify_file(path, package):
     if digest != package["sha256"]:
         raise ValueError("安装包 SHA-256 校验失败，已阻止安装")
 
-def prepare(home, release, current, cancel, progress):
+def prepare(home, release, current, cancel, progress, download_progress=None):
     import io
     base = release["url"].rsplit("/", 1)[0] + "/"
     repo = release["repository"]
@@ -65,17 +65,24 @@ def prepare(home, release, current, cancel, progress):
     archive = directory / "package.zip"
     try:
         route = ["GitHub"]
+        def transferred(count):
+            progress(f"下载更新 · {route[0]} · {count * 100 // package['size']}% · {count / 1048576:.1f}/{package['size'] / 1048576:.1f} MB")
+            if download_progress:
+                download_progress(count, package['size'])
         def route_notice(name):
             route[0] = name
-            progress(f"下载更新 · {name}")
+            transferred(0)
         with archive.open("xb") as stream:
             transfer(release["url"], stream, package["size"], cancel,
-                     lambda n: progress(f"下载更新 · {route[0]} · {n * 100 // package['size']}% · {n / 1048576:.1f}/{package['size'] / 1048576:.1f} MB"), route_notice=route_notice)
+                     transferred, route_notice=route_notice)
+        progress("正在校验更新包…")
         verify_file(archive, package)
         if cancel.is_set():
             raise InterruptedError("已取消更新下载")
         progress("校验通过，正在准备安装…")
         stage = extract_package(archive, directory / "stage")
+        if cancel.is_set():
+            raise InterruptedError("已取消更新下载")
         return {"archive": archive, "stage": stage, "package": package}
     except Exception:
         # Only this newly-created UUID directory can be removed.
