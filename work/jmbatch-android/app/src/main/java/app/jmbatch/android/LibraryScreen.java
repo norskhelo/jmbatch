@@ -82,6 +82,19 @@ public final class LibraryScreen {
     public void close(){if(dialog!=null){dialog.dismiss();return;}dispose();if(page!=null&&page.getParent()!=null)((ViewGroup)page.getParent()).removeView(page);}
     private void dispose(){generation++;resetCovers();cancel();worker.shutdown();updateWorker.shutdownNow();coverWorker.shutdownNow();}
     public void refresh(){load();}
+    public void resetPage(){
+        if(!visible())return;
+        generation++; // Reject any result that still targets the previous folder.
+        moving=false;batchMode=false;movingItems=null;moveViewport=null;moveOrigin="";collection="";
+        selected.clear();list.clearChoices();list.setChoiceMode(ListView.CHOICE_MODE_NONE);
+        boolean working=busy;busy=true;query.setText("");favorites.setChecked(false);busy=working;
+        report="";returningFromReader=false;pendingViewState=new Bundle();
+        sheet.animate().cancel();sheet.setVisibility(View.GONE);moveBar.setVisibility(View.GONE);
+        batchActions.setVisibility(View.GONE);selectionTitle.setVisibility(View.VISIBLE);modeButton.setText("批量处理");
+        long now=SystemClock.uptimeMillis();MotionEvent cancel=MotionEvent.obtain(now,now,MotionEvent.ACTION_CANCEL,0,0,0);
+        list.dispatchTouchEvent(cancel);cancel.recycle();list.smoothScrollBy(0,0);list.restorePosition(0,0);
+        load(false);
+    }
     public void resume(){if(returningFromReader&&visible()){returningFromReader=false;load();}}
     public Bundle saveState(){
         if(!visible())return null;
@@ -104,7 +117,7 @@ public final class LibraryScreen {
         list.restorePosition(first,state.getInt("top"));
     }
     private LinearLayout toolbar;
-    int headerBottom(){return toolbar==null?0:toolbar.getBottom();}
+    int headerBottom(){return toolbar==null?0:Math.round(toolbar.getY()+toolbar.getHeight());}
     public void show(){show(null);}
     public void show(Bundle saved){
         if(visible())return;

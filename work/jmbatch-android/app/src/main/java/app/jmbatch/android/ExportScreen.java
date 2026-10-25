@@ -32,13 +32,13 @@ public final class ExportScreen {
     private void error(String message){new AlertDialog.Builder(activity).setMessage(message).setPositiveButton("关闭",null).show();}
     public void show(){
         boolean allPdf=true;for(LibraryStore.Entry entry:entries)if(!entry.format.equals("pdf"))allPdf=false;final boolean pdfOnly=allPdf;
-        LinearLayout form=Ui.column(activity);TextView title=Ui.heading(activity,"导出为");title.setGravity(android.view.Gravity.CENTER);form.addView(title);Ui.gap(form,20);
+        LinearLayout form=Ui.column(activity);TextView title=Ui.heading(activity,"导出为");title.setGravity(android.view.Gravity.CENTER);title.setPadding(0,Ui.dp(activity,4),0,Ui.dp(activity,6));form.addView(title);Ui.gap(form,6);
         RadioGroup formats=new RadioGroup(activity);formats.setOrientation(RadioGroup.HORIZONTAL);formats.setGravity(android.view.Gravity.CENTER);RadioButton pdf=new RadioButton(activity),zip=new RadioButton(activity),images=new RadioButton(activity);pdf.setId(android.view.View.generateViewId());zip.setId(android.view.View.generateViewId());images.setId(android.view.View.generateViewId());pdf.setText("pdf");zip.setText("zip");formats.addView(pdf,new RadioGroup.LayoutParams(-2,-2));RadioGroup.LayoutParams second=new RadioGroup.LayoutParams(-2,-2);second.leftMargin=Ui.dp(activity,68);formats.addView(zip,second);pdf.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.MUTED));zip.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.MUTED));formats.check(pdfOnly?zip.getId():pdf.getId());form.addView(formats);
         RadioButton numeric=new RadioButton(activity){@Override public void toggle(){setChecked(!isChecked());}};
         CheckBox split=new CheckBox(activity);destination=new TextView(activity);destination.setText(label);
         numeric.setText("只保留编号");numeric.setTextColor(Ui.INK);numeric.setTextSize(16);numeric.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.MUTED));
-        LinearLayout.LayoutParams numericLayout=new LinearLayout.LayoutParams(-2,Ui.dp(activity,48));numericLayout.gravity=android.view.Gravity.CENTER_HORIZONTAL;numericLayout.topMargin=Ui.dp(activity,12);form.addView(numeric,numericLayout);
-        Ui.gap(form,28);dialog=Ui.modal(activity,form,false);Button confirm=Ui.button(activity,"确认",()->{});Ui.primary(confirm);form.addView(Ui.pair(activity,confirm,Ui.button(activity,"取消",dialog::dismiss)));
+        LinearLayout.LayoutParams numericLayout=new LinearLayout.LayoutParams(-2,Ui.dp(activity,48));numericLayout.gravity=android.view.Gravity.CENTER_HORIZONTAL;numericLayout.topMargin=Ui.dp(activity,4);form.addView(numeric,numericLayout);
+        Ui.gap(form,12);dialog=Ui.modal(activity,form,false,14,14);Button confirm=Ui.button(activity,"确认",()->{});Ui.primary(confirm);form.addView(Ui.pair(activity,confirm,Ui.button(activity,"取消",dialog::dismiss)));
         dialog.setOnDismissListener(d->{if(pending==this)pending=null;});
         confirm.setOnClickListener(v->{
             synchronized(store){if(store.running||store.libraryBusy){error("请先暂停下载，并等待其他文件操作完成");return;}for(Store.Task t:store.snapshot())if(t.status.equals("running")||t.status.equals("resetting")){error("下载正在停止，请稍后重试");return;}store.libraryBusy=true;}

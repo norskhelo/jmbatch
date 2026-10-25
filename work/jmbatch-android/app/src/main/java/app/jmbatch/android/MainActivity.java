@@ -24,6 +24,7 @@ public final class MainActivity extends Activity {
     private DownloadCovers downloadCovers;
     private LinearLayout layout,taskActions;
     private LinearLayout queue;
+    private ScrollView taskScroll;
     private InputFocusLayout inputFocus;
     private LinearLayout shell;
     private View settingsPage;
@@ -69,7 +70,7 @@ public final class MainActivity extends Activity {
         LinearLayout header=horizontal(),brandBox=column();TextView brand=text("JM Batch",26,INK);brand.setTypeface(null,Typeface.BOLD);brandBox.addView(brand);brandBox.addView(text("ver "+Core.VERSION,12,MUTED));header.addView(brandBox,new LinearLayout.LayoutParams(0,-2,1));Button settingsButton=button("⚙",v->settings());settingsButton.setContentDescription("设置");settingsButton.setTooltipText("设置");settingsButton.setTextSize(28);Ui.smallIconGlyph(settingsButton);Ui.square(settingsButton);header.addView(settingsButton,new LinearLayout.LayoutParams(-2,-2));shell.addView(header);
         Button updateButton=button("检查更新",v->{});updates=new GithubUpdates(this,updateButton);handler.postDelayed(()->updates.startup(),1500);
         pages=new FrameLayout(this);LinearLayout.LayoutParams pageParams=new LinearLayout.LayoutParams(-1,0,1);pageParams.topMargin=dp(12);shell.addView(pages,pageParams);
-        pageOffset=Math.max(dp(124),(int)(getResources().getDisplayMetrics().heightPixels*.14))+dp(28);
+        pageOffset=dp(124);
         pages.setBackground(Ui.shape(this,BG,18,false));pages.setClipToOutline(true);
         FrameLayout panel=downloadPanel=new FrameLayout(this);downloadPage=panel;panel.setBackground(pageBackground(false));pages.addView(panel,new FrameLayout.LayoutParams(-1,-1));
         layout=column();layout.setPadding(dp(14),dp(10),dp(14),dp(12));panel.addView(layout,new FrameLayout.LayoutParams(-1,-1));layout.addView(Ui.heading(this,"下载页面"));
@@ -78,10 +79,9 @@ public final class MainActivity extends Activity {
         summary=text("",12,MUTED);global=text("",12,MUTED);
         FrameLayout listPanel=new FrameLayout(this);listPanel.setBackground(Ui.shape(this,Color.WHITE,18,true));LinearLayout.LayoutParams listParams=new LinearLayout.LayoutParams(-1,0,1);listParams.topMargin=dp(16);listParams.bottomMargin=dp(12);layout.addView(listPanel,listParams);
         LinearLayout listBody=column();listBody.setPadding(dp(18),dp(10),dp(18),dp(22));listPanel.addView(listBody,new FrameLayout.LayoutParams(-1,-1));TextView listTitle=Ui.heading(this,"下载列表");listTitle.setTextSize(17);listBody.addView(listTitle);
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setOnScrollChangeListener((view,x,y,oldX,oldY)->{refreshDownloadCovers();if(y>oldY&&y+scroll.getHeight()>=queue.getHeight()-dp(50)&&limit<store.snapshot().size()){limit+=50;render();}});
+        ScrollView scroll=taskScroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setOnScrollChangeListener((view,x,y,oldX,oldY)->{refreshDownloadCovers();if(y>oldY&&y+scroll.getHeight()>=queue.getHeight()-dp(50)&&limit<store.snapshot().size()){limit+=50;render();}});
         queue=column();scroll.addView(queue);listBody.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));more=button("显示更多任务",v->{limit+=50;render();});
-        TextView hint=text("点击任务停止 · 长按批量操作",12,MUTED);hint.setGravity(Gravity.CENTER);hint.setPadding(0,dp(16),0,dp(4));listBody.addView(hint);
-        Button add=buttonAccent("＋",v->addDownload());add.setTextSize(Ui.ADD_ACTION_TEXT_SIZE);Ui.square(add);add.setContentDescription("添加下载");add.setBackground(Ui.circle(ACCENT));add.setElevation(dp(5));FrameLayout.LayoutParams fab=new FrameLayout.LayoutParams(-2,Ui.controlHeight(add),Gravity.BOTTOM|Gravity.RIGHT);fab.setMargins(0,0,dp(16),dp(14));listPanel.addView(add,fab);hint.setPadding(0,dp(16),Ui.controlHeight(add)+dp(16),dp(4));
+        Button add=buttonAccent("＋",v->addDownload());add.setTextSize(Ui.ADD_ACTION_TEXT_SIZE);Ui.square(add);add.setContentDescription("添加下载");add.setBackground(Ui.circle(ACCENT));add.setElevation(dp(5));FrameLayout.LayoutParams fab=new FrameLayout.LayoutParams(-2,Ui.controlHeight(add),Gravity.BOTTOM|Gravity.RIGHT);fab.setMargins(0,0,dp(16),dp(14));listPanel.addView(add,fab);listBody.addView(new View(this),new LinearLayout.LayoutParams(1,Ui.controlHeight(add)+dp(8)));
         taskSheet=column();taskSheet.setPadding(dp(18),dp(20),dp(18),dp(24));taskSheet.setBackground(Ui.shape(this,Color.WHITE,18,true));taskSheet.setElevation(dp(10));selectedCount=text("",16,INK);selectedCount.setGravity(Gravity.CENTER);selectedCount.setTypeface(null,Typeface.BOLD);taskSheet.addView(selectedCount);Ui.gap(taskSheet,20);taskSheet.addView(Ui.pair(this,buttonAccent("删除任务",v->removeSelected()),button("返回",v->exitSelection())));FrameLayout.LayoutParams sheetParams=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);panel.addView(taskSheet,sheetParams);taskSheet.setVisibility(View.GONE);
         libraryHost=new FrameLayout(this);libraryHost.setBackground(pageBackground(false));pages.addView(libraryHost,new FrameLayout.LayoutParams(-1,-1));
         pageSwitch=new View(this){
@@ -146,9 +146,8 @@ public final class MainActivity extends Activity {
     private void showLibrary(){setFrontPage(true,true);}
     private void layoutPages(){
         int height=pages.getHeight();if(height<2)return;
-        int compact=Math.max(dp(124),(int)(getResources().getDisplayMetrics().heightPixels*.14))+dp(28);
         int header=Math.max(taskActions.getBottom(),libraryScreen==null?0:libraryScreen.headerBottom());
-        pageOffset=Math.min(Math.max(compact,header+dp(16)),height/2);
+        pageOffset=Math.min(header+dp(8),height/2);
         for(FrameLayout card:new FrameLayout[]{downloadPanel,libraryHost}){
             FrameLayout.LayoutParams p=(FrameLayout.LayoutParams)card.getLayoutParams();p.height=height+dp(28);p.topMargin=0;card.setLayoutParams(p);
         }
@@ -174,7 +173,7 @@ public final class MainActivity extends Activity {
         if(pageExchange!=null&&animate)return;
         finishPageExchange();if(library==libraryVisible){settlePages();return;}
         boolean previous=libraryVisible;libraryVisible=library;
-        if(!animate||pages.getHeight()<2){settlePages();return;}
+        if(!animate||pages.getHeight()<2){resetPage(previous);settlePages();return;}
         pageExchange=new PageExchange(previous);
         downloadPanel.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);libraryHost.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         downloadPanel.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);libraryHost.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
@@ -185,7 +184,18 @@ public final class MainActivity extends Activity {
     }
     private void finishPageExchange(){
         PageExchange exchange=pageExchange;pageExchange=null;
-        if(exchange!=null){pages.removeCallbacks(exchange);libraryVisible=exchange.direction<0?exchange.sourceLibrary:!exchange.sourceLibrary;settlePages();}
+        if(exchange!=null){pages.removeCallbacks(exchange);libraryVisible=exchange.direction<0?exchange.sourceLibrary:!exchange.sourceLibrary;if(libraryVisible!=exchange.sourceLibrary)resetPage(exchange.sourceLibrary);settlePages();}
+    }
+    private void resetPage(boolean library){
+        if(library){libraryScreen.resetPage();return;}
+        limit=50;exitSelection();
+        // ACTION_CANCEL also stops a pending long press or an active fling.
+        long now=SystemClock.uptimeMillis();MotionEvent cancel=MotionEvent.obtain(now,now,MotionEvent.ACTION_CANCEL,0,0,0);
+        taskScroll.dispatchTouchEvent(cancel);
+        // ScrollView aborts its scroller on DOWN. fling(0) leaves an old start
+        // position that computeScroll can otherwise restore after scrollTo.
+        MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,0,0,0);
+        taskScroll.onTouchEvent(down);taskScroll.onTouchEvent(cancel);down.recycle();cancel.recycle();taskScroll.scrollTo(0,0);
     }
     private final class PageExchange implements Runnable {
         final boolean sourceLibrary;final View incoming,outgoing;int direction=1;float progress;long lastFrame=SystemClock.uptimeMillis();boolean incomingOnTop;
@@ -415,7 +425,7 @@ public final class MainActivity extends Activity {
         animation.addListener(new android.animation.AnimatorListenerAdapter(){@Override public void onAnimationEnd(android.animation.Animator value){
             if(settingsAnimation!=animation)return;settingsAnimation=null;
             shell.setTranslationX(0);page.setTranslationX(0);inputFocus.setDescendantFocusability(ViewGroup.FOCUS_BEFORE_DESCENDANTS);
-            if(entering){shell.setVisibility(View.GONE);page.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);}
+            if(entering){shell.setVisibility(View.GONE);resetPage(libraryVisible);page.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);}
             else{inputFocus.removeView(page);settingsPage=null;settingsScreen=null;shell.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);}
             inputFocus.requestFocus();
         }});animation.start();

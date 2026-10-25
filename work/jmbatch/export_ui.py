@@ -14,15 +14,16 @@ def show_export(library_window, keys):
     all_pdf = all(item['format'] == 'pdf' for item in items)
     from ui_common import modal, actions
     dialog, panel = modal(owner.window)
-    ttk.Label(panel, text="导出为", anchor="center", font=("Microsoft YaHei UI", 16, "bold")).pack(fill="x", pady=(8, 32))
+    panel.configure(padding=(22, 14))
+    ttk.Label(panel, text="导出为", anchor="center", font=("Microsoft YaHei UI", 16, "bold")).pack(fill="x", pady=(0, 10))
     fmt, destination = tk.StringVar(value="zip" if all_pdf else "pdf"), tk.StringVar(value=items[0]['root'])
     numeric, split = tk.BooleanVar(), tk.BooleanVar()
-    formats = ttk.Frame(panel); formats.pack(fill="x",pady=(4,16))
+    formats = ttk.Frame(panel); formats.pack(fill="x",pady=(0,8))
     for label, value in (("pdf", "pdf"), ("zip", "zip")):
         ttk.Radiobutton(formats, text=label, value=value, variable=fmt).pack(side="left", expand=True)
     style = ttk.Style(dialog)
     style.layout("Export.TCheckbutton", style.layout("TRadiobutton"))
-    ttk.Checkbutton(panel, text="只保留编号", variable=numeric, style="Export.TCheckbutton").pack(pady=(0, 4))
+    ttk.Checkbutton(panel, text="只保留编号", variable=numeric, style="Export.TCheckbutton").pack()
     def start():
         folder = Path(destination.get())
         if not folder.is_absolute():
@@ -44,5 +45,5 @@ def show_export(library_window, keys):
             elif len(keys) > 1 or result.stopped:
                 messagebox.showinfo("导出结果", summary, parent=owner.window)
         owner.run(operation, finished, pause_required=True)
-    actions(panel, "确认", "取消", start, dialog.destroy)
+    actions(panel, "确认", "取消", start, dialog.destroy).pack_configure(pady=(12, 0))
     return dialog

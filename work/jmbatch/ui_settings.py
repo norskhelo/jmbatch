@@ -47,7 +47,10 @@ def slide(app, entering, finished):
         else:
             app.settings_transition=None;app.settings_animation=None
             app.main_page.place_forget()
-            if entering:page.place_configure(relx=0)
+            if entering:
+                page.place_configure(relx=0)
+                from ui_main import reset_page
+                reset_page(app,app.library_visible)
             else:app.main_page.pack(fill='both',expand=True)
             finished()
     frame()

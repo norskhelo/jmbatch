@@ -110,7 +110,7 @@ def build(app):
     app.pages=ttk.Frame(outer);app.pages.pack(fill='both',expand=True)
     app.pages.bind('<Configure>',lambda e:align_page_exchange(app))
     app.root.bind('<Configure>',lambda e:align_page_exchange(app) if e.widget==app.root else None,add='+')
-    app.page_offset=int(height*.23)
+    app.page_offset=140
     app.download_panel=Panel(app.pages,connected_top=True);body=app.download_panel.body
     ttk.Label(body,text='下载页面',font=('Microsoft YaHei UI',20,'bold')).pack(anchor='w',pady=(0,12))
     bar=app.download_toolbar=ttk.Frame(body);bar.pack(fill='x')
@@ -119,7 +119,7 @@ def build(app):
     app.pause_button=ttk.Button(bar);app.cancel_button=ttk.Button(bar)
     app.summary=tk.StringVar();app.speed_text=tk.StringVar()
     list_panel=Panel(body,padding=22);list_panel.configure(bg='white');list_panel.pack(fill='both',expand=True,pady=(18,12));ttk.Label(list_panel.body,text='下载列表',font=('Microsoft YaHei UI',14,'bold')).pack(anchor='w',pady=(0,12))
-    footer=ttk.Frame(list_panel.body);footer.pack(side='bottom',fill='x',pady=(8,14));hint=ttk.Label(footer,text='点击任务停止 · 长按批量操作',foreground=MUTED,anchor='center',justify='center');hint.pack(fill='x',ipady=16);hint.bind('<Configure>',lambda e:hint.configure(wraplength=max(1,e.width)))
+    footer=ttk.Frame(list_panel.body);footer.pack(side='bottom',fill='x',pady=(8,0))
     holder=ttk.Frame(list_panel.body);holder.pack(fill='both',expand=True)
     columns=('id','title','status','progress','size','format','resets');app.tree=DownloadList(holder,app,columns=columns,show='tree headings',selectmode='none')
     from download_covers import DownloadCovers
@@ -131,7 +131,7 @@ def build(app):
         else:scroll.pack_forget()
     app.tree.configure(yscrollcommand=scrolled);app.tree.pack(fill='both',expand=True);app.tree.set_mode('tiles')
     fab_size=control_height(list_panel,ADD_ACTION_FONT)
-    footer.pack_configure(padx=(0,fab_size+12))
+    footer.configure(height=fab_size)
     fab_width=fab_size
     fab=tk.Canvas(list_panel,width=fab_width,height=fab_size,bg='white',highlightthickness=0,takefocus=True,cursor='hand2')
     fab.create_oval(1,1,fab_width-1,fab_size-1,fill=ACCENT,outline=ACCENT);fab.create_text(fab_width/2,fab_size/2,text='＋',font=ADD_ACTION_FONT,fill='white');app.add_button=fab
@@ -180,6 +180,15 @@ def show_selection(app):
 
 def exit_selection(app):
     app.selecting=False;app.tree.selection_remove(app.tree.selection());app.task_sheet.place_forget();app.tree._schedule()
+
+
+def reset_page(app,library):
+    """Clear navigation state without changing tasks, files or sorting."""
+    if library:
+        app.library_window.reset_page()
+    else:
+        app.tree.cancel_press();app.tree.pressed=None;app.tree.held=False
+        exit_selection(app);app.tree.focus('');app.tree.yview_moveto(0)
 
 
 def remove_selected(app):
@@ -239,8 +248,8 @@ def native_page_alpha(widget,alpha):
 
 def page_header_bottom(app, library):
     page=app.library_window.window if library else app.download_panel
-    toolbar=app.library_window.sort_button.master if library else app.download_toolbar
-    return toolbar.winfo_rooty()-page.winfo_rooty()+toolbar.winfo_reqheight()
+    controls=(app.library_window.sort_button,app.library_window.new_collection_button) if library else app.download_toolbar.winfo_children()
+    return max(control.winfo_rooty()-page.winfo_rooty()+max(control.winfo_height(),control.winfo_reqheight()) for control in controls)
 
 
 def layout_live_pages(app):
@@ -248,7 +257,7 @@ def layout_live_pages(app):
     width,height=app.pages.winfo_width(),app.pages.winfo_height()
     if width<2 or height<2:return
     header=max(page_header_bottom(app,True),page_header_bottom(app,False))
-    app.page_offset=min(max(int(app.root.winfo_height()*.18),header+16),height//2)
+    app.page_offset=min(header+8,height//2)
     app.page_size=(width,height)
     for page,surface in ((app.download_panel,app.download_panel),(app.library_window.window,app.library_window.surface)):
         page.place(x=0,width=width,height=height+28,relwidth=0,relheight=0)
@@ -309,7 +318,7 @@ def set_front_page(app,library,animate=True):
     if getattr(app,'page_exchange',None) is not None:return
     if app.library_visible==library:return
     source=app.library_visible;app.library_visible=library
-    if not animate:settle_live_pages(app);return
+    if not animate:reset_page(app,source);settle_live_pages(app);return
     import time
     from types import SimpleNamespace
     outgoing=app.library_window.window if source else app.download_panel
@@ -337,7 +346,9 @@ def finish_page_exchange(app):
     job=getattr(app,'page_animation',None)
     if job:app.root.after_cancel(job)
     app.page_animation=None;state=getattr(app,'page_exchange',None);app.page_exchange=None
-    if state is not None:app.library_visible=state.source_library if state.direction<0 else not state.source_library
+    if state is not None:
+        app.library_visible=state.source_library if state.direction<0 else not state.source_library
+        if app.library_visible!=state.source_library:reset_page(app,state.source_library)
     if hasattr(app,'library_window'):settle_live_pages(app)
 
 
@@ -345,7 +356,7 @@ def align_page_exchange(app):
     if not hasattr(app,'library_window'):return
     size=(app.pages.winfo_width(),app.pages.winfo_height())
     header=max(page_header_bottom(app,True),page_header_bottom(app,False))
-    offset=min(max(int(app.root.winfo_height()*.18),header+16),size[1]//2)
+    offset=min(header+8,size[1]//2)
     if size!=getattr(app,'page_size',None) or offset!=app.page_offset:
         finish_page_exchange(app);layout_live_pages(app)
 

@@ -2,6 +2,6 @@ plugins { id 'com.android.application' }
 android {
     namespace 'app.jmbatch.android'
     compileSdk 35
-    defaultConfig { applicationId 'app.jmbatch.android'; minSdk 26; targetSdk 34; versionCode 622; versionName '0.6.22' }
+    defaultConfig { applicationId 'app.jmbatch.android'; minSdk 26; targetSdk 34; versionCode 623; versionName '0.6.23' }
     compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
 }

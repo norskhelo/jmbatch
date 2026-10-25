@@ -15,7 +15,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.39 / Android 0.6.22 — 按钮对齐与面板布局\n\n发布日期：2026-10-25\n\nWindows 0.3.38 → 0.3.39；Android 0.6.21 → 0.6.22（versionCode 622）。沿用原包名、Android 签名及更新公钥，可覆盖安装。\n\n• 新建收藏夹按钮上移，中心与左侧“检查更新”“排序方式”对齐，保留按钮尺寸和页面间距。\n• 阅读器“章节列表、收藏／取消收藏、书签、跳转”四个按钮排成一行，保持等宽。\n• 添加下载窗口保持居中和原尺寸，内部输入框、格式选项及操作按钮整体下移，按钮靠近面板底部。\n• 缩小新建收藏夹、主页设置和设置页返回的内部图案，保留按钮外框和点击范围。\n\n已验证 Windows 实际界面与最终 EXE 模块，并在 BlueStacks 5 / Android 9 检查常用尺寸、窄屏放大字号下的布局与入口、返回及键盘遮挡。原签名、源码与安装包校验通过；未测试实体手机。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.40 / Android 0.6.23 — 页面间距与切页状态\n\n发布日期：2026-10-25\n\nWindows 0.3.39 → 0.3.40；Android 0.6.22 → 0.6.23（versionCode 623）。沿用原包名、Android 签名及更新公钥，可覆盖安装。\n\n• 缩小导出弹窗高度，减少标题、格式选项、编号开关和操作按钮之间的空白，保留控件大小与导出功能。\n• 删除下载页“点击任务停止 · 长按批量操作”提示。\n• 下载页与漫画库切换后退出批量/移动模式、取消勾选并滚到顶部；漫画库返回首页，保留当前排序。\n• 进入设置页后同样清理当前页面的临时状态，保留下载任务、漫画文件、收藏和阅读记录；修复 Android 滚动回调把列表拉回旧位置的问题。\n• 两页交界贴近工具栏实际下沿，仅留 8 像素／dp 间隔，大窗口不再额外扩大留白，保留完整按钮和原有切换动画。\n\n以上修改已在本地阶段通过 Windows 实际界面及最终 EXE 模块、BlueStacks 5 / Android 9 常用尺寸与窄屏大字号检查。本次正式构建复核源码一致性、原签名、更新清单和安装包校验，未重复无关功能测试；未测试实体手机。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

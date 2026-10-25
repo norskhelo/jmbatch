@@ -32,6 +32,24 @@ class LibraryWindow:
         from ui_library import build
         build(self,parent)
 
+    def reset_page(self):
+        self.cancel_press()
+        self.pressed = None
+        self.row_press = False
+        self.batch_mode = self.moving = False
+        self.moving_keys = []
+        self.move_origin = self.collection = ""
+        self.query.set("")
+        self.only_favorites.set(False)
+        self.tree.selection_set(())
+        self.tree.focus("")
+        self.status.set("")
+        self.reset_viewport = True
+        from ui_library import update_mode
+        update_mode(self)
+        self.render()
+        self.tree.yview_moveto(0)
+
     def back(self):
         if self.moving:
             from ui_library import cancel_move
@@ -367,6 +385,9 @@ class LibraryWindow:
                 self.tree.focus(focus)
         elif not same_filter:
             self.tree.yview_moveto(0)
+        if getattr(self, 'reset_viewport', False):
+            self.tree.yview_moveto(0)
+            self.reset_viewport = False
         self.details()
         from ui_library import prepare_chapter_counts
         prepare_chapter_counts(self)
