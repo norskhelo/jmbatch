@@ -103,7 +103,7 @@ def build(app):
     outer=app.main_page=ttk.Frame(app.root,padding=12,style='Page.TFrame');outer.pack(fill='both',expand=True)
     header=ttk.Frame(outer,style='Page.TFrame');header.pack(fill='x',pady=(0,16))
     brand=ttk.Frame(header,style='Page.TFrame');brand.pack(side='left');ttk.Label(brand,text='JM Batch',font=('Segoe UI',26,'bold'),style='Page.TLabel').pack(anchor='w');ttk.Label(brand,text=f'ver {VERSION}',foreground=MUTED,style='Page.TLabel').pack(anchor='w')
-    app.settings_button=square_button(ttk.Button(header,text='⚙',command=app.settings_dialog));app.settings_button.pack(side='right',anchor='s')
+    app.settings_button=square_button(ttk.Button(header,text='⚙',style='SmallIcon.TButton',command=app.settings_dialog),content_font=SMALL_ICON_FONT);app.settings_button.pack(side='right',anchor='s')
     app.update_button=ttk.Button(header);app.cleanup_button=ttk.Button(header)
     app.output_var=tk.StringVar(value=app.engine.settings.output);app.format_var=tk.StringVar(value=app.engine.settings.format)
     app.range_start=tk.StringVar();app.range_end=tk.StringVar()
@@ -163,6 +163,7 @@ def back(app):
 
 def add_dialog(app):
     window,body=modal(app.root,width=540)
+    body.configure(padding=(22,34,22,10))
     entry=Input(body,multiline=True);entry.pack(fill='x',pady=(10,8));placeholder(entry,'请输入数字编号，多个编号请用空格隔开')
     row=ttk.Frame(body);row.pack(fill='x',pady=(18,18))
     for label,value in [('pdf','pdf'),('zip','zip'),('文件夹','images')]:ttk.Radiobutton(row,text=label,value=value,variable=app.format_var).pack(side='left',expand=True)

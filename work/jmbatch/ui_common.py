@@ -9,6 +9,7 @@ BG, INK, MUTED, LINE, ACCENT, BLUE = '#f5f5f7', '#1d1f26', '#747780', '#dadce1',
 
 CONTROL_FONT = ('Microsoft YaHei UI', 12)
 BUTTON_FONT = ('Microsoft YaHei UI', 14)
+SMALL_ICON_FONT = ('Microsoft YaHei UI', 11)
 ADD_ACTION_FONT = ('Segoe UI', 28)
 
 
@@ -37,6 +38,7 @@ def install_styles(root):
         extra = control_height(root, BUTTON_FONT) - tkfont.Font(root=root, font=BUTTON_FONT).metrics('linespace')
         style.configure(name, foreground=text, background='white', padding=(6, extra//2, 6, extra-extra//2),font=BUTTON_FONT,width=0)
         style.map(name, background=[('active','white'),('disabled','white')])
+    style.configure('SmallIcon.TButton', font=SMALL_ICON_FONT)
     style.configure('Page.TFrame', background=BG)
     style.configure('Page.TLabel', background=BG)
     style.configure('TLabel',font=('Microsoft YaHei UI',12))
@@ -201,8 +203,8 @@ def slide_sheet(panel,step=0,bottom=None):
     if step<12:panel.after(16,lambda:slide_sheet(panel,step+1,bottom))
 
 
-def square_button(button, font=BUTTON_FONT):
-    face=tkfont.Font(root=button,font=font)
+def square_button(button, font=BUTTON_FONT, content_font=None):
+    face=tkfont.Font(root=button,font=content_font or font)
     size=control_height(button,font)
     content=button.image.width() if hasattr(button,'image') else face.measure(button.cget('text'))
     content_height=button.image.height() if hasattr(button,'image') else face.metrics('linespace')

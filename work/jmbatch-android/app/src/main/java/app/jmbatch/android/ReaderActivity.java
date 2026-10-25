@@ -79,7 +79,7 @@ public final class ReaderActivity extends Activity {
         LinearLayout controls=Ui.column(this);controls.setBackgroundColor(android.graphics.Color.WHITE);controls.setPadding(dp(12),dp(8),dp(12),dp(10));
         TextView title=Ui.text(this,entry.title,18);title.setTypeface(null,Typeface.BOLD);title.setSingleLine(true);title.setGravity(Gravity.CENTER);title.setEllipsize(android.text.TextUtils.TruncateAt.END);controls.addView(title);Ui.gap(controls,12);
         chapterButton=button("章节列表",this::chooseChapter);favoriteButton=button("收藏",this::favorite);modeButton=button("滚动阅读",this::toggleMode);
-        markButton=button("书签",this::showBookmarkInput);controls.addView(new ActionRow(this,2,chapterButton,favoriteButton,markButton,button("跳转",this::jumpPage)));
+        markButton=button("书签",this::showBookmarkInput);controls.addView(new ActionRow(this,chapterButton,favoriteButton,markButton,button("跳转",this::jumpPage)).keepSingleRow());
         viewport=new ReaderViewport(this);viewport.setBackgroundColor(Color.WHITE);viewport.setOnClickListener(v->{if(ready&&!closed){chrome.toggle();updateChromeDescription();}});
         LinearLayout navigation=Ui.column(this);navigation.setBackgroundColor(Color.WHITE);navigation.setPadding(dp(12),dp(4),dp(12),dp(10));
         status=Ui.text(this,"正在读取漫画…",12);status.setGravity(Gravity.CENTER);status.setTextColor(Ui.MUTED);status.setLines(2);

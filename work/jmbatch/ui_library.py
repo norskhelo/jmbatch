@@ -16,8 +16,18 @@ def build(view,parent):
     header=ttk.Frame(body);header.pack(fill='x');ttk.Label(header,text='漫画库',font=('Microsoft YaHei UI',22,'bold')).pack(side='left')
     bar=ttk.Frame(body);bar.pack(fill='x',pady=14);bar.columnconfigure(2,weight=1)
     ttk.Button(bar,text='检查更新',command=lambda:check_all(view)).grid(row=0,column=0,sticky='nw',padx=(0,4));view.sort_button=ttk.Button(bar,text='排序方式',command=lambda:sort_menu(view));view.sort_button.grid(row=0,column=1,sticky='nw',padx=4)
-    view.new_collection_button=icon_button(bar,'folder',command=lambda:new_collection(view),font=ADD_ACTION_FONT,icon_ratio=.8)
-    view.new_collection_button.grid(row=0,column=3,sticky='ne',padx=(4,0))
+    view.new_collection_button=icon_button(body,'folder',command=lambda:new_collection(view),font=ADD_ACTION_FONT,icon_ratio=.64)
+    bar.grid_propagate(False)
+    def align_collection(event=None):
+        button=view.new_collection_button
+        bar.configure(height=max(button.winfo_reqheight(),view.sort_button.winfo_reqheight()))
+        bar.columnconfigure(3,minsize=button.winfo_reqwidth()+4)
+        center=view.sort_button.winfo_y()+view.sort_button.winfo_height()/2
+        button.place(in_=bar,relx=1,y=round(center),anchor='e')
+        button.lift()
+    bar.bind('<Configure>',align_collection)
+    view.sort_button.bind('<Configure>',align_collection)
+    body.after_idle(align_collection)
 
     view.query=tk.StringVar();view.only_favorites=tk.BooleanVar();view.hint=tk.StringVar();view.breadcrumb=tk.StringVar()
     hidden=ttk.Frame(body);view.back_button=ttk.Button(hidden);view.mode_button=ttk.Button(hidden);view.selection_controls=ttk.Frame(hidden);view.stop_button=ttk.Button(hidden);view.display_mode=tk.StringVar(value='tiles')

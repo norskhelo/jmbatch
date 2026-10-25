@@ -57,7 +57,7 @@ def show(app):
     if getattr(app,'settings_page',None) is not None or getattr(app,'page_exchange',None) is not None or getattr(app,'settings_transition',None) is not None:return
     page=app.settings_page=tk.Frame(app.root,bg='white')
     nav=tk.Frame(page,bg='#edf0f5',width=166);nav.pack(side='left',fill='y');nav.pack_propagate(False)
-    back=square_button(ttk.Button(nav,text='←',command=lambda:save(True)));back.pack(anchor='w',padx=16,pady=(16,0))
+    back=square_button(ttk.Button(nav,text='←',style='SmallIcon.TButton',command=lambda:save(True)),content_font=SMALL_ICON_FONT);back.pack(anchor='w',padx=16,pady=(16,0))
     tk.Label(nav,text='设置',bg='#edf0f5',fg=INK,font=('Microsoft YaHei UI',20,'bold'),anchor='w').pack(fill='x',padx=16,pady=(16,18))
     page.bind('<Configure>',lambda e:nav.configure(width=max(100,min(166,e.width//4))) if e.widget is page else None)
     holder=ttk.Frame(page,style='Card.TFrame');holder.pack(fill='both',expand=True)

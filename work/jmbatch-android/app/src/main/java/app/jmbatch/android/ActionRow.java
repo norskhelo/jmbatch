@@ -10,6 +10,7 @@ import java.util.List;
 public final class ActionRow extends ViewGroup {
     private final List<View> visible=new ArrayList<>();
     private final int gap,maxColumns;
+    private boolean singleRow;
     private int columns=1,cellWidth;
     private int[] heights=new int[0];
 
@@ -22,6 +23,7 @@ public final class ActionRow extends ViewGroup {
         gap=Math.round(8*getResources().getDisplayMetrics().density);
         for(View action:actions)addView(action);
     }
+    public ActionRow keepSingleRow(){singleRow=true;requestLayout();return this;}
 
     @Override protected LayoutParams generateDefaultLayoutParams() {
         return new LayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT);
@@ -40,8 +42,8 @@ public final class ActionRow extends ViewGroup {
         int width=MeasureSpec.getMode(widthSpec)==MeasureSpec.UNSPECIFIED
             ?Math.max(getSuggestedMinimumWidth(),desired):MeasureSpec.getSize(widthSpec);
         int available=Math.max(0,width-horizontal);
-        columns=Math.max(1,Math.min(maxColumns,count));
-        while(columns>1&&(available-(columns-1)*gap)/columns<widest)columns--;
+        columns=Math.max(1,singleRow?count:Math.min(maxColumns,count));
+        while(!singleRow&&columns>1&&(available-(columns-1)*gap)/columns<widest)columns--;
         int rows=Math.max(1,(count+columns-1)/columns);
         columns=Math.max(1,(count+rows-1)/rows);
         cellWidth=Math.min(widest,Math.max(0,(available-(columns-1)*gap)/columns));

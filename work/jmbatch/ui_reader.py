@@ -15,8 +15,8 @@ def controls(reader, top, bottom, title):
     buttons = [ttk.Button(grid, text='章节列表', command=lambda: chapters(reader)), reader.favorite_button,
                reader.mark_button, ttk.Button(grid, text='跳转', command=lambda: jump(reader))]
     for i, button in enumerate(buttons):
-        grid.columnconfigure(i % 2, weight=1, uniform='reader')
-        button.grid(row=i // 2, column=i % 2, sticky='ew', padx=5, pady=4)
+        grid.columnconfigure(i, weight=1, uniform='reader')
+        button.grid(row=0, column=i, sticky='ew', padx=5, pady=4)
     reader.page_buttons = ttk.Frame(bottom)
     row=ttk.Frame(reader.page_buttons);row.pack(anchor='center',pady=(8,0));row.columnconfigure((0,1),weight=1,uniform='pages')
     ttk.Button(row,text='上一页',command=lambda:reader.step(-1)).grid(row=0,column=0,sticky='ew',padx=(0,5))

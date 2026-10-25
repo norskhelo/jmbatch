@@ -64,6 +64,11 @@ public final class Ui {
     public static void setText(TextView view,String value){if(!value.contentEquals(view.getText()))view.setText(value);}
     public static TextView heading(Context c,String value){TextView v=text(c,value,21);v.setTypeface(null,Typeface.BOLD);v.setPadding(0,dp(c,10),0,dp(c,12));return v;}
     public static Button square(Button button){((ActionButton)button).setIconOnly(true);return button;}
+    public static void smallIconGlyph(Button button){
+        android.text.SpannableString glyph=new android.text.SpannableString(button.getText());
+        glyph.setSpan(new android.text.style.RelativeSizeSpan(.8f),0,glyph.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        button.setText(glyph);
+    }
     public static Button button(Context c,String title,Runnable action){Button b=new ActionButton(c);b.setText(title);b.setOnClickListener(v->action.run());if(title.equals("←"))square(b);return b;}
     public static Button iconButton(Context c,String kind,String title,Runnable action){return iconButton(c,kind,title,16,action);}
     public static Button iconButton(Context c,String kind,String title,int textSize,Runnable action){Button b=button(c,title,action);b.setTextSize(textSize);b.setContentDescription(title.isEmpty()?"分享":title);b.setCompoundDrawablePadding(dp(c,6));android.text.SpannableString symbol=new android.text.SpannableString("\ufffc"+(title.isEmpty()?"":"  "+title));Drawable image=icon(c,kind);int size=Math.round(b.getTextSize());image.setBounds(0,0,size,size);symbol.setSpan(new android.text.style.ImageSpan(image,android.text.style.ImageSpan.ALIGN_BASELINE),0,1,android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);b.setText(symbol);if(title.isEmpty())square(b);return b;}
@@ -84,7 +89,10 @@ public final class Ui {
     public static void gap(LinearLayout parent,int height){View gap=new View(parent.getContext());parent.addView(gap,new LinearLayout.LayoutParams(1,dp(parent.getContext(),height)));}
     public static ActionRow pair(Context c,View...views){return new ActionRow(c,views);}
     public static AlertDialog modal(Activity a,View content,boolean blur){
-        LinearLayout panel=column(a);int p=dp(a,20);panel.setPadding(p,p,p,p);panel.setBackground(shape(a,Color.WHITE,16,false));panel.addView(content);
+        return modal(a,content,blur,20,20);
+    }
+    public static AlertDialog modal(Activity a,View content,boolean blur,int topPadding,int bottomPadding){
+        LinearLayout panel=column(a);int p=dp(a,20);panel.setPadding(p,dp(a,topPadding),p,dp(a,bottomPadding));panel.setBackground(shape(a,Color.WHITE,16,false));panel.addView(content);
         Modal d=new Modal(a);d.setView(panel);d.setOnShowListener(x->{
             d.getWindow().setBackgroundDrawableResource(android.R.color.transparent);d.getWindow().setDimAmount(.22f);
             int width=Math.min(dp(a,480),a.getResources().getDisplayMetrics().widthPixels-dp(a,36));d.getWindow().setLayout(width,-2);
