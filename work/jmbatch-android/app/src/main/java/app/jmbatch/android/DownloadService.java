@@ -188,8 +188,8 @@ public final class DownloadService extends Service {
                             while(stop.isEmpty()&&SystemClock.elapsedRealtime()<wait)Thread.sleep(200);
                             continue;
                         }
-                        task.status="failed";task.phase="下载失败，点详情查看原因";
-                        task.error=error instanceof OutOfMemoryError?"手机内存不足，缓存已保留。请减少同时下载任务数或图片线程后重试。":Core.error(error,store.cookie);break;
+                        task.phase="下载失败，点击任务重试";
+                        task.error=error instanceof OutOfMemoryError?"手机内存不足，缓存已保留。请减少同时下载任务数或图片线程后重试。":Core.error(error,store.cookie);task.status="failed";break;
                     }finally{task.elapsed=SystemClock.elapsedRealtime()-begin;task.speed=0;saveQuietly();}
                 }
             }catch(Throwable error){
@@ -210,8 +210,8 @@ public final class DownloadService extends Service {
                 active.cancel("单页重试超时；已保留其他图片，请重试任务");
             if(task.status.equals("running")&&active.stop.isEmpty()&&task.settings.autoReset&&(active.stage.equals("metadata")||active.stage.equals("download"))){
                 String reason="";
-                // Slow image reads recover inside their own request. Local queue,
-                // bitmap/memory and fsync waits must never reset healthy downloads.
+                // Recover only stalled network waits. Low throughput and local
+                // queue, bitmap/memory or fsync waits must not reset downloads.
                 if(active.stage.equals("metadata")?now-active.lastData>=task.settings.stall*1000L:active.networkStalled(now,task.settings.stall*1000L))
                     reason="连续 "+task.settings.stall+" 秒没有接收数据或取得进度";
                 if(!reason.isEmpty()){task.phase="正在关闭旧连接："+reason;active.cancel("RESET:"+reason);}

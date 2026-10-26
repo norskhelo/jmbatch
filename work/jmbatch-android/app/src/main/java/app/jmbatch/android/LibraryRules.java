@@ -33,6 +33,11 @@ public final class LibraryRules {
         String lower=name.toLowerCase(Locale.ROOT);
         return lower.endsWith(".pdf") || lower.endsWith(".zip");
     }
+    public static String mimeType(String name) {
+        String lower=name.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".pdf")?"application/pdf":lower.endsWith(".zip")?"application/zip":
+                lower.endsWith(".jpg")?"image/jpeg":"application/octet-stream";
+    }
     public static boolean matches(String id,String title,String uri,boolean favorite,String query,boolean favoritesOnly) {
         return (!favoritesOnly||favorite) && (id+" "+title+" "+uri).toLowerCase(Locale.ROOT).contains(query.trim().toLowerCase(Locale.ROOT));
     }

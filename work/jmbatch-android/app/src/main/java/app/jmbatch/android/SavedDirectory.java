@@ -129,7 +129,7 @@ public final class SavedDirectory {
                             signal.throwIfCanceled();
                             String name=file.getName();
                             if(!name.startsWith(".")&&!name.contains(".partial")&&!java.nio.file.Files.isSymbolicLink(file.toPath())&&(file.isDirectory()||LibraryRules.supported(name)||name.endsWith(".jpg"))&&folder.getCanonicalFile().equals(file.getCanonicalFile().getParentFile()))
-                                found.add(new Item(name,"",file.isDirectory()?DocumentsContract.Document.MIME_TYPE_DIR:name.endsWith(".jpg")?"image/jpeg":name.endsWith(".pdf")?"application/pdf":"application/zip",ExportProvider.uri(activity,file)));
+                                found.add(new Item(name,"",file.isDirectory()?DocumentsContract.Document.MIME_TYPE_DIR:LibraryRules.mimeType(name),ExportProvider.uri(activity,file)));
                         }
                     }
                 } else {

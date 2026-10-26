@@ -204,16 +204,12 @@ public final class JmApi {
             if (status != 200) throw new HttpError(status);
             try (InputStream raw = connection.getInputStream(); InputStream input = "gzip".equalsIgnoreCase(connection.getContentEncoding()) ? new GZIPInputStream(raw) : raw) {
                 byte[] buffer = new byte[32768]; int n; long total = 0;
-                TransferWatch watch=new TransferWatch(image&&settings.autoReset?settings.slowKB*1024L/Math.max(1,settings.threads):0,
-                        settings.window*1000L);
                 while (true) {
                     control.check();long begin=SystemClock.elapsedRealtime();request.networkSince=begin;
                     try { n=input.read(buffer); }
                     catch(Exception error){response.failed(error);throw error;}
                     finally { request.networkSince=0; }
                     if(n==-1)break;
-                    try{watch.read(SystemClock.elapsedRealtime()-begin,n);}
-                    catch(SocketTimeoutException error){response.failed(error);throw error;}
                     control.check(); total += n; if (total > maxBytes) throw new IOException("响应过大，已停止以保护手机内存/存储");
                     if(image)control.rateLimit.acquire(n);
                     output.write(buffer, 0, n); if (image) control.received(n);

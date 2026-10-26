@@ -14,6 +14,17 @@ public final class DownloadDisplay {
         return String.format(Locale.ROOT, unit == 0 ? "%.0f %s" : "%.1f %s", value, units[unit]);
     }
     public static String speed(long value) { return size(value) + "/s"; }
+    public static String failureText(String status, String error, String phase) {
+        if (!"failed".equals(status)) return "";
+        String reason = error == null ? "" : error.trim();
+        String message = reason.replaceFirst("^[\\w.$]*(?:Exception|Error):\\s*", "").trim();
+        if (!message.isEmpty() && !message.equals("null")) reason = message;
+        if (reason.isEmpty()) {
+            reason = phase == null ? "" : phase.trim();
+            if (reason.isEmpty() || reason.startsWith("下载失败")) reason = "未记录具体原因，请重试后查看";
+        }
+        return "失败原因：" + reason.replaceAll("\\s+", " ");
+    }
     public static double percent(int done, int total, String status) {
         return status.equals("done") ? 100 : total > 0 ? Math.min(99.9, Math.max(0, done) * 100.0 / total) : 0;
     }

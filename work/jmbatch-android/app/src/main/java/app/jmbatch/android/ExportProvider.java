@@ -24,7 +24,7 @@ public final class ExportProvider extends ContentProvider {
         }catch(Exception error){throw new FileNotFoundException("导出文件不存在");}
     }
     public ParcelFileDescriptor openFile(Uri uri,String mode)throws FileNotFoundException {if(!mode.equals("r"))throw new FileNotFoundException("仅允许读取");return ParcelFileDescriptor.open(file(uri),ParcelFileDescriptor.MODE_READ_ONLY);}
-    public String getType(Uri uri){try{File f=file(uri);return f.isDirectory()?android.provider.DocumentsContract.Document.MIME_TYPE_DIR:f.getName().endsWith(".jpg")?"image/jpeg":f.getName().endsWith(".pdf")?"application/pdf":"application/zip";}catch(Exception e){return "application/octet-stream";}}
+    public String getType(Uri uri){try{File f=file(uri);return f.isDirectory()?android.provider.DocumentsContract.Document.MIME_TYPE_DIR:LibraryRules.mimeType(f.getName());}catch(Exception e){return "application/octet-stream";}}
     public Cursor query(Uri uri,String[] projection,String selection,String[] args,String order){
         try{File file=file(uri);String[] cols=projection==null?new String[]{OpenableColumns.DISPLAY_NAME,OpenableColumns.SIZE}:projection;MatrixCursor cursor=new MatrixCursor(cols);Object[] values=new Object[cols.length];for(int i=0;i<cols.length;i++)values[i]=cols[i].equals(OpenableColumns.DISPLAY_NAME)?file.getName():cols[i].equals(OpenableColumns.SIZE)?file.length():null;cursor.addRow(values);return cursor;}catch(Exception error){return null;}
     }

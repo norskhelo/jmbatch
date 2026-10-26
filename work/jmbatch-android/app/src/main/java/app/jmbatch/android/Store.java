@@ -24,7 +24,9 @@ public final class Store {
 
     public static final class Settings {
         public String outputUri = "", outputLabel = "应用下载目录", format = "images";
-        public int concurrentTasks = 2, threads = 8, timeout = 25, retries = 2, slowKB = 30, window = 90, stall = 180, maxResets = 3;
+        public int concurrentTasks = 2, threads = 8, timeout = 25, retries = 2, stall = 180, maxResets = 3;
+        // Legacy serialized fields; old settings/tasks remain readable, but these are ignored.
+        public int slowKB = 0, window = 90;
         public int chapterWorkers = ChapterMetadata.DEFAULT_WORKERS;
         public int chapterViewMode = 1;
         public int downloadLimitKB = 0;
@@ -40,7 +42,7 @@ public final class Store {
             downloadAllChapters = json.optBoolean("downloadAllChapters", false);
             outputUri = json.optString("outputUri", ""); outputLabel = json.optString("outputLabel", "应用下载目录");
             format = json.optString("format", "images"); threads = json.optInt("threads", 8); timeout = json.optInt("timeout", 25);
-            retries = json.optInt("retries", 2); slowKB = json.optInt("slowKB", 30); window = json.optInt("window", 90);
+            retries = json.optInt("retries", 2); slowKB = json.optInt("slowKB", 0); window = json.optInt("window", 90);
             stall = json.optInt("stall", 180); maxResets = json.optInt("maxResets", 3);
             autoReset = json.optBoolean("autoReset", true); keepImages = json.optBoolean("keepImages", false);
             numericFilename = json.optBoolean("numericFilename", false); flatZip = json.optBoolean("flatZip", false);
@@ -54,7 +56,7 @@ public final class Store {
             check(chapterViewMode, 1, 2, "多章节观看模式");
             if (!format.equals("images") && !format.equals("pdf") && !format.equals("zip")) throw new IllegalArgumentException("输出格式无效");
             check(threads, 1, 16, "图片线程"); check(timeout, 5, 120, "请求超时"); check(retries, 0, 5, "请求重试");
-            check(slowKB, 0, 10240, "慢速阈值"); check(window, 15, 600, "慢速检测时长"); check(stall, 30, 1800, "无进度超时"); check(maxResets, 0, 10, "自动重连上限");
+            check(stall, 30, 1800, "无进度超时"); check(maxResets, 0, 10, "自动重连上限");
         }
         private static void check(int n, int min, int max, String label) { if (n < min || n > max) throw new IllegalArgumentException(label + "应为 " + min + "–" + max); }
         public JSONObject json() {

@@ -4,6 +4,12 @@ public class DownloadDisplayTest {
     static int checks;
     static void check(boolean value, String label) { if (!value) throw new AssertionError(label); checks++; }
     public static void main(String[] args) {
+        check(DownloadDisplay.failureText("failed", "IOException: 网络超时\n请重试", "下载失败").equals("失败原因：网络超时 请重试"), "stored reason");
+        check(DownloadDisplay.failureText("failed", "SocketTimeoutException: 网络请求超时", "").equals("失败原因：网络请求超时"), "message before technical class");
+        check(DownloadDisplay.failureText("failed", "", "自动重连失败").equals("失败原因：自动重连失败"), "legacy phase fallback");
+        check(DownloadDisplay.failureText("failed", null, "下载失败，点详情查看原因").contains("未记录具体原因"), "legacy generic fallback");
+        for(String status:new String[]{"queued","running","paused","resetting","done","cancelled"})
+            check(DownloadDisplay.failureText(status,"旧错误","").isEmpty(), "no stale reason " + status);
         long[] values = {0, 1023, 1024, 1048576, 1073741824, -1};
         String[] expected = {"0 B/s", "1023 B/s", "1.0 KB/s", "1.0 MB/s", "1.0 GB/s", "0 B/s"};
         for (int i = 0; i < values.length; i++) check(DownloadDisplay.speed(values[i]).equals(expected[i]), "speed boundary " + i);

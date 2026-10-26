@@ -278,7 +278,15 @@ public final class MainActivity extends Activity {
             Ui.setText(row.state,Store.status(task.status)+(task.status.equals("done")?"":" · "+task.done+"/"+task.total));Ui.setText(row.percent,String.format(Locale.ROOT,"%.0f%%",DownloadDisplay.percent(task.done,task.total,task.status)));
             row.state.setTextColor(task.status.equals("failed")?Color.rgb(180,35,54):task.status.equals("done")?ACCENT:MUTED);
             row.progress.setIndeterminate(task.status.equals("running")&&task.total==0);row.progress.setProgress((int)(DownloadDisplay.percent(task.done,task.total,task.status)*10));
-            Ui.setText(row.phase,DownloadDisplay.size(task.status.equals("done")?task.resultBytes:task.imageBytes)+" / "+(task.status.equals("done")?DownloadDisplay.size(task.resultBytes):task.done>0&&task.total>0?DownloadDisplay.size(task.imageBytes*(double)task.total/task.done):"—")+(task.status.equals("running")||task.status.equals("resetting")?" · "+DownloadDisplay.speed(task.speed):""));row.open.setVisibility(View.GONE);row.chosen.bind(selecting,selected.contains(task.key));String old=previousStates.put(task.key,task.status);if(old!=null&&!old.equals("done")&&task.status.equals("done")){Ui.notice(this,"下载完成");refreshPreview();}
+            String failure=DownloadDisplay.failureText(task.status,task.error,task.phase);
+            Ui.setText(row.phase,failure.isEmpty()?DownloadDisplay.size(task.status.equals("done")?task.resultBytes:task.imageBytes)+" / "+(task.status.equals("done")?DownloadDisplay.size(task.resultBytes):task.done>0&&task.total>0?DownloadDisplay.size(task.imageBytes*(double)task.total/task.done):"—")+(task.status.equals("running")||task.status.equals("resetting")?" · "+DownloadDisplay.speed(task.speed):""):failure);
+            row.phase.setTextColor(failure.isEmpty()?MUTED:Color.rgb(180,35,54));
+            row.phase.setMaxLines(failure.isEmpty()?Integer.MAX_VALUE:2);
+            row.phase.setEllipsize(failure.isEmpty()?null:android.text.TextUtils.TruncateAt.END);
+            row.phase.setOnClickListener(failure.isEmpty()?null:v->{if(selecting)selectTask(task);else details(task);});
+            row.phase.setClickable(!failure.isEmpty());
+            row.phase.setContentDescription(failure.isEmpty()?null:failure+"，点击查看完整原因");
+            row.open.setVisibility(View.GONE);row.chosen.bind(selecting,selected.contains(task.key));String old=previousStates.put(task.key,task.status);if(old!=null&&!old.equals("done")&&task.status.equals("done")){Ui.notice(this,"下载完成");refreshPreview();}
             downloadCovers.bind(task,row.cover);
         }
         Iterator<Map.Entry<String,Row>> iterator=rows.entrySet().iterator();while(iterator.hasNext()){Map.Entry<String,Row> entry=iterator.next();if(!visible.contains(entry.getKey())){entry.getValue().cover.remove();queue.removeView(entry.getValue().card);iterator.remove();}}
@@ -435,7 +443,7 @@ public final class MainActivity extends Activity {
         if(store.running){toast("请先暂停下载，再运行离线诊断。");return;}
         toast("正在运行离线诊断，无需联网…");new Thread(()->{String result;try{result=Diagnostics.run(this);}catch(Throwable error){result="诊断未完成："+Core.error(error,"");}String message=result;runOnUiThread(()->new AlertDialog.Builder(this).setTitle("离线诊断结果").setMessage(message).setPositiveButton("确定",null).show());},"offline-check").start();
     }
-    protected void onResume(){super.onResume();if(output!=null&&store!=null)output.setText(store.settings.outputLabel);if(inputFocus!=null)inputFocus.prepareForResume();if(libraryScreen!=null)libraryScreen.resume();handler.removeCallbacks(refresh);handler.post(refresh);}
+    protected void onResume(){super.onResume();if(output!=null&&store!=null)output.setText(settingsPage!=null?OutputDirectory.display(this,store.settings.outputUri):store.settings.outputLabel);if(inputFocus!=null)inputFocus.prepareForResume();if(libraryScreen!=null)libraryScreen.resume();handler.removeCallbacks(refresh);handler.post(refresh);}
     protected void onPause(){finishPageExchange();if(settingsAnimation!=null)settingsAnimation.end();if(inputFocus!=null)inputFocus.finishEditing();handler.removeCallbacks(refresh);if(chapterDialog!=null){chapterDialog.dismiss();chapterDialog=null;}save();super.onPause();}
     protected void onDestroy(){if(libraryScreen!=null)libraryScreen.close();if(downloadCovers!=null)downloadCovers.close();for(Row row:rows.values())row.cover.remove();super.onDestroy();}
     private void save(){try{store.save();}catch(Exception error){store.note=error.getMessage();toast(store.note);}}

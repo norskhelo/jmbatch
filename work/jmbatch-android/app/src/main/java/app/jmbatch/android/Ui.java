@@ -31,6 +31,15 @@ public final class Ui {
     private static final class Modal extends AlertDialog {
         Runnable cleanup;
         Modal(Activity activity){super(activity);}
+        @Override protected void onStart(){
+            super.onStart();
+            // Dialog.show calls onStart before attaching the window. An OnShowListener
+            // runs later and can resize/recenter an already visible first frame.
+            Window window=getWindow();
+            window.setBackgroundDrawableResource(android.R.color.transparent);window.setDimAmount(.22f);
+            int width=Math.min(dp(getContext(),480),getContext().getResources().getDisplayMetrics().widthPixels-dp(getContext(),36));
+            window.setLayout(width,WindowManager.LayoutParams.WRAP_CONTENT);
+        }
         @Override protected void onStop(){try{super.onStop();}finally{if(cleanup!=null){Runnable action=cleanup;cleanup=null;action.run();}}}
     }
     private static final java.util.WeakHashMap<Activity,Dialog> surfaces=new java.util.WeakHashMap<>();
@@ -93,10 +102,7 @@ public final class Ui {
     }
     public static AlertDialog modal(Activity a,View content,boolean blur,int topPadding,int bottomPadding){
         LinearLayout panel=column(a);int p=dp(a,20);panel.setPadding(p,dp(a,topPadding),p,dp(a,bottomPadding));panel.setBackground(shape(a,Color.WHITE,16,false));panel.addView(content);
-        Modal d=new Modal(a);d.setView(panel);d.setOnShowListener(x->{
-            d.getWindow().setBackgroundDrawableResource(android.R.color.transparent);d.getWindow().setDimAmount(.22f);
-            int width=Math.min(dp(a,480),a.getResources().getDisplayMetrics().widthPixels-dp(a,36));d.getWindow().setLayout(width,-2);
-        });
+        Modal d=new Modal(a);d.setView(panel);
         if(blur){ViewGroup decor=decor(a);
             if(decor.getWidth()>0&&decor.getHeight()>0){
                 Bitmap bitmap=blurred(decor);

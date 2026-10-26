@@ -26,10 +26,17 @@ public class JmApiTransportTest {
             return 200;
         }
         public Map<String,List<String>> getHeaderFields(){return Collections.emptyMap();}
-        public long getContentLengthLong(){return 1024;}
+        public long getContentLengthLong(){return mode.equals("trickle")?128:1024;}
         public String getContentEncoding(){return null;}
-        public InputStream getInputStream(){
+        public InputStream getInputStream() throws IOException {
             check(getRequestProperty("Accept-Encoding").equals("identity"));
+            if(mode.equals("timeout")&&url.getHost().equals(JmApi.IMAGE_HOSTS[0]))
+                throw new SocketTimeoutException("synthetic read timeout");
+            if(mode.equals("trickle"))return new InputStream(){
+                int count;
+                public int read(){if(count==128)return -1;android.os.SystemClock.advance(1000);return count++;}
+                public int read(byte[] buffer,int offset,int length){if(length==0)return 0;int n=read();if(n<0)return -1;buffer[offset]=(byte)n;return 1;}
+            };
             return new ByteArrayInputStream(new byte[mode.equals("truncated")&&url.getHost().equals(JmApi.IMAGE_HOSTS[0])?512:1024]);
         }
     }
@@ -43,6 +50,15 @@ public class JmApiTransportTest {
         api=api("slow");
         for(int i=0;i<16;i++)api.image("123456",i+".jpg",root.resolve(i+".raw").toFile(),0);
         check(calls.subList(8,16).stream().noneMatch(h->h.equals(JmApi.IMAGE_HOSTS[0])));check(disconnects==0);
+        // Legacy defaults enable slow detection (30 KB/s, 90 s). A 1 B/s body
+        // must finish on its original connection beyond that observation window.
+        api=api("trickle");api.image("123456","1.jpg",root.resolve("trickle.raw").toFile(),0);
+        byte[] body=Files.readAllBytes(root.resolve("trickle.raw"));
+        check(calls.size()==1);check(disconnects==0);check(body.length==128);check(api.control.bytes.get()==128);
+        for(int i=0;i<body.length;i++)check(body[i]==(byte)i);
+        check(api.control.stop.isEmpty());
+        api=api("timeout");api.image("123456","1.jpg",root.resolve("timeout.raw").toFile(),0);
+        check(calls.size()==2);check(disconnects==1);check(Files.size(root.resolve("timeout.raw"))==1024);
         api=api("truncated");api.image("123456","1.jpg",root.resolve("truncated.raw").toFile(),0);
         check(calls.size()==2);check(Files.size(root.resolve("truncated.raw"))==1024);check(api.control.bytes.get()==1536);check(disconnects==1);
         api=api("denied");

@@ -15,7 +15,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.40 / Android 0.6.23 — 页面间距与切页状态\n\n发布日期：2026-10-25\n\nWindows 0.3.39 → 0.3.40；Android 0.6.22 → 0.6.23（versionCode 623）。沿用原包名、Android 签名及更新公钥，可覆盖安装。\n\n• 缩小导出弹窗高度，减少标题、格式选项、编号开关和操作按钮之间的空白，保留控件大小与导出功能。\n• 删除下载页“点击任务停止 · 长按批量操作”提示。\n• 下载页与漫画库切换后退出批量/移动模式、取消勾选并滚到顶部；漫画库返回首页，保留当前排序。\n• 进入设置页后同样清理当前页面的临时状态，保留下载任务、漫画文件、收藏和阅读记录；修复 Android 滚动回调把列表拉回旧位置的问题。\n• 两页交界贴近工具栏实际下沿，仅留 8 像素／dp 间隔，大窗口不再额外扩大留白，保留完整按钮和原有切换动画。\n\n以上修改已在本地阶段通过 Windows 实际界面及最终 EXE 模块、BlueStacks 5 / Android 9 常用尺寸与窄屏大字号检查。本次正式构建复核源码一致性、原签名、更新清单和安装包校验，未重复无关功能测试；未测试实体手机。\n";
+    private static final String CURRENT_NOTES="Android 0.6.24 — 分享修复\n\n发布日期：2026-10-26\n\nAndroid 0.6.23 → 0.6.24（versionCode 624）。沿用原包名、签名及更新公钥，可覆盖安装并保留数据。Windows 正式版保持 0.3.40。\n\n• 修复单文件也按多文件发送、PDF/ZIP 统一标为通用文件导致部分分享应用不显示的问题；混合格式批量分享使用通配类型。\n• 修复大写 .PDF 在文件提供接口和保存目录分享中被误识别为 ZIP。\n• 漫画库分享前在后台检查所有选中文件的位置与读取权限；缺失或授权失效时先提示，取消或关闭后不再打开分享面板。\n• 纳入此前已验证的 Android 本地修订：取消慢速阈值触发的断连，保留无进度恢复和请求超时；下载失败直接显示原因；设置中可打开当前保存目录；修复添加下载及共用弹窗显示后的二次定位时序。\n\n验证：Android 10/15 框架 20 项分享专项通过，覆盖单/多文件、混合格式、大写扩展名、文件读取、模拟 SAF 权限失败、实际分享按钮以及取消/关闭保护。沿用此前其他修订的专项验证；本轮未测试实体手机或第三方应用实际接收。原签名与更新清单签名、安装包和源码一致性在发布前核验。\n\n安装：暂停下载后覆盖安装 APK，无需卸载或清除数据。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

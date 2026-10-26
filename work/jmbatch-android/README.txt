@@ -1,4 +1,6 @@
-JM Batch 0.6.23 — Android 使用说明
+JM Batch 0.6.24 — Android 使用说明
+
+本版修复单/多文件分享、文件类型识别及分享前可读性检查，并包含取消慢速检测、失败原因显示、打开当前保存目录与弹窗定位修订。
 
 本版收紧两页间距与导出弹窗，删除下载提示；切页后重置临时选择、移动与滚动状态，并保留漫画库排序。
 
@@ -12,11 +14,11 @@ JM Batch 0.6.23 — Android 使用说明
 4. ZIP 只含图片，图片文件夹另含相册隐藏标记 .nomedia：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。导出和文件删除前请暂停下载并等待请求退出。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
-安装包下载（2026-10-24）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.40-0.6.23/JMBatch-0.6.23-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.40-0.6.23/JMBatch-0.6.23-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-0.3.40-0.6.23/JMBatch-0.6.23-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-0.3.40-0.6.23/SHA256-release-0.3.40-0.6.23.txt
+安装包下载（2026-10-26）
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.24/JMBatch-0.6.24-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.24/JMBatch-0.6.24-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.24/JMBatch-0.6.24-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.24/SHA256-release-android-0.6.24.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 

@@ -360,7 +360,23 @@ public final class LibraryScreen {
     }
     private void sortMenu(){PopupMenu menu=new PopupMenu(activity,sortButton);String[] names={"名称","时间","大小","章节数"},values={"name","time","size","chapters"};for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,i,names[i]);menu.setOnMenuItemClickListener(item->{sort=values[item.getItemId()];pendingViewState=new Bundle();if(!sort.equals("time"))sortCached();else load();return true;});menu.show();}
 
-    private void shareSelection(){List<LibraryStore.Entry> items=selection();ArrayList<Uri> uris=new ArrayList<>();for(LibraryStore.Entry item:items){if(item.format.equals("images")){message("图片文件夹请先导出为 pdf 或 zip 后分享");return;}uris.add(Uri.parse(item.uri));}if(uris.isEmpty())return;Intent intent=new Intent(Intent.ACTION_SEND_MULTIPLE).setType("application/octet-stream").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM,uris);android.content.ClipData clip=android.content.ClipData.newRawUri("漫画",uris.get(0));for(int i=1;i<uris.size();i++)clip.addItem(new android.content.ClipData.Item(uris.get(i)));intent.setClipData(clip);try{activity.startActivity(Intent.createChooser(intent,"分享"));}catch(Exception error){message("没有支持分享的应用");}}
+    private void shareSelection(){shareItems(selection());}
+    private void shareItems(List<LibraryStore.Entry> items){
+        if(items.isEmpty())return;
+        for(LibraryStore.Entry item:items)if(item.format.equals("images")){message("图片文件夹请先导出为 PDF 或 ZIP 后分享");return;}
+        final Intent[] ready=new Intent[1];
+        perform(()->{
+            CancellationSignal signal=new CancellationSignal();scanSignal=signal;
+            if(cancelled.get())signal.cancel();
+            ready[0]=FileSharing.prepare(activity,items,signal);
+            return "";
+        },()->{
+            if(cancelled.get()||ready[0]==null)return;
+            try{activity.startActivity(Intent.createChooser(ready[0],"分享文件"));}
+            catch(ActivityNotFoundException error){message("没有支持分享此文件的应用。");}
+            catch(SecurityException error){message("文件读取权限已失效，请重新选择原保存目录授权后重试。");}
+        });
+    }
     private void beginMove(){
         movingItems=selection();if(movingItems.isEmpty())return;
         moveOrigin=collection;moveViewport=viewportState();moving=true;batchMode=false;
@@ -393,7 +409,7 @@ public final class LibraryScreen {
             if(index==0){read(entry);return;}
             if(index==1&&entry.format.equals("images")){message("图片文件夹请先导出为 ZIP 或 PDF 后分享。");return;}
             if(index==5){new ExportScreen(activity,store,Collections.singletonList(entry),this::load).show();return;}
-            if(index==0||index==1)perform(()->{library.check(entry);return "";},()->open(entry,index==1));
+            if(index==1)shareItems(Collections.singletonList(entry));
             else if(index==2)perform(()->{library.favorite(entry);return "已更新收藏";},null);
             else if(index==3)new SavedDirectory(activity,entry.tree,entry.label).openExternal();
             else new SavedDirectory(activity,entry.tree,entry.label).show();
@@ -452,12 +468,5 @@ public final class LibraryScreen {
                     }).show();
             }));picker.show();
         });
-    }
-    private void open(LibraryStore.Entry entry,boolean share){
-        if(!share){read(entry);return;}
-        Uri uri=Uri.parse(entry.uri);String mime=entry.format.equals("pdf")?"application/pdf":"application/zip";
-        Intent intent=new Intent(share?Intent.ACTION_SEND:Intent.ACTION_VIEW).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.setClipData(ClipData.newRawUri("漫画",uri));
-        if(share){intent.setType(mime);intent.putExtra(Intent.EXTRA_STREAM,uri);}else intent.setDataAndType(uri,mime);
-        try{activity.startActivity(Intent.createChooser(intent,share?"分享文件":"打开文件"));}catch(Exception e){message("没有支持此格式的应用，或文件权限不可用。");}
     }
 }
