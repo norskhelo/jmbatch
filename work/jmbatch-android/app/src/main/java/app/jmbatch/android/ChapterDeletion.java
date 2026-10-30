@@ -99,11 +99,7 @@ public final class ChapterDeletion {
     }
     public static String delete(Context context,Store store,LibraryStore.Entry item,Plan expected,Set<Integer> removed,
                                 BooleanSupplier cancelled,Consumer<String> progress)throws Exception {
-        synchronized(store){
-            if(store.running||store.libraryBusy)throw new IOException("请先暂停下载队列，再删除章节");
-            for(Store.Task task:store.tasks)if(Arrays.asList("running","resetting","cancelling","cancel_failed").contains(task.status)||task.id.equals(item.id)&&task.status.equals("queued"))throw new IOException("下载任务尚未停止，请先暂停或取消");
-            store.libraryBusy=true;
-        }
+        store.beginFileOperation(Collections.singletonList(item));
         File temp=null;Uri replacement=null;final Uri[] owned={null};boolean committed=false;
         try{
             Plan current=inspect(context,item,cancelled,progress);
@@ -164,10 +160,11 @@ public final class ChapterDeletion {
             LibraryCover.forget(context,item);
             return "已从漫画库删除 "+removed.size()+" 章，保留 "+(current.counts.size()-removed.size())+" 章。"+warning;
         }finally{
-            store.libraryBusy=false;
-            if(temp!=null)Downloader.deleteOwned(temp,temp.getParentFile());
-            Uri abandoned=replacement!=null?replacement:owned[0];
-            if(abandoned!=null&&!committed){AlbumStorage.remove(context,abandoned);if(item.format.equals("images"))AlbumStorage.forget(context,abandoned);}
+            try{
+                if(temp!=null)Downloader.deleteOwned(temp,temp.getParentFile());
+                Uri abandoned=replacement!=null?replacement:owned[0];
+                if(abandoned!=null&&!committed){AlbumStorage.remove(context,abandoned);if(item.format.equals("images"))AlbumStorage.forget(context,abandoned);}
+            }finally{store.endFileOperation();}
         }
     }
 }

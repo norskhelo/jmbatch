@@ -13,6 +13,12 @@ import android.widget.*;
 public final class Ui {
     private static final class CompactInput extends EditText {
         CompactInput(Context context){super(context);}
+        @Override protected void onTextChanged(CharSequence text,int start,int before,int count){
+            super.onTextChanged(text,start,before,count);
+            // TextView can skip measurement while the empty hint is capped to one
+            // line. Always remeasure edits so both wrapping and deletion resize us.
+            requestLayout();
+        }
         @Override protected void onMeasure(int width,int height){
             // A long hint must not expand an empty field; entered text can wrap freely.
             int lines=length()==0?1:Integer.MAX_VALUE;

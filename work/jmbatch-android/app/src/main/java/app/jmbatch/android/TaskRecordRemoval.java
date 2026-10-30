@@ -10,10 +10,10 @@ public final class TaskRecordRemoval {
     }
     public static Result prepare(Store store,Set<String> selected)throws Exception {
         synchronized(store){
-            if(store.libraryBusy)throw new IOException("正在管理漫画文件，请稍后再删除任务");
+            if(store.globalFileOperation())throw new IOException("正在管理漫画文件，请稍后再删除任务");
             List<Store.Task> before=new ArrayList<>(store.tasks),targets=new ArrayList<>();
             for(Store.Task task:before){
-                boolean busy=store.activeKeys.contains(task.key)||Arrays.asList("running","resetting","cancelling").contains(task.status);
+                boolean busy=store.fileBlocked(task)||store.activeKeys.contains(task.key)||Arrays.asList("running","resetting","cancelling").contains(task.status);
                 if(selected!=null){
                     if(!selected.contains(task.key))continue;
                     if(busy)throw new IOException("请先暂停选中的下载任务，或等待文件清理完成");

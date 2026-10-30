@@ -15,7 +15,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Android 0.6.24 — 分享修复\n\n发布日期：2026-10-26\n\nAndroid 0.6.23 → 0.6.24（versionCode 624）。沿用原包名、签名及更新公钥，可覆盖安装并保留数据。Windows 正式版保持 0.3.40。\n\n• 修复单文件也按多文件发送、PDF/ZIP 统一标为通用文件导致部分分享应用不显示的问题；混合格式批量分享使用通配类型。\n• 修复大写 .PDF 在文件提供接口和保存目录分享中被误识别为 ZIP。\n• 漫画库分享前在后台检查所有选中文件的位置与读取权限；缺失或授权失效时先提示，取消或关闭后不再打开分享面板。\n• 纳入此前已验证的 Android 本地修订：取消慢速阈值触发的断连，保留无进度恢复和请求超时；下载失败直接显示原因；设置中可打开当前保存目录；修复添加下载及共用弹窗显示后的二次定位时序。\n\n验证：Android 10/15 框架 20 项分享专项通过，覆盖单/多文件、混合格式、大写扩展名、文件读取、模拟 SAF 权限失败、实际分享按钮以及取消/关闭保护。沿用此前其他修订的专项验证；本轮未测试实体手机或第三方应用实际接收。原签名与更新清单签名、安装包和源码一致性在发布前核验。\n\n安装：暂停下载后覆盖安装 APK，无需卸载或清除数据。\n";
+    private static final String CURRENT_NOTES="Android 0.6.25 — 添加下载多行输入修复\n\n发布日期：2026-10-30\n\nAndroid 0.6.24 → 0.6.25（versionCode 625）。沿用原包名、签名及更新公钥，可覆盖安装并保留数据。Windows 正式版保持 0.3.40。\n\n• 修复添加下载输入框输入、粘贴多行后仍保持单行高度的问题；手动换行和自动换行会撑高输入框，删减后恢复紧凑高度，弹窗同步调整。\n• 保留输入框的原有样式、弹窗居中位置、格式选项和操作按钮。\n• 保留修复包中此前已验证的 Android 本地修订：进入软件时优先恢复下载封面；允许下载期间操作其他漫画的文件；阅读页码移到底部中央，下载列表显示总实时速度。\n\n验证：沿用修复阶段 Android 10/15 共 12 项框架检查及原生文字渲染核对，覆盖键入换行、多行粘贴、窄屏自动换行、删减恢复、弹窗高度和定位；Windows 15 项实际 Tk 检查正常。发布版业务源码与已验证修复包一致，仅调整版本信息和公告。已核验原 APK v2/v3 签名、签名更新清单、源码包与安装包摘要。此次输入框修复未测试实体手机、模拟器或软键盘。\n\n安装：暂停下载后覆盖安装 APK，无需卸载或清除数据。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

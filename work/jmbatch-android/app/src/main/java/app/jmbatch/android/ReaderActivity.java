@@ -53,7 +53,7 @@ public final class ReaderActivity extends Activity {
     private String lastSaved="";
     private int viewportWidth,viewportHeight;
     private int noticeTarget=-1;
-    private TextView status;
+    private TextView status,pageCounter;
     private final Runnable loadingNotice=()->{if(!closed&&pager!=null&&pager.target()!=pager.displayed()&&cache.get(job(pager.target()).key)==null&&!errors.containsKey(pager.target()))status.setText(statusText()+"\n正在加载第 "+(pager.target()+1)+" 页…");};
     private Button chapterButton,favoriteButton,modeButton,markButton;
     private ActionRow pageNavigation;
@@ -81,10 +81,13 @@ public final class ReaderActivity extends Activity {
         chapterButton=button("章节列表",this::chooseChapter);favoriteButton=button("收藏",this::favorite);modeButton=button("滚动阅读",this::toggleMode);
         markButton=button("书签",this::showBookmarkInput);controls.addView(new ActionRow(this,chapterButton,favoriteButton,markButton,button("跳转",this::jumpPage)).keepSingleRow());
         viewport=new ReaderViewport(this);viewport.setBackgroundColor(Color.WHITE);viewport.setOnClickListener(v->{if(ready&&!closed){chrome.toggle();updateChromeDescription();}});
+        FrameLayout readingArea=new FrameLayout(this);readingArea.addView(viewport,new FrameLayout.LayoutParams(-1,-1));
+        pageCounter=Ui.text(this,"0/0",12);pageCounter.setTextColor(Color.BLACK);pageCounter.setBackgroundColor(Color.WHITE);pageCounter.setPadding(dp(6),dp(2),dp(6),dp(2));
+        FrameLayout.LayoutParams counterParams=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);counterParams.setMargins(dp(12),0,dp(12),dp(8));readingArea.addView(pageCounter,counterParams);
         LinearLayout navigation=Ui.column(this);navigation.setBackgroundColor(Color.WHITE);navigation.setPadding(dp(12),dp(4),dp(12),dp(10));
         status=Ui.text(this,"正在读取漫画…",12);status.setGravity(Gravity.CENTER);status.setTextColor(Ui.MUTED);status.setLines(2);
         pageNavigation=Ui.pair(this,button("上一页",()->step(-1)),button("下一页",()->step(1)));navigation.addView(pageNavigation);
-        chrome=new ReaderChrome(this,new ControlScroll(this,controls),new ControlScroll(this,navigation),viewport,()->{
+        chrome=new ReaderChrome(this,new ControlScroll(this,controls),new ControlScroll(this,navigation),readingArea,()->{
             if(closed)return;
             getWindow().getDecorView().setSystemUiVisibility(chrome.controlsVisible()?View.SYSTEM_UI_FLAG_VISIBLE:
                 View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
@@ -146,6 +149,7 @@ public final class ReaderActivity extends Activity {
     private void update(){
         text(favoriteButton,entry.favorite?"取消收藏":"收藏");text(modeButton,scroll?"滚动阅读":"左右翻页");text(markButton,"书签");pageNavigation.setVisibility(scroll?View.GONE:View.VISIBLE);
         if(!ready)return;
+        text(pageCounter,(page+1)+"/"+chapters.length);
         int chapter=ReaderRules.chapter(starts,page);
         text(chapterButton,"章节列表");
         text(status,statusText()+"\n"+(checkStatus.isEmpty()?"点按漫画隐藏或显示工具栏"+(!scroll?(verticalPages?" · 上下滑动翻页":" · 左右滑动翻页"):""):checkStatus));

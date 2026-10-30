@@ -19,12 +19,36 @@ public final class CoverDiskCache {
         public final String dependency,stamp;
         public Value(byte[] image,String dependency,String stamp){this.image=image;this.dependency=dependency;this.stamp=stamp;}
     }
+    public static final class Snapshot {
+        public final String source;public final byte[] image;
+        Snapshot(String source,byte[] image){this.source=source;this.image=image;}
+    }
     private final File root;
     public CoverDiskCache(File root){this.root=root;}
     File file(String key)throws Exception {
         byte[] digest=MessageDigest.getInstance("SHA-256").digest(key.getBytes(StandardCharsets.UTF_8));
         StringBuilder name=new StringBuilder();for(byte b:digest)name.append(String.format(Locale.ROOT,"%02x",b&255));
         return new File(root,name+".cover");
+    }
+    /** Local thumbnail only. The caller must validate original storage asynchronously. */
+    public Snapshot peek(String key){
+        try{
+            File file=file(key);if(file.length()>MAX_ENTRY)return null;
+            try(DataInputStream input=new DataInputStream(new FileInputStream(file))){
+                if(input.readInt()!=1)return null;
+                String source=input.readUTF();input.readUTF();input.readUTF();
+                int size=input.readInt();if(size<=0||size>MAX_ENTRY)return null;
+                byte[] bytes=new byte[size];input.readFully(bytes);if(input.read()!=-1)return null;
+                return new Snapshot(source,bytes);
+            }
+        }catch(Exception ignored){return null;}
+    }
+    /** Save an already validated preview, including repairs at the same URI. */
+    public void remember(String key,String source,byte[] image)throws Exception {
+        if(image==null||image.length==0||image.length>MAX_ENTRY)return;
+        synchronized(locks[(key.hashCode()&0x7fffffff)%locks.length]){
+            write(file(key),source,new Value(image,"",""));
+        }
     }
     public byte[] get(String key,String uri,Stamps stamps,Loader loader)throws Exception {
         File file=file(key);

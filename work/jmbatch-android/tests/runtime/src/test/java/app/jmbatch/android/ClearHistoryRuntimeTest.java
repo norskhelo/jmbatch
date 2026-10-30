@@ -157,10 +157,11 @@ public class ClearHistoryRuntimeTest {
         LinearLayout.LayoutParams params=(LinearLayout.LayoutParams)pages.getLayoutParams();params.height=Ui.dp(activity,360);params.weight=0;pages.setLayoutParams(params);
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(350));assertEquals(Ui.dp(activity,360),pages.getHeight());assertMenuVisible();
     }
-    @Test public void taskMenuSurvivesPageRoundTrip()throws Exception {
+    @Test public void taskMenuResetsAfterPageRoundTrip()throws Exception {
         select(task("paused"));assertMenuVisible();
         for(boolean library:new boolean[]{true,false}){call(activity,"setFrontPage",new Class<?>[]{boolean.class,boolean.class},library,true);shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1200));}
-        assertMenuVisible();button(menu(),"返回").performClick();assertEquals(View.GONE,menu().getVisibility());
+        assertEquals(View.GONE,menu().getVisibility());assertFalse(field(MainActivity.class,"selecting").getBoolean(activity));
+        assertEquals(1,store.tasks.size());
     }
     @Test public void taskMenuDeleteRemovesOnlySelectedRecord()throws Exception {
         Store.Task first=task("paused"),second=task("paused");store.save();select(first);assertMenuVisible();button(menu(),"删除任务").performClick();choose(ShadowAlertDialog.getLatestAlertDialog(),"确认");

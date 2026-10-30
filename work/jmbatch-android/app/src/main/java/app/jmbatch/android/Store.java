@@ -17,6 +17,33 @@ public final class Store {
     public final Set<String> activeKeys = java.util.concurrent.ConcurrentHashMap.newKeySet();
     public volatile boolean running;
     public volatile boolean libraryBusy;
+    // null denotes a global cache operation; non-null reserves only these books.
+    private List<LibraryStore.Entry> fileTargets;
+
+    private boolean conflicts(Task task,LibraryStore.Entry item) {
+        return (!task.resultUri.isEmpty()&&task.resultUri.equals(item.uri))||
+            (!task.cleanupUri.isEmpty()&&task.cleanupUri.equals(item.uri))||
+            (task.id.equals(item.id)&&task.settings.outputUri.equals(item.tree));
+    }
+    public synchronized boolean globalFileOperation() {return libraryBusy&&fileTargets==null;}
+    public synchronized boolean fileBlocked(Task task) {
+        if(!libraryBusy)return false;
+        if(fileTargets==null)return true;
+        for(LibraryStore.Entry item:fileTargets)if(conflicts(task,item))return true;
+        return false;
+    }
+    public synchronized void beginFileOperation(List<LibraryStore.Entry> items)throws IOException {
+        if(libraryBusy)throw new IOException("正在进行其他文件操作，请稍后重试");
+        for(Task task:tasks)if(activeKeys.contains(task.key)||Arrays.asList("queued","running","resetting","cancelling","cancel_failed").contains(task.status))
+            for(LibraryStore.Entry item:items)if(conflicts(task,item))
+                throw new IOException("所选漫画仍有待下载或进行中的任务，请先暂停或取消该漫画的任务");
+        fileTargets=new ArrayList<>(items);libraryBusy=true;
+    }
+    public synchronized void endFileOperation() {fileTargets=null;libraryBusy=false;}
+    public synchronized boolean hasQueuedTasks() {
+        for(Task task:tasks)if(task.status.equals("queued"))return true;
+        return false;
+    }
     public volatile String note = "";
     public volatile String cleanupNotice = "";
     public volatile String galleryNotice = "";
@@ -143,9 +170,9 @@ public final class Store {
         for (String id : ids) if (exists.add(id + "|" + options.format + "|" + options.outputUri)) { tasks.add(new Task(id, options)); count++; }
         settings = new Settings(options.json()); save(); return count;
     }
-    public synchronized Task next() { for (Task t : tasks) if (t.status.equals("queued") && !activeKeys.contains(t.key)) return t; return null; }
+    public synchronized Task next() { for (Task t : tasks) if (t.status.equals("queued") && !activeKeys.contains(t.key) && !fileBlocked(t)) return t; return null; }
     public synchronized Task addChapterUpdate(String id,List<ChapterRules.Chapter> catalog,List<ChapterRules.Chapter> chapters,Settings options)throws IOException {
-        if(libraryBusy)throw new IOException("正在管理文件，请稍后下载。");
+        if(globalFileOperation())throw new IOException("正在清理缓存，请稍后下载。");
         if(tasks.size()>=5000)throw new IOException("最多保留 5000 条记录，请先清理已完成记录。");
         for(Task t:tasks)if(t.id.equals(id)&&!t.status.equals("done")&&!t.status.equals("cancelled"))
             throw new IOException("该漫画已有未完成任务，请先继续、重试或取消原任务。");

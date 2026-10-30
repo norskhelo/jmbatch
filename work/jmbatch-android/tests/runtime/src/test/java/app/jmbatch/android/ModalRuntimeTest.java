@@ -47,6 +47,14 @@ public class ModalRuntimeTest {
         Method m=MainActivity.class.getDeclaredMethod("addDownload");m.setAccessible(true);m.invoke(activity);
         dialog=(AlertDialog)field(activity,"addDialog");
     }
+    void preview(String name)throws Exception {
+        View decor=dialog.getWindow().getDecorView();
+        android.graphics.Bitmap image=android.graphics.Bitmap.createBitmap(decor.getWidth(),decor.getHeight(),android.graphics.Bitmap.Config.ARGB_8888);
+        decor.draw(new android.graphics.Canvas(image));
+        java.io.File directory=new java.io.File(System.getProperty("jm.test.classes"),"download-input-preview");directory.mkdirs();
+        try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(directory,name+"-"+Build.VERSION.SDK_INT+".png"))){image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}
+        finally{image.recycle();}
+    }
     void assertReady(){
         Window window=dialog.getWindow();WindowManager.LayoutParams params=window.getAttributes();
         int expected=Math.min(Ui.dp(activity,480),activity.getResources().getDisplayMetrics().widthPixels-Ui.dp(activity,36));
@@ -75,6 +83,35 @@ public class ModalRuntimeTest {
     }
     @Test @Config(qualifiers="w720dp-h1000dp-mdpi")
     public void wideDownloadUsesCappedWidthImmediately()throws Exception {openDownload();assertStableAfterCallbacks();assertEquals(480,dialog.getWindow().getAttributes().width);}
+    @Test public void downloadInputGrowsAfterTypingAndShrinksAfterClearing()throws Exception {
+        openDownload();shadowOf(Looper.getMainLooper()).idle();
+        EditText ids=(EditText)field(activity,"ids");
+        int base=ids.getHeight();assertTrue(base>0);
+        ids.getText().append("123456");shadowOf(Looper.getMainLooper()).idle();
+        assertEquals("One line keeps the compact height",base,ids.getHeight());
+        ids.getText().append("\n234567\n345678");shadowOf(Looper.getMainLooper()).idle();
+        assertTrue("Typing multiple lines must grow the visible input",ids.getHeight()>base);
+        assertTrue("All entered lines fit",ids.getHeight()>=ids.getLayout().getHeight()+ids.getPaddingTop()+ids.getPaddingBottom());
+        ids.getText().clear();shadowOf(Looper.getMainLooper()).idle();
+        assertEquals("Clearing restores the compact height",base,ids.getHeight());
+    }
+    @Test @Config(qualifiers="w320dp-h600dp-mdpi") @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    public void downloadInputGrowsForPasteAndSoftWrapping()throws Exception {
+        openDownload();shadowOf(Looper.getMainLooper()).idle();
+        EditText ids=(EditText)field(activity,"ids");int base=ids.getHeight();assertTrue(base>0);
+        int initialDialogHeight=dialog.getWindow().getDecorView().getHeight();preview("empty");
+        ids.getText().append("123456\n234567\n345678");shadowOf(Looper.getMainLooper()).idle();
+        assertTrue("Pasting into an empty field must grow it",ids.getHeight()>base);
+        assertTrue("The dialog grows with the input",dialog.getWindow().getDecorView().getHeight()>initialDialogHeight);preview("multiline");
+        ids.getText().replace(0,ids.length(),"123456 234567 345678 456789 567890 678901 789012 890123");
+        shadowOf(Looper.getMainLooper()).idle();
+        assertTrue("Long space-separated input wraps",ids.getLineCount()>1);
+        assertTrue("Soft wrapping must grow the input",ids.getHeight()>base);
+        assertTrue("Wrapped lines fit without clipping",ids.getHeight()>=ids.getLayout().getHeight()+ids.getPaddingTop()+ids.getPaddingBottom());preview("wrapped");
+        ids.getText().replace(0,ids.length(),"123456");shadowOf(Looper.getMainLooper()).idle();
+        assertEquals(base,ids.getHeight());
+        assertEquals(initialDialogHeight,dialog.getWindow().getDecorView().getHeight());
+    }
     @Test @Config(qualifiers="w320dp-h600dp-mdpi")
     public void narrowDownloadUsesAvailableWidthImmediately()throws Exception {openDownload();assertStableAfterCallbacks();assertEquals(284,dialog.getWindow().getAttributes().width);}
     @Test public void callerShowListenerCannotReplaceWindowSetup(){

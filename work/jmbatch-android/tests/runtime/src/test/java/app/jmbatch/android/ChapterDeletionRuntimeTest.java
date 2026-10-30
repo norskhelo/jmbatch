@@ -108,7 +108,7 @@ public class ChapterDeletionRuntimeTest {
         Files.write(new File(root,"0001/00001.jpg").toPath(),new byte[]{1,2,3,4});
         try{ChapterDeletion.delete(context,store,old,plan,Collections.singleton(2),()->false,t->{});fail();}catch(IOException expected){}
         Files.write(new File(root,"personal.txt").toPath(),new byte[]{1});try{ChapterDeletion.inspect(context,old,()->false);fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("额外"));}
-        store.running=true;try{ChapterDeletion.delete(context,store,old,plan,Collections.singleton(2),()->false,t->{});fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("暂停"));}
+        store.running=true;store.tasks.get(0).status="running";try{ChapterDeletion.delete(context,store,old,plan,Collections.singleton(2),()->false,t->{});fail();}catch(IOException expected){assertTrue(expected.getMessage().contains("暂停"));}
         assertTrue(root.exists());assertFalse(store.libraryBusy);
     }
     @Test public void safCleanupFailureKeepsReplacementAndReportsOldUri()throws Exception {

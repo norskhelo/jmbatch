@@ -190,23 +190,16 @@ public final class LibraryStore {
             if(name==null||!LibraryRules.supported(name)||DocumentsContract.Document.MIME_TYPE_DIR.equals(mime))throw new IOException("只允许操作 PDF / ZIP 文件，不允许删除目录");
         }
     }
-    private void beginRemoval(Store store)throws IOException {
-        synchronized(store){
-            if(store.libraryBusy||store.running)throw new IOException("请先暂停下载队列，再删除文件或移除记录");
-            for(Store.Task task:store.tasks)if(task.status.equals("running")||task.status.equals("resetting"))throw new IOException("下载任务正在停止，请稍后再试");
-            store.libraryBusy=true;
-        }
-    }
     public void remove(Store store,Entry item,boolean delete)throws IOException {
-        beginRemoval(store);
-        try{removeOne(store,item,delete);}finally{store.libraryBusy=false;}
+        store.beginFileOperation(Collections.singletonList(item));
+        try{removeOne(store,item,delete);}finally{store.endFileOperation();}
     }
     public BatchOperations.Result removeMany(Store store,List<Entry> selected,boolean delete,java.util.function.BooleanSupplier cancelled,java.util.function.BiConsumer<Integer,Integer> progress)throws IOException {
-        beginRemoval(store);
+        store.beginFileOperation(selected);
         try{
             LinkedHashMap<String,Entry> unique=new LinkedHashMap<>();for(Entry item:selected)unique.put(item.uri,item);
             return BatchOperations.run(new ArrayList<>(unique.values()),item->removeOne(store,item,delete),cancelled,item->item.title,progress);
-        }finally{store.libraryBusy=false;}
+        }finally{store.endFileOperation();}
     }
     private void removeOne(Store store,Entry item,boolean delete)throws IOException {
         synchronized(this){writable();if(!entries.containsKey(item.uri))throw new IOException("记录已移除，请刷新");}
@@ -225,8 +218,8 @@ public final class LibraryStore {
                     if(delete){task.status="cancelled";task.phase="文件已删除，可重新下载";}
                 }
                 store.save();
+                synchronized(this){LinkedHashMap<String,Entry> next=new LinkedHashMap<>(entries);next.remove(item.uri);persist(next);}
             }
-            synchronized(this){LinkedHashMap<String,Entry> next=new LinkedHashMap<>(entries);next.remove(item.uri);persist(next);}
             LibraryCover.forget(context,item);
         }catch(IOException failure){throw new IOException((delete?"文件已删除，但记录保存失败：":"记录保存失败：")+failure.getMessage(),failure);}
     }

@@ -32,7 +32,7 @@ public final class MainActivity extends Activity {
     private android.animation.ValueAnimator settingsAnimation;
     private LibraryScreen libraryScreen;
     private EditText ids,rangeFirst,rangeLast;
-    private TextView output,summary,global;
+    private TextView output,summary,global,totalSpeed;
     private Button start,pause,more;
     private final Handler handler=new Handler(Looper.getMainLooper());
     private final Map<String,Row> rows=new LinkedHashMap<>();
@@ -78,9 +78,12 @@ public final class MainActivity extends Activity {
         taskActions=horizontal();taskActions.addView(start,new LinearLayout.LayoutParams(-2,-2));Button clear=Ui.iconButton(this,"trash","清除下载记录",()->confirmRemoval(this::clearHistory));LinearLayout.LayoutParams clearParams=new LinearLayout.LayoutParams(-2,-2);clearParams.leftMargin=dp(8);taskActions.addView(clear,clearParams);layout.addView(taskActions);
         summary=text("",12,MUTED);global=text("",12,MUTED);
         FrameLayout listPanel=new FrameLayout(this);listPanel.setBackground(Ui.shape(this,Color.WHITE,18,true));LinearLayout.LayoutParams listParams=new LinearLayout.LayoutParams(-1,0,1);listParams.topMargin=dp(16);listParams.bottomMargin=dp(12);layout.addView(listPanel,listParams);
-        LinearLayout listBody=column();listBody.setPadding(dp(18),dp(10),dp(18),dp(22));listPanel.addView(listBody,new FrameLayout.LayoutParams(-1,-1));TextView listTitle=Ui.heading(this,"下载列表");listTitle.setTextSize(17);listBody.addView(listTitle);
+        LinearLayout listBody=column();listBody.setPadding(dp(18),dp(10),dp(18),dp(22));listPanel.addView(listBody,new FrameLayout.LayoutParams(-1,-1));TextView listTitle=Ui.heading(this,"下载列表");listTitle.setTextSize(17);
+        LinearLayout listHeading=horizontal();listHeading.setGravity(Gravity.CENTER_VERTICAL);listHeading.addView(listTitle,new LinearLayout.LayoutParams(0,-2,1));
+        totalSpeed=text("下载总速度  0 B/s",12,INK);LinearLayout.LayoutParams speedParams=new LinearLayout.LayoutParams(-2,-2);speedParams.leftMargin=dp(8);listHeading.addView(totalSpeed,speedParams);listBody.addView(listHeading);
         ScrollView scroll=taskScroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setOnScrollChangeListener((view,x,y,oldX,oldY)->{refreshDownloadCovers();if(y>oldY&&y+scroll.getHeight()>=queue.getHeight()-dp(50)&&limit<store.snapshot().size()){limit+=50;render();}});
         queue=column();scroll.addView(queue);listBody.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));more=button("显示更多任务",v->{limit+=50;render();});
+        scroll.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob)->refreshDownloadCovers());
         Button add=buttonAccent("＋",v->addDownload());add.setTextSize(Ui.ADD_ACTION_TEXT_SIZE);Ui.square(add);add.setContentDescription("添加下载");add.setBackground(Ui.circle(ACCENT));add.setElevation(dp(5));FrameLayout.LayoutParams fab=new FrameLayout.LayoutParams(-2,Ui.controlHeight(add),Gravity.BOTTOM|Gravity.RIGHT);fab.setMargins(0,0,dp(16),dp(14));listPanel.addView(add,fab);listBody.addView(new View(this),new LinearLayout.LayoutParams(1,Ui.controlHeight(add)+dp(8)));
         taskSheet=column();taskSheet.setPadding(dp(18),dp(20),dp(18),dp(24));taskSheet.setBackground(Ui.shape(this,Color.WHITE,18,true));taskSheet.setElevation(dp(10));selectedCount=text("",16,INK);selectedCount.setGravity(Gravity.CENTER);selectedCount.setTypeface(null,Typeface.BOLD);taskSheet.addView(selectedCount);Ui.gap(taskSheet,20);taskSheet.addView(Ui.pair(this,buttonAccent("删除任务",v->removeSelected()),button("返回",v->exitSelection())));FrameLayout.LayoutParams sheetParams=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);panel.addView(taskSheet,sheetParams);taskSheet.setVisibility(View.GONE);
         libraryHost=new FrameLayout(this);libraryHost.setBackground(pageBackground(false));pages.addView(libraryHost,new FrameLayout.LayoutParams(-1,-1));
@@ -272,7 +275,7 @@ public final class MainActivity extends Activity {
         List<Store.Task> tasks=store.snapshot();int completed=0,failed=0,active=0;long speed=0;
         Set<String> visible=new HashSet<>();
         for(int i=0;i<tasks.size();i++){
-            Store.Task task=tasks.get(i);if(task.status.equals("done"))completed++;if(task.status.equals("failed"))failed++;if(task.status.equals("running")||task.status.equals("resetting")){active++;speed+=task.speed;}
+            Store.Task task=tasks.get(i);if(task.status.equals("done"))completed++;if(task.status.equals("failed"))failed++;if(task.status.equals("running")||task.status.equals("resetting")){active++;speed+=Math.max(0,task.speed);}
             if(i>=limit)continue;visible.add(task.key);Row row=rows.get(task.key);if(row==null){row=new Row(task);rows.put(task.key,row);queue.addView(row.card);}
             Ui.setText(row.title,task.title.isEmpty()?"JM"+task.id:task.title);
             Ui.setText(row.state,Store.status(task.status)+(task.status.equals("done")?"":" · "+task.done+"/"+task.total));Ui.setText(row.percent,String.format(Locale.ROOT,"%.0f%%",DownloadDisplay.percent(task.done,task.total,task.status)));
@@ -291,6 +294,7 @@ public final class MainActivity extends Activity {
         }
         Iterator<Map.Entry<String,Row>> iterator=rows.entrySet().iterator();while(iterator.hasNext()){Map.Entry<String,Row> entry=iterator.next();if(!visible.contains(entry.getKey())){entry.getValue().cover.remove();queue.removeView(entry.getValue().card);iterator.remove();}}
         Ui.setText(summary,"共 "+tasks.size()+" 本  ·  完成 "+completed+"  ·  失败 "+failed);
+        Ui.setText(totalSpeed,"下载总速度  "+DownloadDisplay.speed(speed));
         Ui.setText(global,active==0?(store.running?"正在启动…":store.note.isEmpty()?(completed>0&&completed==tasks.size()?"下载完成":"暂无正在下载的任务"):store.note):"同时下载 "+active+" 本 · 总实时速度 "+DownloadDisplay.speed(speed));
         if(!store.galleryNotice.isEmpty())global.append("\n"+store.galleryNotice);
         if(!store.cleanupNotice.isEmpty())global.append("\n最近清理："+store.cleanupNotice);
@@ -443,7 +447,7 @@ public final class MainActivity extends Activity {
         if(store.running){toast("请先暂停下载，再运行离线诊断。");return;}
         toast("正在运行离线诊断，无需联网…");new Thread(()->{String result;try{result=Diagnostics.run(this);}catch(Throwable error){result="诊断未完成："+Core.error(error,"");}String message=result;runOnUiThread(()->new AlertDialog.Builder(this).setTitle("离线诊断结果").setMessage(message).setPositiveButton("确定",null).show());},"offline-check").start();
     }
-    protected void onResume(){super.onResume();if(output!=null&&store!=null)output.setText(settingsPage!=null?OutputDirectory.display(this,store.settings.outputUri):store.settings.outputLabel);if(inputFocus!=null)inputFocus.prepareForResume();if(libraryScreen!=null)libraryScreen.resume();handler.removeCallbacks(refresh);handler.post(refresh);}
+    protected void onResume(){super.onResume();if(output!=null&&store!=null)output.setText(settingsPage!=null?OutputDirectory.display(this,store.settings.outputUri):store.settings.outputLabel);if(inputFocus!=null)inputFocus.prepareForResume();if(libraryScreen!=null)libraryScreen.resume();handler.removeCallbacks(refresh);refresh.run();}
     protected void onPause(){finishPageExchange();if(settingsAnimation!=null)settingsAnimation.end();if(inputFocus!=null)inputFocus.finishEditing();handler.removeCallbacks(refresh);if(chapterDialog!=null){chapterDialog.dismiss();chapterDialog=null;}save();super.onPause();}
     protected void onDestroy(){if(libraryScreen!=null)libraryScreen.close();if(downloadCovers!=null)downloadCovers.close();for(Row row:rows.values())row.cover.remove();super.onDestroy();}
     private void save(){try{store.save();}catch(Exception error){store.note=error.getMessage();toast(store.note);}}

@@ -41,7 +41,7 @@ public final class ExportScreen {
         Ui.gap(form,12);dialog=Ui.modal(activity,form,false,14,14);Button confirm=Ui.button(activity,"确认",()->{});Ui.primary(confirm);form.addView(Ui.pair(activity,confirm,Ui.button(activity,"取消",dialog::dismiss)));
         dialog.setOnDismissListener(d->{if(pending==this)pending=null;});
         confirm.setOnClickListener(v->{
-            synchronized(store){if(store.running||store.libraryBusy){error("请先暂停下载，并等待其他文件操作完成");return;}for(Store.Task t:store.snapshot())if(t.status.equals("running")||t.status.equals("resetting")){error("下载正在停止，请稍后重试");return;}store.libraryBusy=true;}
+            try{store.beginFileOperation(entries);}catch(Exception failure){error(failure.getMessage());return;}
             String format=pdf.isChecked()?"pdf":zip.isChecked()?"zip":"images",outputTree=tree,outputLabel=label;boolean numbered=numeric.isChecked()&&!images.isChecked(),separate=split.isChecked()&&pdf.isChecked();dialog.dismiss();
             AtomicBoolean cancelled=new AtomicBoolean();ProgressDialog progress=new ProgressDialog(activity);progress.setTitle("导出漫画 · "+entries.size()+" 本");progress.setMessage("正在读取…");progress.setCancelable(false);progress.setButton(DialogInterface.BUTTON_NEGATIVE,"停止导出",(DialogInterface.OnClickListener)null);progress.show();
             progress.getButton(DialogInterface.BUTTON_NEGATIVE).setOnClickListener(stop->{cancelled.set(true);progress.getButton(DialogInterface.BUTTON_NEGATIVE).setEnabled(false);progress.setMessage("正在停止，已完成的导出结果将保留…");});
@@ -52,7 +52,7 @@ public final class ExportScreen {
                     for(String warning:done.warnings)summary.append("\n\n").append(warning);
                     for(String failure:done.errors.subList(0,Math.min(20,done.errors.size())))summary.append("\n\n").append(failure);
                     if(done.errors.size()>20)summary.append("\n……另 ").append(done.errors.size()-20).append(" 本失败");result=summary.toString();
-                }catch(Exception e){result="导出未完成："+e.getMessage();}finally{store.libraryBusy=false;}
+                }catch(Exception e){result="导出未完成："+e.getMessage();}finally{store.endFileOperation();}
                 String message=result;activity.runOnUiThread(()->{progress.dismiss();if(!activity.isFinishing()&&!activity.isDestroyed()){finished.run();error(message);}});
             },"album-export").start();
         });dialog.show();

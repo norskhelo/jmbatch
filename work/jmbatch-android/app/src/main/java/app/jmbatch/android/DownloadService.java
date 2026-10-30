@@ -54,9 +54,9 @@ public final class DownloadService extends Service {
         if(CANCEL.equals(action)){
             String key=intent.getStringExtra("key");DownloadJob job=pool.get(key);
             synchronized(store){
-                if(store.libraryBusy){store.note="正在管理文件，请结束后再取消任务";return START_NOT_STICKY;}
                 Store.Task target=null;for(Store.Task task:store.snapshot())if(task.key.equals(key))target=task;
                 if(target==null||target.status.equals("done"))return START_NOT_STICKY;
+                if(store.fileBlocked(target)){store.note="该漫画正在进行文件操作，请稍后取消";return START_NOT_STICKY;}
                 boolean wasRequested=target.discardRequested;String previousStatus=target.status,previousPhase=target.phase;
                 target.discardRequested=true;target.status="cancelling";target.phase="正在取消并删除任务文件…";target.speed=0;target.error="";
                 try{store.save();}catch(Exception error){target.discardRequested=wasRequested;target.status=previousStatus;target.phase=previousPhase;store.note="无法保存取消状态，未开始删除："+error.getMessage();return START_NOT_STICKY;}
@@ -68,7 +68,7 @@ public final class DownloadService extends Service {
         if(accepting||pool.size()>0){store.note=accepting?"队列已在运行":"正在停止旧请求，请稍后继续";return START_NOT_STICKY;}
         startForeground(1,notification());foreground=true;
         synchronized(store){
-            if(store.libraryBusy||!store.activeKeys.isEmpty()){store.note="正在管理文件或关闭旧请求，请稍后再开始下载";stopForeground(true);foreground=false;stopSelf();return START_NOT_STICKY;}
+            if(store.globalFileOperation()||!store.activeKeys.isEmpty()){store.note="正在管理文件或关闭旧请求，请稍后再开始下载";stopForeground(true);foreground=false;stopSelf();return START_NOT_STICKY;}
             store.running=true;
         }
         try{if(!SELECTED.equals(action))store.resume();}catch(Exception error){store.note=error.getMessage();finishQueue();return START_NOT_STICKY;}
@@ -92,7 +92,7 @@ public final class DownloadService extends Service {
                     store.activeKeys.remove(task.key);task.status="failed";task.phase="无法启动下载";task.error=Core.error(error,store.cookie);
                 }
             }
-            if(pool.size()==0&&store.next()==null)accepting=false;
+            if(pool.size()==0&&!store.hasQueuedTasks())accepting=false;
         }
     }
 
@@ -102,10 +102,10 @@ public final class DownloadService extends Service {
     }
     private void cleanCancelled(){
         synchronized(store){
-            if(store.libraryBusy)return;
+            if(store.globalFileOperation())return;
             for(Store.Task task:store.snapshot()){
                 if(cleaningKeys.size()>=2)break;
-                if(!task.discardRequested||!task.status.equals("cancelling")||store.activeKeys.contains(task.key)||!cleaningKeys.add(task.key))continue;
+                if(store.fileBlocked(task)||!task.discardRequested||!task.status.equals("cancelling")||store.activeKeys.contains(task.key)||!cleaningKeys.add(task.key))continue;
                 store.activeKeys.add(task.key);store.running=true;
                 new Thread(()->{
                     CacheCleanup.Result result;
