@@ -9,11 +9,13 @@ from cache_cleanup import clean_tasks
 
 def show_cleanup(app):
     engine = app.engine
-    if engine.running or engine.active or engine.cancelling or engine.cancel_workers or engine.cleaning:
-        messagebox.showinfo('清理下载缓存', '请先暂停全部下载，待任务停止后再清理缓存。', parent=app.root)
-        return
-    engine.cleaning = True
-    tasks = list(engine.tasks)
+    with engine.state_lock:
+        if (engine.running or engine.active or engine.cancelling or engine.cancel_workers or
+                engine.cleaning or engine.file_targets is not None):
+            messagebox.showinfo('清理下载缓存', '请先暂停全部下载，待任务及文件操作结束后再清理缓存。', parent=app.root)
+            return
+        engine.cleaning = True
+        tasks = list(engine.tasks)
     window = tk.Toplevel(app.root)
     window.title('清理下载缓存')
     window.transient(app.root)

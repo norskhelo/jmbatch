@@ -31,9 +31,12 @@ class ParseTests(unittest.TestCase):
     def test_speed_and_stall(self):
         settings = Settings(slow_kbps=30, slow_seconds=20, stall_seconds=100)
         slow = SpeedWatch(settings, 0)
-        for n in range(1, 51):
-            _, reason = slow.sample(n, n * 100)
-        self.assertIn("平均保存速度", reason)
+        for n in range(1, 601):
+            speed, reason = slow.sample(n, n * 100)
+            self.assertEqual(speed, 100)
+            self.assertIsNone(reason, "legacy slow settings must not interrupt progress")
+        self.assertIsNone(slow.sample(699, 60000)[1])
+        self.assertIn("没有完成", slow.sample(700, 60000)[1])
         normal = SpeedWatch(settings, 0)
         for n in range(1, 81):
             _, reason = normal.sample(n, n * 100 * 1024)
@@ -313,6 +316,31 @@ class IntegrationTests(unittest.TestCase):
             time.sleep(.05)
         try:
             self.assertEqual(engine.tasks[0].status, "done", engine.tasks[0].error)
+        finally:
+            engine.close()
+
+    def test_slow_progress_does_not_reconnect_with_legacy_task_settings(self):
+        from unittest.mock import Mock
+        settings = Settings(output=str(self.root / "out"), slow_kbps=10240, slow_seconds=15, stall_seconds=30)
+        engine = Engine(self.root / "state")
+        task = Task("123456", settings.__dict__, status="running")
+        state = WorkerState(task, watch=SpeedWatch(Settings(**task.settings), 0))
+        state.phase = "download"
+        process = state.process = Mock()
+        process.is_alive.return_value = True
+        engine.active[task.key] = state
+        try:
+            for second in range(1, 601):
+                state.bytes = second
+                engine._tick_worker(state, second)
+                self.assertEqual(task.status, "running")
+                self.assertEqual(task.resets, 0)
+                self.assertIs(state.process, process)
+            self.assertEqual(task.speed, 1)
+            process.terminate.assert_not_called()
+            engine._tick_worker(state, 630)
+            self.assertEqual(task.status, "resetting")
+            self.assertEqual(task.resets, 1)
         finally:
             engine.close()
 

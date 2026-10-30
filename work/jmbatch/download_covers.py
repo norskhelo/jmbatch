@@ -32,6 +32,29 @@ class DownloadCoverLoader:
         from cover_cache import CoverCache
         self.disk = CoverCache(home) if home is not None else None
 
+    @staticmethod
+    def preview_path(task):
+        chosen = task.get('selected_chapters') or [{'number': 1}]
+        return task_cache(task) / f"cover-{chosen[0]['number']}-{task['settings']['format']}"
+
+    def restore(self, task):
+        """No original-file access: startup displays the last known small preview."""
+        if self.disk is None:
+            return None
+        try:
+            saved = self.disk.peek(self.preview_path(task), 'download-preview')
+            if saved and isinstance(saved[0], list) and len(saved[0]) == 4:
+                return tuple(saved[0]), saved[1]
+            # Reuse older releases' finished-comic cache on the first launch too.
+            if task.get('status') == 'done' and task.get('result'):
+                path, fmt = task['result'], task['settings']['format']
+                saved = self.disk.peek(path, fmt)
+                if saved and isinstance(saved[0], list) and len(saved[0]) == 2:
+                    return (path, fmt, *saved[0]), saved[1]
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+        return None
+
     def __call__(self, task, _fmt):
         try:
             source = cover_source(task)
@@ -44,7 +67,13 @@ class DownloadCoverLoader:
             self.cache.move_to_end(key)
             return previous[:2]
         loader = self.disk.load if self.disk is not None and source and source[1] != "image" else load_cover
-        result = loader(*source[:2]) if source else None
+        saved = self.restore(task) if source and previous is None else None
+        # Only raw-page stamps fully describe the source. Finished albums may
+        # have nested dependencies, which the shared cache must still validate.
+        result = (saved[1] if saved and saved[0] == source and source[1] == 'image'
+                  else loader(*source[:2]) if source else None)
+        if result is not None and self.disk is not None:
+            self.disk.remember_preview(self.preview_path(task), 'download-preview', source, result)
         self.cache[key] = (source, result, now)
         self.cache.move_to_end(key)
         while len(self.cache) > 64:
@@ -62,7 +91,8 @@ class DownloadCovers:
         for y in (28, 36, 44):
             draw.line((20, y, 34, y), fill="#96a6b2", width=2)
         self.placeholder = ImageTk.PhotoImage(placeholder, master=tree)
-        self.worker = CoverWorker(DownloadCoverLoader(home))
+        self.loader = DownloadCoverLoader(home)
+        self.worker = CoverWorker(self.loader)
         self.pending = set()
         self.images = OrderedDict()
         self.next_check = {}
@@ -79,13 +109,22 @@ class DownloadCovers:
         by_key = {task.key: task for task in tasks}
         identities = {key: cover_identity(task) for key, task in by_key.items()}
         self.pending.intersection_update(by_key)
-        for key, identity in identities.items():
+        for index, (key, identity) in enumerate(identities.items()):
             if self.identities.get(key) != identity:
                 self.images.pop(key, None)
                 self.next_check.pop(key, None)
                 self.pending.discard(key)
                 if self.tree.exists(key):
                     self.tree.item(key, image=self.placeholder)
+                    # Bound synchronous startup work to a screenful of private
+                    # thumbnails; originals and remaining rows stay asynchronous.
+                    loader = getattr(self, 'loader', None)
+                    saved = loader.restore(by_key[key].to_dict()) if loader and index < 12 else None
+                    if saved:
+                        source, result = saved
+                        photo = ImageTk.PhotoImage(fit_cover(result, (54, 72)), master=self.tree)
+                        self.images[key] = (source, True, photo)
+                        self.tree.item(key, image=photo)
         self.identities = identities
         for key in list(self.images):
             if key not in by_key:

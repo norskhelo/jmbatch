@@ -74,6 +74,7 @@ class App:
         self.notices.clear()
         self.log("就绪。支持单个编号、多个编号和连续区间；Cookie 仅保存在本次会话内存中。")
         self.root.protocol("WM_DELETE_WINDOW", self.close)
+        self.render()  # Restore saved task thumbnails before the first polling tick.
         self.root.after(250, self.tick)
 
     def _styles(self):
@@ -316,6 +317,8 @@ class App:
         selecting = sum(t.status == "selecting" for t in tasks)
         self.summary.set(f"共 {len(tasks)} 本    ·    已完成 {done}    ·    失败 {failed}    ·    待处理 {waiting}")
         active = list(self.engine.active.values())
+        self.speed_text.set("下载总速度  " + format_speed(sum(max(0, t.speed) for t in tasks
+                                                            if t.status in ("running", "resetting"))))
         selected = self.selected_task()
         state = self.engine.active.get(selected.key) if selected else None
         state = state or (active[0] if active else None)
@@ -323,7 +326,6 @@ class App:
         self.start_button.configure(state="disabled" if self.engine.running else "normal")
         self.pause_button.configure(state="normal" if self.engine.running or selecting else "disabled")
         if current:
-            self.speed_text.set(f"同时下载 {len(active)} 本 · 总实时速度  " + format_speed(sum(s.task.speed for s in active)))
             estimate = eta_text(current.status, state.phase, current.done, current.total, current.cached,
                                 time.monotonic() - state.download_started, current.speed)
             if current.settings["format"] == "images":
@@ -332,7 +334,6 @@ class App:
                                    + size_text(current.done, current.total, current.image_bytes, current.result_bytes, current.status) + "\n" + estimate)
             self.progressbar["value"] = percent(current.done, current.total, current.status)
         else:
-            self.speed_text.set("实时速度  —")
             latest = next((t for t in reversed(tasks) if t.status == "done"), None)
             self.progress_text.set(f"{selecting} 本等待选择下载章节" if selecting else "队列已暂停，点击“开始下载”继续" if waiting and not self.engine.running else
                                    (f"JM{latest.album_id} · 下载完成 · 100.0%\n" + size_text(latest.done, latest.total, latest.image_bytes, latest.result_bytes, latest.status) if latest else "暂无正在下载的任务"))

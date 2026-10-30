@@ -54,6 +54,10 @@ class ReaderWindow:
         self.canvas = tk.Canvas(holder, bg="white", highlightthickness=0, yscrollincrement=1)
         self.scrollbar = ttk.Scrollbar(holder, orient="vertical", command=self.scroll)
         self.canvas.pack(fill="both", expand=True)
+        self.page_count = tk.StringVar(value="0/0")
+        self.page_counter = tk.Label(holder, textvariable=self.page_count, fg="#000000", bg="white",
+                                     font=('Microsoft YaHei UI', 11), padx=6, pady=2)
+        self.page_counter.place(relx=.5, rely=1, y=-8, anchor='s')
         self.scrollbar.place(relx=1, x=0, y=0, anchor='ne', relheight=1)
         self.canvas.configure(yscrollcommand=self.scrolled)
         self.canvas.bind("<Configure>", self.resize)
@@ -365,6 +369,7 @@ class ReaderWindow:
         self.timer = self.window.after(16 if self.pending or self.pager.animating else 80, self.poll)
 
     def refresh_buttons(self):
+        self.page_count.set(f"{self.current + 1}/{len(self.pages)}" if self.pages else "0/0")
         entry = self.library.entries.get(self.key, {})
         self.favorite_button.configure(text="取消收藏" if entry.get("favorite") else "收藏")
         self.mark_button.configure(text="书签")

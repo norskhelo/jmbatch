@@ -163,10 +163,12 @@ class ChapterDeletionTests(unittest.TestCase):
             inspect(self.engine.library, key)
         (source / "personal.txt").unlink()
         self.engine.running = True
+        self.engine.tasks[0].status = "running"
         with self.assertRaisesRegex(OSError, "暂停"):
             self.delete(key, [2])
         self.assertTrue(source.exists())
         self.engine.running = False
+        self.engine.tasks[0].status = "done"
         self.engine.library.entries[key]["id"] = "../../outside"
         with self.assertRaisesRegex(ValueError, "编号无效"):
             self.delete(key, [2])

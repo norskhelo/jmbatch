@@ -4,7 +4,7 @@ from tkinter import ttk,messagebox
 from display_view import DisplayView
 from ui_common import *
 from core import VERSION
-from download_display import percent,format_speed,size_text
+from download_display import percent,format_speed,size_text,failure_text
 
 
 class DownloadList(DisplayView):
@@ -56,7 +56,8 @@ class DownloadList(DisplayView):
             total=task.result_bytes if task.status=='done' and task.result_bytes else round(task.image_bytes*task.total/task.done) if task.done and task.total else 0
             detail=f'{format_size(task.result_bytes if task.status=="done" and task.result_bytes else task.image_bytes)} / {format_size(total) if total else "—"}'
             if task.status in ('running','resetting'):detail+=' · '+format_speed(task.speed)
-            self.canvas.create_text(108,y+96,text=self._lines(detail,max(40,width-150),1),anchor='nw',fill=MUTED,font=self.tile_font)
+            failure=failure_text(task.status,task.error,task.phase)
+            self.canvas.create_text(108,y+(92 if failure else 96),text=self._lines(failure or detail,max(40,edge-108),2 if failure else 1),anchor='nw',fill='#b42336' if failure else MUTED,font=self.tile_font)
             if self.app.selecting:self.selection_effects.draw(self.canvas,key,width-33,y+63,key in chosen)
         self.row_images=pictures
         if self.selection_effects.end() and self.paint_timer is None:self.paint_timer=self.after(16,self._paint)
@@ -118,7 +119,11 @@ def build(app):
     icon_button(bar,'trash','清除下载记录',lambda:clear_history(app)).pack(side='left',padx=10)
     app.pause_button=ttk.Button(bar);app.cancel_button=ttk.Button(bar)
     app.summary=tk.StringVar();app.speed_text=tk.StringVar()
-    list_panel=Panel(body,padding=22);list_panel.configure(bg='white');list_panel.pack(fill='both',expand=True,pady=(18,12));ttk.Label(list_panel.body,text='下载列表',font=('Microsoft YaHei UI',14,'bold')).pack(anchor='w',pady=(0,12))
+    list_panel=Panel(body,padding=22);list_panel.configure(bg='white');list_panel.pack(fill='both',expand=True,pady=(18,12))
+    list_heading=ttk.Frame(list_panel.body);list_heading.pack(fill='x',pady=(0,12))
+    ttk.Label(list_heading,text='下载列表',font=('Microsoft YaHei UI',14,'bold')).pack(side='left')
+    app.total_speed_label=ttk.Label(list_heading,textvariable=app.speed_text,foreground=INK)
+    app.total_speed_label.pack(side='right',padx=(12,0))
     footer=ttk.Frame(list_panel.body);footer.pack(side='bottom',fill='x',pady=(8,0))
     holder=ttk.Frame(list_panel.body);holder.pack(fill='both',expand=True)
     columns=('id','title','status','progress','size','format','resets');app.tree=DownloadList(holder,app,columns=columns,show='tree headings',selectmode='none')

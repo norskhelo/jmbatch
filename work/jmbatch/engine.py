@@ -1,4 +1,4 @@
-"""Persistent concurrent queue with killable workers and bounded slow-speed resets."""
+"""Persistent concurrent queue with killable workers and bounded stall recovery."""
 from __future__ import annotations
 
 import json
@@ -13,6 +13,7 @@ from core import Settings, SpeedWatch, Task, atomic_json
 from worker import worker_entry
 from library import Library
 from chapters import select_chapters
+from file_operations import synchronized, conflicts, reserve
 
 ACTIVE = {"running", "resetting"}
 
@@ -32,6 +33,9 @@ class WorkerState:
 
 class Engine:
     def __init__(self, home: Path, notify=lambda message: None, worker_target=worker_entry):
+        self.state_lock = threading.RLock()
+        self.file_targets = None
+        self.file_owner = None
         self.home = home
         self.notify = notify
         self.worker_target = worker_target
@@ -51,7 +55,7 @@ class Engine:
         self.rate_path = self.home / 'download-rate.bin'
         self.home.mkdir(parents=True, exist_ok=True)
         self.rate_path.write_bytes(bytes(24))
-        self.library = Library(home)
+        self.library = Library(home, self.state_lock)
         try:
             self.library.sync(self.tasks)
         except OSError as exc:
@@ -78,10 +82,18 @@ class Engine:
             path.rename(backup)
             self.notify(f"队列文件无法读取，已备份至 {backup}：{exc}")
 
+    def file_operation(self, keys):
+        return reserve(self, keys)
+
+    def file_blocked(self, task):
+        return self.file_targets is not None and any(conflicts(self.library, task, item) for item in self.file_targets)
+
+    @synchronized
     def save(self):
         atomic_json(self.home / "queue.json", {"version": 1, "settings": self.settings.__dict__, "tasks": [t.to_dict() for t in self.tasks]})
         self.last_saved = time.monotonic()
 
+    @synchronized
     def add(self, ids, settings: Settings):
         existing = {(t.album_id, t.settings["output"], t.settings["format"]) for t in self.tasks if t.status != "cancelled"}
         count = 0
@@ -95,6 +107,7 @@ class Engine:
         self.save()
         return count
 
+    @synchronized
     def start(self):
         if self.cleaning:
             self.notify("正在清理缓存，请稍后开始。")
@@ -106,6 +119,7 @@ class Engine:
         self.running = True
         self.save()
 
+    @synchronized
     def add_chapter_update(self, album_id, catalog, chapters, settings):
         if self.cleaning or any(t.album_id == album_id and t.status not in ("done", "cancelled") for t in self.tasks):
             raise ValueError("该漫画已有未完成任务，请先继续、重试或取消原任务。")
@@ -125,6 +139,7 @@ class Engine:
         self.running = True
         return task
 
+    @synchronized
     def pause_one(self,key):
         state=self.active.pop(key,None)
         if state:
@@ -134,6 +149,7 @@ class Engine:
             state.task.speed=0
             self.save()
 
+    @synchronized
     def pause(self):
         self.running = False
         for state in list(self.active.values()):
@@ -148,6 +164,7 @@ class Engine:
                 task.phase = "已暂停"
         self.save()
 
+    @synchronized
     def choose_chapters(self, key, ids):
         task = next(t for t in self.tasks if t.key == key)
         if task.status != "selecting":
@@ -157,18 +174,23 @@ class Engine:
         self.save()
         self.running = True
 
+    @synchronized
     def postpone_chapters(self, key):
         task = next((t for t in self.tasks if t.key == key), None)
         if task and task.status == "selecting":
             task.status, task.phase = "paused", "已暂停；点击开始继续选择章节"
             self.save()
 
+    @synchronized
     def cancel(self, keys):
         if self.cleaning:
             self.notify("正在清理缓存，请稍后取消任务。")
             return
         for task in self.tasks:
             if task.key not in keys or task.status == "done" or task.key in self.cancelling:
+                continue
+            if self.file_blocked(task):
+                self.notify("该漫画正在进行文件操作，请稍后取消。")
                 continue
             task.status = "cancelling"
             task.speed = 0
@@ -222,6 +244,7 @@ class Engine:
         if pending:
             self.cancel(pending)
 
+    @synchronized
     def retry(self, keys, settings: Settings | None = None):
         if self.cleaning:
             raise ValueError("正在清理缓存，请稍后重试。")
@@ -254,7 +277,10 @@ class Engine:
             state.channel = None
         state.exit_seen = None
 
+    @synchronized
     def _launch(self, task: Task, now):
+        if self.file_blocked(task):
+            return
         state = WorkerState(task)
         self.active[task.key] = state
         task.status = "running"
@@ -288,7 +314,7 @@ class Engine:
         self._stop_process(state)
         task.status = "failed"
         task.error = message
-        task.phase = "下载失败，点击任务查看原因"
+        task.phase = "下载失败，点击任务重试"
         task.speed = 0
         self.notify(f"JM{task.album_id} 失败：{message}")
         self.active.pop(task.key, None)
@@ -317,7 +343,6 @@ class Engine:
             state.watch.last_progress = now
         elif kind == "throttled":
             state.watch.last_progress = now
-            state.watch.start = now
         elif kind == "phase":
             state.phase = event["phase"]
             task.phase = event["message"]
@@ -391,12 +416,9 @@ class Engine:
             elif state.phase in ("metadata", "download"):
                 speed, reason = state.watch.sample(now, state.bytes)
                 task.speed = speed
-                # A slow byte rate is only meaningful in the image phase.
-                if state.phase == "metadata" and now - state.watch.last_progress < state.watch.settings.stall_seconds:
-                    reason = None
                 if reason:
                     if task.resets >= task.settings["max_resets"]:
-                        self._fail(state, f"{reason}；已达到自动重连上限 {task.settings['max_resets']} 次。请检查网络或调低慢速阈值后重试。")
+                        self._fail(state, f"{reason}；已达到自动重连上限 {task.settings['max_resets']} 次。请检查网络后重试。")
                     else:
                         self._stop_process(state)
                         task.resets += 1
@@ -410,6 +432,7 @@ class Engine:
             else:
                 task.speed = 0
 
+    @synchronized
     def tick(self, now=None):
         self.rate_limit.value = self.settings.download_limit_kbps
         now = time.monotonic() if now is None else now
@@ -420,7 +443,7 @@ class Engine:
             for task in self.tasks:
                 if len(self.active) >= self.settings.concurrent_tasks:
                     break
-                if task.status == "queued" and task.key not in self.active:
+                if task.status == "queued" and task.key not in self.active and not self.file_blocked(task):
                     self._launch(task, now)
             if not self.active and not any(t.status == "queued" for t in self.tasks):
                 self.running = False

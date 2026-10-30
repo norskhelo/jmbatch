@@ -7,13 +7,16 @@ import re
 import time
 import shutil
 import uuid
+import threading
+from file_operations import synchronized
 from pathlib import Path
 
 from core import atomic_json
 
 
 class Library:
-    def __init__(self, home):
+    def __init__(self, home, state_lock=None):
+        self.state_lock = state_lock or threading.RLock()
         self.path = Path(home) / "library.json"
         self.entries = {}
         self.collections = {}
@@ -46,11 +49,13 @@ class Library:
     def key(path):
         return os.path.normcase(os.path.abspath(path))
 
+    @synchronized
     def save(self):
         if self.error:
             raise OSError(self.error)
         atomic_json(self.path, {"version": 1, "entries": self.entries, "collections": self.collections})
 
+    @synchronized
     def sync(self, tasks):
         if self.error:
             raise OSError(self.error)
@@ -99,6 +104,7 @@ class Library:
                 continue
         return counts
 
+    @synchronized
     def save_chapter_counts(self, counts):
         previous = self.entries.copy()
         for key, count in counts.items():
@@ -114,12 +120,14 @@ class Library:
             raise
         return True
 
+    @synchronized
     def select(self, query="", favorites=False):
         query = query.strip().casefold()
         return [(key, item) for key, item in reversed(list(self.entries.items()))
                 if (not favorites or item["favorite"]) and
                 (not query or query in (item["id"] + " " + item["title"] + " " + Path(item["path"]).name).casefold())]
 
+    @synchronized
     def favorite(self, key):
         item = self.entries[key]
         old = item["favorite"]
@@ -150,22 +158,26 @@ class Library:
             self.collections, self.entries = old
             raise
 
+    @synchronized
     def create_collection(self, name):
         key = "collection:" + uuid.uuid4().hex
         self._save_collections(dict(self.collections, **{key: self._collection_name(name)}), self.entries)
         return key
 
+    @synchronized
     def rename_collection(self, key, name):
         if key not in self.collections:
             raise ValueError("收藏夹不存在")
         self._save_collections(dict(self.collections, **{key: self._collection_name(name, key)}), self.entries)
 
+    @synchronized
     def delete_collection(self, key):
         if key not in self.collections:
             raise ValueError("收藏夹不存在")
         self._save_collections({k: v for k, v in self.collections.items() if k != key},
                                {k: dict(v, collection="") if v.get("collection") == key else v for k, v in self.entries.items()})
 
+    @synchronized
     def move_to_collection(self, keys, collection=""):
         if collection and collection not in self.collections:
             raise ValueError("收藏夹不存在")
@@ -174,6 +186,7 @@ class Library:
             raise ValueError("部分漫画记录已移除，请刷新")
         self._save_collections(self.collections, {k: dict(v, collection=collection) if k in keys else v for k, v in self.entries.items()})
 
+    @synchronized
     def browse(self, query="", favorites=False, collection=""):
         """Folders and default comics share the root; each comic has one location."""
         if collection and collection not in self.collections:
@@ -195,6 +208,7 @@ class Library:
         result.extend((k, v) for k, v in matches if v.get("collection", "") == collection)
         return result
 
+    @synchronized
     def set_favorites(self, keys, value):
         previous = self.entries.copy()
         for key in dict.fromkeys(keys):
@@ -247,6 +261,7 @@ class Library:
                     skipped += 1
         return found, skipped
 
+    @synchronized
     def import_found(self, found):
         if self.error:
             raise OSError(self.error)
@@ -284,14 +299,15 @@ class Library:
         return path
 
     def remove(self, key, tasks, delete_file=False):
-        if self.error:
-            raise OSError(self.error)
-        item = self.entries[key]
-        # Do not race a task which may currently publish into the same directory.
-        if any(t.status in ("queued", "running", "resetting", "cancelling", "cancel_failed") and
-               self.key(t.settings["output"]) == self.key(item["root"]) and
-               str(t.album_id) == item["id"] for t in tasks):
-            raise OSError("这本漫画仍有待下载或进行中的任务，请先暂停或取消")
+        with self.state_lock:
+            if self.error:
+                raise OSError(self.error)
+            item = self.entries[key]
+            # Do not race a task which may currently publish into the same directory.
+            if any(t.status in ("queued", "running", "resetting", "cancelling", "cancel_failed") and
+                   self.key(t.settings["output"]) == self.key(item["root"]) and
+                   str(t.album_id) == item["id"] for t in tasks):
+                raise OSError("这本漫画仍有待下载或进行中的任务，请先暂停或取消")
         if delete_file:
             target = self.checked_path(key)
             if item["format"] == "images":
@@ -307,22 +323,23 @@ class Library:
                 shutil.rmtree(target)
             else:
                 target.unlink()
-        for task in tasks:
-            if task.result and self.key(task.result) == key:
-                task.result = ""
+        with self.state_lock:
+            for task in tasks:
+                if task.result and self.key(task.result) == key:
+                    task.result = ""
+                    if delete_file:
+                        task.status = "cancelled"
+                        task.phase = "文件已删除，可重新下载"
+            previous = self.entries.pop(key)
+            try:
+                self.save()
+            except Exception:
+                self.entries[key] = previous
                 if delete_file:
-                    task.status = "cancelled"
-                    task.phase = "文件已删除，可重新下载"
-        previous = self.entries.pop(key)
-        try:
-            self.save()
-        except Exception:
-            self.entries[key] = previous
-            if delete_file:
-                raise OSError("文件已删除，但漫画列表保存失败；请检查磁盘空间与写入权限")
-            raise
-        from cover_cache import CoverCache
-        CoverCache(self.path.parent).forget(item["path"], item["format"])
+                    raise OSError("文件已删除，但漫画列表保存失败；请检查磁盘空间与写入权限")
+                raise
+            from cover_cache import CoverCache
+            CoverCache(self.path.parent).forget(item["path"], item["format"])
 
     def remove_many(self, keys, tasks, delete_file=False, cancelled=None, progress=lambda done, total: None):
         keys = list(dict.fromkeys(keys))

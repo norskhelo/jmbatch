@@ -1,5 +1,6 @@
 """Download presentation; image estimates never include retry traffic."""
 import math
+import re
 import time
 
 
@@ -13,6 +14,25 @@ def format_size(value):
 
 def format_speed(value):
     return format_size(value) + "/s"
+
+
+def failure_text(status, error, phase=""):
+    """Present the stored reason, including failures restored from an older queue."""
+    if status != "failed":
+        return ""
+    reason = str(error or "").strip()
+    generic = "任务未完成。下方为具体原因；修正后可选中任务重试。"
+    if reason.startswith(generic):
+        reason = reason[len(generic):].strip()
+    # Put the useful message before a long technical exception class on narrow rows.
+    message = re.sub(r"^[\w.$]*(?:Exception|Error):\s*", "", reason).strip()
+    if message and message != "null":
+        reason = message
+    if not reason:
+        reason = str(phase or "").strip()
+        if not reason or reason.startswith("下载失败"):
+            reason = "未记录具体原因，请重试后查看"
+    return "失败原因：" + " ".join(reason.split())
 
 
 def percent(done, total, status):

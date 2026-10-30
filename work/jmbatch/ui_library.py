@@ -169,7 +169,7 @@ def share(view):
         files=[view.library.checked_path(key) for key in keys]
         path=prepare(files,view.app.home,view.cancelled.is_set);show(path)
         return '已打开系统分享；多选文件保存在 '+str(path) if len(files)>1 else '已打开系统分享'
-    view.run(operation,view.status.set)
+    view.run(operation,view.status.set,file_keys=keys)
 
 
 def delete_selection(view):
@@ -200,9 +200,9 @@ def delete_selection(view):
                     done,errors,remaining=view.library.remove_many(whole,view.app.engine.tasks,True,view.cancelled,lambda d,t:None);messages.append(f'已删除 {len(done)} 本；失败 {len(errors)} 本')
                     if errors:messages.extend(str(e) for _,e in errors)
                 return '\n'.join(messages)
-            view.run(operation,lambda text:(view.status.set(text),view.exit_batch()),True)
+            view.run(operation,lambda text:(view.status.set(text),view.exit_batch()),file_keys=keys)
         actions(body,'确认','取消',remove,dialog.destroy)
-    view.run(lambda:{key:inspect(view.library,key) for key in keys},prepared,True)
+    view.run(lambda:{key:inspect(view.library,key) for key in keys},prepared,file_keys=keys)
 
 
 def check_all(view):

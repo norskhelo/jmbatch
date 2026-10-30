@@ -407,11 +407,8 @@ class LibraryWindow:
                 enabled = False
             button.configure(state="normal" if enabled else "disabled")
 
-    def run(self, operation, finished, pause_required=False):
+    def run(self, operation, finished, file_keys=None):
         if self.busy:
-            return
-        if pause_required and (self.app.engine.running or any(t.status in ("running", "resetting") for t in self.app.engine.tasks)):
-            self.messagebox.showinfo("请先暂停", "导出、批量删除或移除记录前，请先暂停下载队列。", parent=self.window)
             return
         self.busy = True
         self.cancel_press()
@@ -421,7 +418,15 @@ class LibraryWindow:
         self.window.grab_set()
         def worker():
             try:
-                self.events.put(("done", operation()))
+                if file_keys is None:
+                    result = operation()
+                else:
+                    with self.app.engine.file_operation(file_keys):
+                        try:
+                            result = operation()
+                        finally:
+                            self.app.engine.save()
+                self.events.put(("done", result))
             except Exception as exc:
                 self.events.put(("error", str(exc)))
         threading.Thread(target=worker, daemon=True).start()
@@ -527,6 +532,6 @@ class LibraryWindow:
                     if errors:
                         self.messagebox.showwarning("部分操作失败", "失败记录已保留：\n\n" + "\n".join(f"{Path(k).name}：{error}" for k, error in errors[:20]), parent=self.window)
                 self.run(lambda: self.library.remove_many(selected, self.app.engine.tasks, delete, self.cancelled,
-                         lambda done, total: self.events.put(("progress", f"正在处理 {done} / {total} 项"))), finished, True)
+                         lambda done, total: self.events.put(("progress", f"正在处理 {done} / {total} 项"))), finished, file_keys=selected)
         except Exception as exc:
             self.messagebox.showerror("操作未完成", str(exc), parent=self.window)

@@ -97,6 +97,72 @@ class DownloadCoverTests(unittest.TestCase):
         self.assertGreater(red.getpixel((0, 0))[0], 200)
         self.assertGreater(blue.getpixel((0, 0))[2], 200)
 
+    def test_restart_reuses_saved_task_thumbnail_without_decoding_original(self):
+        self.page(self.first)
+        home = self.root / 'home'
+        self.assertIsNotNone(DownloadCoverLoader(home)(self.task, '')[1])
+        with patch('download_covers.load_cover', side_effect=AssertionError('reopened original')):
+            self.assertIsNotNone(DownloadCoverLoader(home)(self.task, '')[1])
+
+    def test_startup_poll_restores_cover_before_worker_returns(self):
+        import queue
+        from collections import OrderedDict
+        self.page(self.first)
+        home = self.root / 'home'
+        DownloadCoverLoader(home)(self.task, '')
+        covers = DownloadCovers.__new__(DownloadCovers)
+        covers.tree = Mock()
+        covers.tree.exists.return_value = True
+        covers.tree.visible_keys.return_value = [self.task['key']]
+        covers.placeholder = object()
+        covers.loader = DownloadCoverLoader(home)
+        covers.worker = Mock(jobs=queue.Queue(24), results=queue.Queue(24))
+        covers.pending = set()
+        covers.images = OrderedDict()
+        covers.next_check = {}
+        covers.identities = {}
+        task = Task(**self.task)
+        with patch('PIL.ImageTk.PhotoImage', return_value=object()) as photo:
+            covers.poll([task])
+            self.assertTrue(covers.images[task.key][1])
+            self.assertEqual(photo.call_count, 1)
+            self.assertFalse(covers.worker.jobs.empty(), 'Source validation still runs in background')
+
+    def test_changed_or_corrupt_snapshot_repairs_without_reusing_wrong_chapter(self):
+        home = self.root / 'home'
+        self.page(self.first)
+        DownloadCoverLoader(home)(self.task, '')
+        loader = DownloadCoverLoader(home)
+        other = dict(self.task, selected_chapters=[{'number': 2}])
+        self.assertIsNone(loader.restore(other))
+        self.page(self.first, 'blue')
+        self.assertGreater(loader(self.task, '')[1].getpixel((0, 0))[2], 200)
+        loader.disk.file(loader.preview_path(self.task), 'download-preview').write_bytes(b'corrupt')
+        repaired = DownloadCoverLoader(home)
+        self.assertIsNone(repaired.restore(self.task))
+        self.assertIsNotNone(repaired(self.task, '')[1])
+
+    def test_real_app_binds_saved_cover_before_first_event_loop(self):
+        import tkinter as tk
+        from app import App
+        from core import atomic_json
+        self.page(self.first)
+        home = self.root / 'home'
+        task = dict(self.task, status='paused')
+        atomic_json(home / 'queue.json', {'settings': task['settings'], 'tasks': [task]})
+        DownloadCoverLoader(home)(task, '')
+        root = tk.Tk()
+        try:
+            app = App(root, home)
+            self.assertTrue(app.download_covers.images[task['key']][1])
+            self.assertNotEqual(str(app.tree.item(task['key'], 'image')[0]), str(app.download_covers.placeholder))
+            root.update_idletasks()
+            self.assertTrue(app.tree.canvas.find_all())
+        finally:
+            for timer in root.tk.call('after', 'info'):
+                root.after_cancel(timer)
+            root.tk.call('destroy', '.')
+
 
 class DownloadCoverBindingTests(unittest.TestCase):
     def setUp(self):

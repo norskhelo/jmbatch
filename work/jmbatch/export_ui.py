@@ -44,6 +44,6 @@ def show_export(library_window, keys):
                 messagebox.showwarning("导出结果", summary+'\n\n'+details, parent=owner.window)
             elif len(keys) > 1 or result.stopped:
                 messagebox.showinfo("导出结果", summary, parent=owner.window)
-        owner.run(operation, finished, pause_required=True)
+        owner.run(operation, finished, file_keys=keys)
     actions(panel, "确认", "取消", start, dialog.destroy).pack_configure(pady=(12, 0))
     return dialog

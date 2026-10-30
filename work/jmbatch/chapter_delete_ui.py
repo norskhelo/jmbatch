@@ -47,9 +47,9 @@ def show(library_window, key):
                 if "清理未完成" in message:
                     owner.messagebox.showwarning("旧文件清理未完成", message, parent=owner.window)
             owner.run(lambda: delete_chapters(owner.app.engine, key, selected, plan, owner.cancelled.is_set,
-                      lambda text: owner.events.put(("progress", text))), finished, True)
+                      lambda text: owner.events.put(("progress", text))), finished, file_keys=[key])
         bar = ttk.Frame(dialog)
         bar.pack(pady=12)
         ttk.Button(bar, text="删除所选章节", command=confirm).pack(side="left", padx=8)
         ttk.Button(bar, text="取消", command=dialog.destroy).pack(side="left")
-    owner.run(lambda: inspect(owner.library, key), choose, True)
+    owner.run(lambda: inspect(owner.library, key), choose, file_keys=[key])

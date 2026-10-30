@@ -115,6 +115,13 @@ def show(app):
     path_trace=app.output_var.trace_add('write',refresh_path)
     page.bind('<Destroy>',lambda e:app.output_var.trace_remove('write',path_trace) if e.widget is page else None,add='+')
     refresh_path()
+    def open_current_directory():
+        value=app.output_var.get().strip()
+        if not value:
+            messagebox.showinfo('请选择保存目录','请先选择下载保存目录。',parent=app.root)
+            return
+        app._open(Path(value).expanduser().absolute())
+    ttk.Button(body,text='打开当前保存目录',command=open_current_directory).pack(anchor='w',padx=(80,0),pady=4)
     from cleanup_ui import show_cleanup
     ttk.Button(body,text='清除缓存',command=lambda:show_cleanup(app)).pack(anchor='w',padx=(80,0),pady=4)
     section('阅读');ttk.Label(body,text='阅读模式').pack(anchor='w');row=ttk.Frame(body);row.pack(fill='x',pady=(8,12))

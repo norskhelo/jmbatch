@@ -77,16 +77,17 @@ def _copy(source, target, cancelled):
 
 
 def delete_chapters(engine, key, selected, expected, cancelled=lambda: False, progress=lambda text: None):
+    with engine.file_operation([key]):
+        return _delete_chapters(engine, key, selected, expected, cancelled, progress)
+
+
+def _delete_chapters(engine, key, selected, expected, cancelled, progress):
     library = engine.library
     if library.error:
         raise OSError(library.error)
-    if engine.running or engine.cleaning or any(t.status in ("running", "resetting", "cancelling", "cancel_failed") for t in engine.tasks):
-        raise OSError("请先暂停下载队列并等待任务停止，再删除章节")
     item = library.entries[key]
     if item["id"] and not re.fullmatch(r"[0-9]{1,10}", item["id"]):
         raise ValueError("漫画编号无效，请重新扫描导入")
-    if any(str(t.album_id) == item["id"] and t.status == "queued" for t in engine.tasks):
-        raise OSError("这本漫画仍有排队任务，请先暂停或取消")
     current = inspect(library, key)
     if current != expected:
         raise OSError("漫画内容已变化，请重新打开章节列表")
@@ -104,7 +105,6 @@ def delete_chapters(engine, key, selected, expected, cancelled=lambda: False, pr
     staging = path.parent / (".chapter-delete-" + uuid.uuid4().hex + ".partial")
     committed = False
     published = False
-    engine.cleaning = True
     try:
         _check(cancelled)
         progress("正在保存并校验保留章节…")
@@ -158,25 +158,26 @@ def delete_chapters(engine, key, selected, expected, cancelled=lambda: False, pr
             read_album(target)
         new_key = library.key(target)
         state.put(new_key, **mapped)
-        previous = library.entries.copy()
-        affected = [(t, t.result) for t in engine.tasks if t.result and library.key(t.result) == key]
-        try:
-            library.entries = {new_key if k == key else k: dict(v, path=str(target), chapter_count=len(current["chapters"]) - len(removed)) if k == key else v for k, v in previous.items()}
-            library.save()
-            for task, _ in affected:
-                task.result = str(target)
-            engine.save()
-        except Exception:
-            library.entries = previous
-            for task, result in affected:
-                task.result = result
+        with engine.state_lock:
+            previous = library.entries.copy()
+            affected = [(t, t.result) for t in engine.tasks if t.result and library.key(t.result) == key]
             try:
+                library.entries = {new_key if k == key else k: dict(v, path=str(target), chapter_count=len(current["chapters"]) - len(removed)) if k == key else v for k, v in previous.items()}
                 library.save()
+                for task, _ in affected:
+                    task.result = str(target)
                 engine.save()
             except Exception:
-                committed = True  # Keep both complete copies if rollback cannot persist.
-                raise OSError("记录保存及恢复失败，原漫画和新副本均已保留，请检查写入权限：" + str(target))
-            raise
+                library.entries = previous
+                for task, result in affected:
+                    task.result = result
+                try:
+                    library.save()
+                    engine.save()
+                except Exception:
+                    committed = True  # Keep both complete copies if rollback cannot persist.
+                    raise OSError("记录保存及恢复失败，原漫画和新副本均已保留，请检查写入权限：" + str(target))
+                raise
         committed = True
         warning = ""
         try:
@@ -191,7 +192,6 @@ def delete_chapters(engine, key, selected, expected, cancelled=lambda: False, pr
         CoverCache(library.path.parent).forget(path, item["format"])
         return new_key, f"已从漫画库删除 {len(removed)} 章，保留 {len(current['chapters']) - len(removed)} 章。" + warning
     finally:
-        engine.cleaning = False
         if staging.exists():
             if staging.is_dir():
                 shutil.rmtree(staging)

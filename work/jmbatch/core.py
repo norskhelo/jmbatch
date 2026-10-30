@@ -8,11 +8,10 @@ import shutil
 import time
 import uuid
 import zipfile
-from collections import deque
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-VERSION = "0.3.40"
+VERSION = "0.3.41"
 ZIP_LAYOUT_VERSION = 3
 MAX_TASKS = 2000
 
@@ -50,7 +49,8 @@ class Settings:
     timeout: int = 25
     request_retries: int = 2
     auto_reset: bool = True
-    slow_kbps: int = 30
+    # Legacy serialized fields; retained for old settings/tasks, no longer used.
+    slow_kbps: int = 0
     slow_seconds: int = 90
     stall_seconds: int = 180
     max_resets: int = 3
@@ -73,8 +73,8 @@ class Settings:
             ("chapter_workers", 1, 8, "章节读取并行数"),
             ("chapter_view_mode", 1, 2, "多章节观看模式"),
             ("threads", 1, 16, "图片线程数"), ("timeout", 5, 120, "请求超时"),
-            ("request_retries", 0, 5, "请求重试次数"), ("slow_kbps", 0, 10240, "慢速阈值"),
-            ("slow_seconds", 15, 600, "慢速观察窗口"), ("stall_seconds", 30, 1800, "无进度超时"),
+            ("request_retries", 0, 5, "请求重试次数"),
+            ("stall_seconds", 30, 1800, "无进度超时"),
             ("max_resets", 0, 10, "自动重连上限"),
         ]:
             value = getattr(self, name)
@@ -163,12 +163,10 @@ def explain_error(exc: Exception, cookie: str = "") -> str:
 
 
 class SpeedWatch:
-    """Rates use completed image bytes, not network-layer transfer bytes."""
+    """Display completed-byte rates; recover only when progress has stalled."""
     def __init__(self, settings: Settings, now: float, received: int = 0):
         self.settings = settings
-        self.start = now
         self.last_progress = now
-        self.samples = deque([(now, received)])
         self.last_bytes = received
         self.rate_time = now
         self.rate_bytes = received
@@ -178,10 +176,6 @@ class SpeedWatch:
         if received > self.last_bytes:
             self.last_progress = now
         self.last_bytes = received
-        self.samples.append((now, received))
-        window = self.settings.slow_seconds
-        while len(self.samples) > 2 and self.samples[1][0] <= now - window:
-            self.samples.popleft()
         elapsed = now - self.rate_time
         if elapsed >= 1:
             self.speed = max(0, received - self.rate_bytes) / elapsed
@@ -191,11 +185,6 @@ class SpeedWatch:
             return speed, None
         if now - self.last_progress >= self.settings.stall_seconds:
             return speed, f"连续 {self.settings.stall_seconds} 秒没有完成新图片或元数据进度"
-        elapsed = now - self.samples[0][0]
-        if now - self.start >= 30 + window and elapsed >= window:
-            avg = max(0, received - self.samples[0][1]) / max(1, elapsed)
-            if avg < self.settings.slow_kbps * 1024:
-                return speed, f"最近 {window} 秒平均保存速度 {avg / 1024:.1f} KB/s，低于 {self.settings.slow_kbps} KB/s"
         return speed, None
 
 

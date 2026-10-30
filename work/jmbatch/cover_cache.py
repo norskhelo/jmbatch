@@ -32,24 +32,31 @@ class CoverCache:
         key = fmt + "\n" + os.path.normcase(os.path.abspath(path))
         return self.root / (hashlib.sha256(key.encode("utf-8")).hexdigest() + ".cover")
 
-    def _read(self, target, version):
+    def _read(self, target, version, *, snapshot=False):
         try:
             if target.stat().st_size > MAX_ENTRY:
                 return None
             with target.open("rb") as stream:
                 metadata = json.loads(stream.readline(16384))
-                if metadata["version"] != 1 or metadata["source"] != version:
+                if metadata["version"] != 1 or (not snapshot and metadata["source"] != version):
                     return None
-                if any(stamp(path) != value for path, value in metadata["dependencies"]):
+                if not snapshot and any(stamp(path) != value for path, value in metadata["dependencies"]):
                     return None
                 with Image.open(io.BytesIO(stream.read(MAX_ENTRY))) as image:
                     if image.width > 72 or image.height > 96:
                         return None
                     result = image.convert("RGB").copy()
             target.touch()  # Least recently used, including across application restarts.
-            return result
+            return (metadata["source"], result) if snapshot else result
         except (OSError, ValueError, KeyError, TypeError):
             return None
+
+    def peek(self, path, fmt):
+        """Read only a bounded local preview; callers must validate in the background."""
+        return self._read(self.file(path, fmt), None, snapshot=True)
+
+    def remember_preview(self, path, fmt, source, image):
+        self._write(self.file(path, fmt), list(source), [], image)
 
     def _write(self, target, version, dependencies, image):
         temporary = None

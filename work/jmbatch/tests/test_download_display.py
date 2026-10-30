@@ -1,9 +1,22 @@
 import unittest
 
-from download_display import format_speed, percent, progress_text, size_text, eta_text
+from download_display import format_speed, percent, progress_text, size_text, eta_text, failure_text
 
 
 class DownloadDisplayTests(unittest.TestCase):
+    def test_failed_task_shows_stored_cause_and_recovers_without_stale_error(self):
+        error = "网络请求超时。\nTimeoutError: timed out"
+        self.assertEqual(failure_text("failed", error), "失败原因：网络请求超时。 TimeoutError: timed out")
+        for status in ("queued", "running", "paused", "resetting", "done", "cancelled"):
+            self.assertEqual(failure_text(status, error), "")
+
+    def test_legacy_failure_and_generic_explanation(self):
+        self.assertEqual(failure_text("failed", "", "自动重连失败"), "失败原因：自动重连失败")
+        for phase in (None, "", "下载失败，点击任务查看原因"):
+            self.assertIn("未记录具体原因", failure_text("failed", None, phase))
+        self.assertEqual(failure_text("failed", "任务未完成。下方为具体原因；修正后可选中任务重试。\nOSError: 图片损坏"), "失败原因：图片损坏")
+        self.assertEqual(failure_text("failed", "SocketTimeoutException: 网络请求超时"), "失败原因：网络请求超时")
+
     def test_speed_unit_boundaries(self):
         for value, expected in [(0, "0 B/s"), (1023, "1023 B/s"), (1024, "1.0 KB/s"),
                                 (1024 ** 2, "1.0 MB/s"), (1024 ** 3, "1.0 GB/s"), (-1, "0 B/s")]:
