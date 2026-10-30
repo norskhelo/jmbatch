@@ -82,7 +82,7 @@ public final class ReaderActivity extends Activity {
         markButton=button("书签",this::showBookmarkInput);controls.addView(new ActionRow(this,chapterButton,favoriteButton,markButton,button("跳转",this::jumpPage)).keepSingleRow());
         viewport=new ReaderViewport(this);viewport.setBackgroundColor(Color.WHITE);viewport.setOnClickListener(v->{if(ready&&!closed){chrome.toggle();updateChromeDescription();}});
         FrameLayout readingArea=new FrameLayout(this);readingArea.addView(viewport,new FrameLayout.LayoutParams(-1,-1));
-        pageCounter=Ui.text(this,"0/0",12);pageCounter.setTextColor(Color.BLACK);pageCounter.setBackgroundColor(Color.WHITE);pageCounter.setPadding(dp(6),dp(2),dp(6),dp(2));
+        pageCounter=Ui.text(this,"0/0",12);pageCounter.setTextColor(Color.BLACK);pageCounter.setPadding(dp(6),dp(2),dp(6),dp(2));
         FrameLayout.LayoutParams counterParams=new FrameLayout.LayoutParams(-2,-2,Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);counterParams.setMargins(dp(12),0,dp(12),dp(8));readingArea.addView(pageCounter,counterParams);
         LinearLayout navigation=Ui.column(this);navigation.setBackgroundColor(Color.WHITE);navigation.setPadding(dp(12),dp(4),dp(12),dp(10));
         status=Ui.text(this,"正在读取漫画…",12);status.setGravity(Gravity.CENTER);status.setTextColor(Ui.MUTED);status.setLines(2);

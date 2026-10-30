@@ -15,7 +15,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Android 0.6.25 — 添加下载多行输入修复\n\n发布日期：2026-10-30\n\nAndroid 0.6.24 → 0.6.25（versionCode 625）。沿用原包名、签名及更新公钥，可覆盖安装并保留数据。Windows 正式版保持 0.3.40。\n\n• 修复添加下载输入框输入、粘贴多行后仍保持单行高度的问题；手动换行和自动换行会撑高输入框，删减后恢复紧凑高度，弹窗同步调整。\n• 保留输入框的原有样式、弹窗居中位置、格式选项和操作按钮。\n• 保留修复包中此前已验证的 Android 本地修订：进入软件时优先恢复下载封面；允许下载期间操作其他漫画的文件；阅读页码移到底部中央，下载列表显示总实时速度。\n\n验证：沿用修复阶段 Android 10/15 共 12 项框架检查及原生文字渲染核对，覆盖键入换行、多行粘贴、窄屏自动换行、删减恢复、弹窗高度和定位；Windows 15 项实际 Tk 检查正常。发布版业务源码与已验证修复包一致，仅调整版本信息和公告。已核验原 APK v2/v3 签名、签名更新清单、源码包与安装包摘要。此次输入框修复未测试实体手机、模拟器或软键盘。\n\n安装：暂停下载后覆盖安装 APK，无需卸载或清除数据。\n";
+    private static final String CURRENT_NOTES="Windows 0.3.42 / Android 0.6.26 — 阅读页码透明底\n\n发布日期：2026-10-30\n\nWindows 0.3.41 → 0.3.42；Android 0.6.25 → 0.6.26（versionCode 626）。沿用原包名、Android 签名及更新公钥，可覆盖安装并保留数据。\n\n• 去掉阅读页码的白色底块，黑色“当前页/总页数”直接叠加在阅读画面上。\n• 保持页码位于底部中央、上一页/下一页按钮上方；滚动、翻页、跳转及隐藏工具栏后仍正确显示。\n• Windows 用阅读画布的无背景文字实现透明，并保持页码位于图片上层；Android 去掉页码背景，保留文字大小和位置。\n\n验证：Windows 隔离源码及最终本地 EXE 模块各 40 项阅读器检查通过，像素对比确认只增加黑色文字、没有底块；Android 原签名 APK 在 BlueStacks 5 / Android 9 常用尺寸和窄屏 1.3 倍字号各 108 项检查通过。正式版复核相同界面代码、版本、源码包、原签名和更新清单，未重复无关功能测试；未测试实体手机或真实网络吞吐。\n\n安装：Windows 退出旧程序后完整解压 ZIP，再运行 JMBatch.exe；Android 直接覆盖安装 APK，无需卸载或清除数据。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

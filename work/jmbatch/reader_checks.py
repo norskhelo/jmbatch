@@ -41,7 +41,8 @@ def check_paging(reader, root, wait):
         assert reader.pager.photo is old
         wait(lambda: reader.current == target)
         elapsed.append(round((time.monotonic() - started) * 1000, 2))
-        assert len(reader.canvas.find_all()) == 3
+        assert set(reader.canvas.find_all()) == {reader.pager.front, reader.pager.back,
+                                                reader.pager.notice, reader.page_counter}
         assert sum(p.width() * p.height() * 4 for p in reader.images.values()) <= 32 * 1024 * 1024
     wait(lambda: not reader.pending)
     target = (reader.current + 1) % len(reader.pages)

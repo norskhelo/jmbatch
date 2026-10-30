@@ -11,7 +11,7 @@ import zipfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-VERSION = "0.3.41"
+VERSION = "0.3.42"
 ZIP_LAYOUT_VERSION = 3
 MAX_TASKS = 2000
 

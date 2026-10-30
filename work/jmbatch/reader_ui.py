@@ -55,9 +55,8 @@ class ReaderWindow:
         self.scrollbar = ttk.Scrollbar(holder, orient="vertical", command=self.scroll)
         self.canvas.pack(fill="both", expand=True)
         self.page_count = tk.StringVar(value="0/0")
-        self.page_counter = tk.Label(holder, textvariable=self.page_count, fg="#000000", bg="white",
-                                     font=('Microsoft YaHei UI', 11), padx=6, pady=2)
-        self.page_counter.place(relx=.5, rely=1, y=-8, anchor='s')
+        self.page_counter = self.canvas.create_text(0, 0, text="0/0", fill="#000000",
+                                                    font=('Microsoft YaHei UI', 11), anchor='s', tags='page-counter')
         self.scrollbar.place(relx=1, x=0, y=0, anchor='ne', relheight=1)
         self.canvas.configure(yscrollcommand=self.scrolled)
         self.canvas.bind("<Configure>", self.resize)
@@ -138,6 +137,7 @@ class ReaderWindow:
             self.relayout()
 
     def resize(self, event):
+        self.draw_page_count()
         if self.resize_timer:
             self.window.after_cancel(self.resize_timer)
         if not hasattr(self, 'chrome') or self.chrome.animating:
@@ -254,6 +254,7 @@ class ReaderWindow:
             return
         if not self.is_scroll():
             self.draw_paged()
+            self.draw_page_count()
             return
         self.canvas.delete("scroll")
         width, height = self.canvas.winfo_width(), self.canvas.winfo_height()
@@ -274,6 +275,7 @@ class ReaderWindow:
                 self.canvas.create_image(width / 2, y, image=photo, anchor="n", tags='scroll')
             else:
                 self.canvas.create_text(width / 2, y + (50 if self.is_scroll() else height / 2), text=self.errors.get(index, "正在加载…"), fill="white", width=max(100, width - 80), tags='scroll')
+        self.draw_page_count()
         # Replace obsolete work. Already decoded results are accepted only for this layout.
         needed = [i for i in visible if i not in self.images and i not in self.errors]
         self.pending = set(needed)
@@ -368,8 +370,16 @@ class ReaderWindow:
             self.draw()
         self.timer = self.window.after(16 if self.pending or self.pager.animating else 80, self.poll)
 
+    def draw_page_count(self):
+        # Canvas text has no background; keep it fixed to the visible viewport.
+        self.canvas.coords(self.page_counter, self.canvas.canvasx(self.canvas.winfo_width() / 2),
+                           self.canvas.canvasy(self.canvas.winfo_height() - 10))
+        self.canvas.itemconfigure(self.page_counter, text=self.page_count.get())
+        self.canvas.tag_raise(self.page_counter)
+
     def refresh_buttons(self):
         self.page_count.set(f"{self.current + 1}/{len(self.pages)}" if self.pages else "0/0")
+        self.draw_page_count()
         entry = self.library.entries.get(self.key, {})
         self.favorite_button.configure(text="取消收藏" if entry.get("favorite") else "收藏")
         self.mark_button.configure(text="书签")
