@@ -358,7 +358,7 @@ public final class LibraryScreen {
             });
         });
     }
-    private void sortMenu(){PopupMenu menu=new PopupMenu(activity,sortButton);String[] names={"名称","时间","大小","章节数"},values={"name","time","size","chapters"};for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,i,names[i]);menu.setOnMenuItemClickListener(item->{sort=values[item.getItemId()];pendingViewState=new Bundle();if(!sort.equals("time"))sortCached();else load();return true;});menu.show();}
+    private void sortMenu(){PopupMenu menu=new PopupMenu(activity,sortButton);String[] names={"名称","时间","大小","章节数","序号"},values={"name","time","size","chapters","number"};for(int i=0;i<names.length;i++)menu.getMenu().add(0,i,i,names[i]);menu.setOnMenuItemClickListener(item->{sort=values[item.getItemId()];pendingViewState=new Bundle();if(!sort.equals("time"))sortCached();else load();return true;});menu.show();}
 
     private void shareSelection(){shareItems(selection());}
     private void shareItems(List<LibraryStore.Entry> items){

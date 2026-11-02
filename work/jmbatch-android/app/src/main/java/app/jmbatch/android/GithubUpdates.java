@@ -15,7 +15,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Windows 0.3.42 / Android 0.6.26 — 阅读页码透明底\n\n发布日期：2026-10-30\n\nWindows 0.3.41 → 0.3.42；Android 0.6.25 → 0.6.26（versionCode 626）。沿用原包名、Android 签名及更新公钥，可覆盖安装并保留数据。\n\n• 去掉阅读页码的白色底块，黑色“当前页/总页数”直接叠加在阅读画面上。\n• 保持页码位于底部中央、上一页/下一页按钮上方；滚动、翻页、跳转及隐藏工具栏后仍正确显示。\n• Windows 用阅读画布的无背景文字实现透明，并保持页码位于图片上层；Android 去掉页码背景，保留文字大小和位置。\n\n验证：Windows 隔离源码及最终本地 EXE 模块各 40 项阅读器检查通过，像素对比确认只增加黑色文字、没有底块；Android 原签名 APK 在 BlueStacks 5 / Android 9 常用尺寸和窄屏 1.3 倍字号各 108 项检查通过。正式版复核相同界面代码、版本、源码包、原签名和更新清单，未重复无关功能测试；未测试实体手机或真实网络吞吐。\n\n安装：Windows 退出旧程序后完整解压 ZIP，再运行 JMBatch.exe；Android 直接覆盖安装 APK，无需卸载或清除数据。\n";
+    private static final String CURRENT_NOTES="Windows 1.0.0 / Android 1.0.0 — 序号排序\n\n发布日期：2026-11-02\n\nWindows 0.3.42 → 1.0.0；Android 0.6.26 → 1.0.0（versionCode 10000）。沿用原包名、Android 签名及更新公钥，可覆盖安装并保留数据。\n\n• 双端版本统一为 1.0.0，兼容原有三段版本号的更新检查。\n• 漫画库“排序方式”新增“序号”，按漫画编号从小到大排列，例如 2、10、100；重复选择保持升序。\n• 保留收藏夹在前、收藏漫画置顶的规则，各组内按编号排序；收藏夹仍按名称排序。\n• 前导零按同一数值处理，相同编号按名称排序；没有有效编号的导入漫画排在同组末尾。直接使用已有记录，不额外读取漫画文件。\n\n安装：Windows 退出旧程序后完整解压 ZIP，再运行 JMBatch.exe；Android 直接覆盖安装 APK，无需卸载或清除数据。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

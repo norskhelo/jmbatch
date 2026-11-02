@@ -93,15 +93,23 @@ def sort_menu(view):
                 return facts
             view.run(load,lambda facts:(setattr(view,'sort_facts',facts),view.render()))
         else:view.render()
-    for label,value in [('名称','name'),('时间','time'),('大小','size'),('章节数','chapters')]:menu.add_command(label=label,command=lambda m=value:choose(m))
+    for label,value in [('名称','name'),('时间','time'),('大小','size'),('章节数','chapters'),('序号','number')]:menu.add_command(label=label,command=lambda m=value:choose(m))
     menu.tk_popup(view.sort_button.winfo_rootx(),view.sort_button.winfo_rooty()+view.sort_button.winfo_height())
+
+
+def number_key(value):
+    """Compare numeric comic IDs without integer limits; unknown IDs sort last."""
+    if not isinstance(value,str) or not value or not value.isascii() or not value.isdigit():
+        return 1,0,''
+    number=value.lstrip('0') or '0'
+    return 0,len(number),number
 
 
 def sorted_items(view,items):
     from name_sort import name_key
     facts=({key:item.get('chapter_count',-1) for key,item in view.library.entries.items()}
            if view.sort_mode=='chapters' else dict(view.sort_facts))
-    if view.sort_mode!='name':
+    if view.sort_mode not in ('name','number'):
         folders={key:0 for key,item in items if item.get('format')=='collection'}
         for key,item in view.library.entries.items():
             folder=item.get('collection','')
@@ -113,6 +121,8 @@ def sorted_items(view,items):
         identity,item=pair
         group=0 if item.get('format')=='collection' else 1 if item.get('favorite') else 2
         title=name_key(item['title'])
+        if view.sort_mode=='number':
+            return group,number_key(item.get('id') if group else None),title
         return group,title if view.sort_mode=='name' else facts.get(identity,0),title
     return sorted(items,key=key)
 

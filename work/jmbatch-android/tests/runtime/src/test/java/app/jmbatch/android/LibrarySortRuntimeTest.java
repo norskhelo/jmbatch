@@ -49,6 +49,61 @@ public class LibrarySortRuntimeTest {
         comics.add(e);return e;
     }
     List<String> titles(List<LibraryStore.Entry> entries){List<String> result=new ArrayList<>();for(LibraryStore.Entry e:entries)result.add(e.title);return result;}
+    @Test public void numberSortUsesNumericIdsKeepsGroupsAndDoesNotReadFiles()throws Exception {
+        String[][] data={{"10","ten"},{"2","two-z"},{"0002","two-a"},{"0","zero"},
+            {"999999999999999999999999","huge"},{"","missing"},{"JM2","invalid"}};
+        List<LibraryStore.Entry> source=new ArrayList<>();
+        for(String[] row:data)source.add(new LibraryStore.Entry(row[0],row[1],"content://unavailable/"+row[1],"","","zip",false));
+        assertEquals(Arrays.asList("zero","two-a","two-z","ten","huge","invalid","missing"),titles(LibrarySort.sorted(context,source,"number")));
+        source.add(new LibraryStore.Entry("100","favorite","content://unavailable/favorite","","","zip",true));
+        source.add(new LibraryStore.Entry("","fav unknown","content://unavailable/unknown","","","zip",true));
+        source.add(new LibraryStore.Entry("1","Z folder","collection:z","","","collection",false));
+        source.add(new LibraryStore.Entry("9","A folder","collection:a","","","collection",false));
+        assertEquals(Arrays.asList("A folder","Z folder","favorite","fav unknown","zero","two-a","two-z","ten","huge","invalid","missing"),titles(LibrarySort.sorted(context,source,"number")));
+        assertEquals("ten",source.get(0).title);
+    }
+
+    @Test public void numberMenuSortsImmediatelyAndRepeatedChoiceDoesNotToggle()throws Exception {
+        for(String id:new String[]{"10","2","0002"}) {
+            LibraryStore.Entry e=book(id,false,1,"");
+        }
+        library.importFound(comics);
+        controller=Robolectric.buildActivity(Activity.class);Activity activity=controller.get();activity.setTheme(android.R.style.Theme_Material_Light_NoActionBar);controller.setup();
+        screen=new LibraryScreen(activity,Store.get(activity));screen.show();settle();
+        CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1);
+        ((ExecutorService)field(screen,"worker")).submit(()->{entered.countDown();try{release.await(10,TimeUnit.SECONDS);}catch(InterruptedException e){Thread.currentThread().interrupt();}});
+        assertTrue(entered.await(5,TimeUnit.SECONDS));
+        try {
+            for(int repeat=0;repeat<2;repeat++) {
+                ((Button)field(screen,"sortButton")).performClick();PopupMenu popup=ShadowPopupMenu.getLatestPopupMenu();
+                assertEquals(5,popup.getMenu().size());assertEquals("序号",popup.getMenu().getItem(4).getTitle().toString());
+                shadowOf(popup).getOnMenuItemClickListener().onMenuItemClick(popup.getMenu().getItem(4));popup.dismiss();
+                assertEquals("number",field(screen,"sort"));assertFalse((Boolean)field(screen,"loading"));
+                @SuppressWarnings("unchecked") List<LibraryStore.Entry> entries=(List<LibraryStore.Entry>)field(screen,"entries");
+                assertEquals(Arrays.asList("0002","2","10"),titles(entries));
+            }
+        }finally{release.countDown();}
+    }
+
+    @Test @Config(qualifiers="w320dp-h640dp-mdpi") @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    public void numberMenuFitsAndRendersAllFiveChoices()throws Exception {
+        controller=Robolectric.buildActivity(Activity.class);Activity activity=controller.get();activity.setTheme(android.R.style.Theme_Material_Light_NoActionBar);controller.setup().visible();
+        screen=new LibraryScreen(activity,Store.get(activity));screen.show();settle();
+        ((Button)field(screen,"sortButton")).performClick();shadowOf(Looper.getMainLooper()).idle();
+        PopupMenu popup=ShadowPopupMenu.getLatestPopupMenu();Object helper=field(popup,"mPopup");
+        Method getPopup=helper.getClass().getMethod("getPopup");getPopup.setAccessible(true);Object nativePopup=getPopup.invoke(helper);
+        Method getList=nativePopup.getClass().getMethod("getListView");getList.setAccessible(true);ListView list=(ListView)getList.invoke(nativePopup);
+        View decor=list.getRootView();shadowOf(Looper.getMainLooper()).idle();
+        assertEquals(5,list.getCount());assertEquals(5,list.getChildCount());
+        View last=list.getChildAt(4);assertTrue(last.getBottom()<=list.getHeight());
+        assertTrue(decor.getWidth()<=activity.getResources().getDisplayMetrics().widthPixels);
+        assertTrue(decor.getHeight()>0);
+        android.graphics.Bitmap image=android.graphics.Bitmap.createBitmap(decor.getWidth(),decor.getHeight(),android.graphics.Bitmap.Config.ARGB_8888);
+        decor.draw(new android.graphics.Canvas(image));
+        File directory=new File(System.getProperty("jm.test.classes"),"number-sort-preview");directory.mkdirs();
+        try(FileOutputStream out=new FileOutputStream(new File(directory,"menu-"+android.os.Build.VERSION.SDK_INT+".png"))){image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}
+        finally{image.recycle();popup.dismiss();}
+    }
     @Test public void pinyinComparesEveryCharacterAndPreservesSyllableBoundaries() {
         List<String> names=new ArrayList<>(Arrays.asList("安中白","白安","安中阿","安波","安","安阿"));
         names.sort((a,b)->NameSort.compare(NameSort.key(a),NameSort.key(b)));

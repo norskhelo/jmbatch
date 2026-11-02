@@ -48,6 +48,34 @@ class LibrarySortTest(TestCase):
         self.items = [pair for pair in self.items if pair[0].startswith('fav')]
         self.assertEqual(self.keys(), ['fav-c', 'fav-z'])
 
+    def test_numbers_are_numeric_with_leading_zero_ties_and_unknowns_last(self):
+        self.items=[(title,dict(title=title,id=number)) for title,number in [
+            ('ten','10'),('two-z','2'),('two-a','0002'),('zero','0'),
+            ('huge','999999999999999999999999'),('missing',''),('invalid','JM2')]]
+        self.view.sort_mode='number'
+        self.assertEqual(self.keys(),['zero','two-a','two-z','ten','huge','invalid','missing'])
+        self.assertEqual(self.items[0][0],'ten')
+
+    def test_numbers_keep_folder_and_favorite_priority(self):
+        for index,(_,item) in enumerate(self.items):item['id']=str(10-index)
+        self.view.sort_mode='number'
+        self.assertEqual(self.keys(),['folder-a','folder-z','fav-c','fav-z','normal-a','normal-b'])
+        self.items[5][1]['id']=''
+        self.assertEqual(self.keys(),['folder-a','folder-z','fav-z','fav-c','normal-a','normal-b'])
+
+    def test_number_menu_sorts_immediately_and_does_not_toggle(self):
+        self.view.window=Mock();self.view.sort_button=Mock();self.view.busy=False
+        self.view.sort_button.winfo_rooty.return_value=10
+        self.view.sort_button.winfo_height.return_value=20
+        self.view.render=Mock();self.view.run=Mock()
+        with patch('ui_library.tk.Menu') as factory:
+            sort_menu(self.view)
+            item=next(c.kwargs for c in factory.return_value.add_command.call_args_list if c.kwargs['label']=='序号')
+            item['command']();first=self.keys();item['command']()
+        self.assertEqual(self.view.sort_mode,'number')
+        self.assertEqual(self.keys(),first)
+        self.view.run.assert_not_called()
+
     def test_pinyin_names_apply_inside_all_groups_and_metadata_ties(self):
         self.items = [(str(i), dict(title=title, favorite=group==1,
                                   format='collection' if group==0 else 'images'))
