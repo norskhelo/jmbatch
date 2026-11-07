@@ -15,7 +15,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Android 1.0.2 — 检查更新与下载提速\n\n• 漫画库批量检查共用一次会话，最多同时检查三本漫画。单本失败会显示 JM 编号和原因，其余漫画仍可下载更新。\n• 新任务取得首份章节页清单后即可开始下载图片，其余章节继续读取。最终文件按所选章序排列，暂停或重试会先校验已缓存的图片。\n• 确认下载的新章节会自动追加到原漫画，可在同一本内连续阅读和导出。旧版已经分开的漫画保留各自的文件和书目。\n\n本版沿用原包名和签名，可覆盖安装 Android 1.0.1 正式版或本地修复版。\n";
+    private static final String CURRENT_NOTES="Android 1.0.3 — 删除更新分册后可重新检查\n\n• 修复删除独立更新分册后，漫画库再次检查只提示“检查完成”的问题。现在按仍在库中的文件判断哪些章节可下载。只清理已完成的下载任务时，保留的分册仍参与检查。\n• 如果旧版下载任务已经清除，可从原图片文件夹的编号子目录恢复检查位置。确认下载后，新章节会追加到原漫画。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

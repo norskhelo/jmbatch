@@ -415,12 +415,11 @@ public final class LibraryScreen {
             Map<LibraryStore.Entry,ChapterUpdates.Result> changed=new LinkedHashMap<>();
             List<String> failures=new ArrayList<>();
             try{
-                ChapterUpdates.record(activity,store.snapshot());
-                Set<String> singleChapterAlbums=ChapterUpdates.knownSingleChapterAlbums(activity);
+                library.sync(store.snapshot());
                 Map<String,LibraryStore.Entry> books=new LinkedHashMap<>();
                 for(LibraryStore.Entry book:library.list("",false)){
                     control.check();
-                    if(book.id.matches("[0-9]{1,10}")&&!(book.chapterCount==1&&singleChapterAlbums.contains(book.id)))
+                    if(book.id.matches("[0-9]{1,10}")&&!(book.chapterCount==1&&book.history.single()))
                         books.put(book.id,book); // newest first: append future updates to the earliest saved copy
                 }
                 if(!books.isEmpty()){
@@ -529,7 +528,7 @@ public final class LibraryScreen {
                 if(cancelled.get())throw new OperationCanceledException();
                 List<ChapterRules.Chapter> catalog=chapterUpdateSession.open(options,cookie,control).get(entry.id);
                 if(cancelled.get())throw new OperationCanceledException();
-                ChapterUpdates.record(activity,store.snapshot());result[0]=ChapterUpdates.compare(activity,entry.id,catalog);
+                library.sync(store.snapshot());result[0]=ChapterUpdates.compare(activity,entry.id,catalog);
                 return "章节目录检查完成";
             }finally{updateControl=null;control.cancel("检查结束");}
         },()->{

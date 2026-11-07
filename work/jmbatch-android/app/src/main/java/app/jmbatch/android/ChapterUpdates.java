@@ -3,7 +3,7 @@ package app.jmbatch.android;
 import android.content.Context;
 import android.util.AtomicFile;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
+import android.net.Uri;
 import java.util.*;
 import org.json.*;
 
@@ -30,51 +30,96 @@ public final class ChapterUpdates {
         AtomicFile file=file(context);if(!file.getBaseFile().exists())return new JSONObject();
         try(InputStream in=file.openRead()){ByteArrayOutputStream out=new ByteArrayOutputStream();Core.copy(in,out);return new JSONObject(out.toString("UTF-8"));}
     }
-    private static void write(Context context,JSONObject data)throws Exception {
-        AtomicFile file=file(context);FileOutputStream out=null;
-        try{out=file.startWrite();out.write(data.toString().getBytes(StandardCharsets.UTF_8));file.finishWrite(out);}
-        catch(Exception error){if(out!=null)file.failWrite(out);throw error;}
-    }
-    private static Set<String> ids(JSONObject item,String key)throws Exception {
-        Set<String> ids=new TreeSet<>();JSONArray array=item.optJSONArray(key);
-        if(array!=null)for(int i=0;i<array.length();i++)ids.add(array.getString(i));return ids;
-    }
-    static synchronized Set<String> knownSingleChapterAlbums(Context context)throws Exception {
-        JSONObject history=read(context);
-        Set<String> albums=new HashSet<>();
-        for(Iterator<String> keys=history.keys();keys.hasNext();){
-            String id=keys.next();
-            JSONObject item=history.getJSONObject(id);
-            Set<String> chapters=ids(item,"known");
-            if(chapters.size()==1&&chapters.containsAll(ids(item,"anchors")))albums.add(id);
+    static final class History {
+        static final History EMPTY=new History(Collections.emptySet(),Collections.emptySet());
+        final Set<String> known,anchors;
+        History(Set<String> known,Set<String> anchors){
+            this.known=Collections.unmodifiableSet(known);this.anchors=Collections.unmodifiableSet(anchors);
         }
-        return albums;
-    }
-    static synchronized void record(Context context,List<Store.Task> tasks)throws IOException {
-        try{
-            JSONObject data=read(context);boolean changed=false;
-            for(Store.Task task:tasks){
-                if(!task.status.equals("done")||task.resultUri.isEmpty())continue;
-                JSONObject item=data.optJSONObject(task.id);if(item==null)item=new JSONObject();
-                String key=task.chapterOptions.isEmpty()?"anchors":"known";Set<String> ids=ids(item,key);int before=ids.size();
-                for(ChapterRules.Chapter c:task.chapterOptions.isEmpty()?task.selectedChapters:task.chapterOptions)ids.add(c.id);
-                if(ids.size()!=before){item.put(key,new JSONArray(ids));data.put(task.id,item);changed=true;}
+        private static Set<String> ids(JSONArray array)throws JSONException {
+            Set<String> ids=new TreeSet<>();
+            if(array!=null)for(int i=0;i<array.length();i++)ids.add(array.getString(i));
+            return ids;
+        }
+        static History from(JSONObject item)throws JSONException {
+            return item==null?EMPTY:new History(ids(item.optJSONArray("known")),ids(item.optJSONArray("anchors")));
+        }
+        JSONObject json()throws JSONException {
+            return new JSONObject().put("known",new JSONArray(known)).put("anchors",new JSONArray(anchors));
+        }
+        boolean empty(){return known.isEmpty()&&anchors.isEmpty();}
+        boolean single(){return known.size()==1&&known.containsAll(anchors);}
+        History record(Store.Task task){
+            boolean hasCatalog=!task.chapterOptions.isEmpty();
+            Set<String> previous=hasCatalog?known:anchors,added=null;
+            for(ChapterRules.Chapter chapter:hasCatalog?task.chapterOptions:task.selectedChapters){
+                if(previous.contains(chapter.id))continue;
+                if(added==null)added=new TreeSet<>(previous);
+                added.add(chapter.id);
             }
-            if(changed)write(context,data);
-        }catch(Exception error){throw new IOException("章节更新记录保存失败："+error.getMessage(),error);}
-    }
-    static synchronized Result compare(Context context,String id,List<ChapterRules.Chapter> catalog)throws Exception {
-        ChapterRules.resolve(catalog,Collections.emptyList(),true); // validate unique IDs and nonempty catalogue
-        JSONObject data=read(context),item=data.optJSONObject(id);if(item==null)item=new JSONObject();
-        Set<String> known=ids(item,"known");boolean initialized=false;
-        if(known.isEmpty()){
-            Set<String> anchors=ids(item,"anchors");int last=-1;
-            for(int i=0;i<catalog.size();i++)if(anchors.contains(catalog.get(i).id))last=i;
-            initialized=last<0;if(initialized)last=catalog.size()-1;
-            for(int i=0;i<=last;i++)known.add(catalog.get(i).id);
-            item.put("known",new JSONArray(known));data.put(id,item);write(context,data);
+            if(added==null)return this;
+            return hasCatalog?new History(added,anchors):new History(known,added);
         }
-        List<ChapterRules.Chapter> fresh=new ArrayList<>();for(ChapterRules.Chapter c:catalog)if(!known.contains(c.id))fresh.add(c);
+    }
+
+    // Legacy exports stored chapter numbers in folder names and one catalogue per JM ID.
+    // Read only the first directory level. A flat, single-chapter folder has no ordinal.
+    private static int lastFolderChapter(Context context,LibraryStore.Entry book)throws IOException {
+        int last=0;
+        for(AlbumStorage.Node node:AlbumStorage.children(context,Uri.parse(book.uri))){
+            if(node.directory&&node.name.matches("[0-9]{4,8}"))last=Math.max(last,Integer.parseInt(node.name));
+        }
+        return last;
+    }
+
+    private static History resolve(Context context,LibraryStore.Entry book,History legacy,List<ChapterRules.Chapter> catalog)throws Exception {
+        Set<String> anchors=book.history.anchors;
+        int last=-1;
+        if(anchors.isEmpty()&&!legacy.known.isEmpty()){
+            if(book.format.equals("images")&&legacy.known.size()>1&&book.chapterCount<legacy.known.size()){
+                int number=lastFolderChapter(context,book);
+                if(number>0){
+                    // Ignore genuinely new insertions when mapping the saved chapter numbers.
+                    List<String> oldOrder=new ArrayList<>();
+                    for(ChapterRules.Chapter c:catalog)if(legacy.known.contains(c.id))oldOrder.add(c.id);
+                    if(oldOrder.size()!=legacy.known.size()||number>oldOrder.size())
+                        throw new IOException("旧章节目录已变化，无法核对原图片文件夹的章节位置");
+                    return new History(new TreeSet<>(oldOrder.subList(0,number)),Collections.emptySet());
+                }
+            }
+            return legacy;
+        }
+        if(anchors.isEmpty())anchors=legacy.anchors;
+        for(int i=0;i<catalog.size();i++)if(anchors.contains(catalog.get(i).id))last=i;
+        if(last<0)last=catalog.size()-1;
+        Set<String> known=new TreeSet<>();
+        for(int i=0;i<=last;i++)known.add(catalog.get(i).id);
+        return new History(known,anchors);
+    }
+
+    static Result compare(Context context,String id,List<ChapterRules.Chapter> catalog)throws Exception {
+        ChapterRules.resolve(catalog,Collections.emptyList(),true);
+        LibraryStore library=LibraryStore.get(context);
+        List<LibraryStore.Entry> copies=library.albumEntries(id);
+        if(copies.isEmpty())throw new IOException("原漫画已移除，请刷新漫画库");
+        Set<String> known=new HashSet<>();History legacy=null;
+        boolean initialized=true;
+        boolean hasHistory=false;
+        for(LibraryStore.Entry copy:copies)if(!copy.history.empty()){hasHistory=true;break;}
+        for(LibraryStore.Entry book:copies){
+            History history=book.history;
+            if(history.known.isEmpty()){
+                if(legacy==null)legacy=History.from(read(context).optJSONObject(id));
+                // An untracked import must not mask updates confirmed by a tracked sibling.
+                if(history.empty()&&hasHistory&&legacy.empty())continue;
+                if(!history.empty()||!legacy.empty())initialized=false;
+                history=resolve(context,book,legacy,catalog);
+                library.rememberChapters(book,history);
+            }else initialized=false;
+            known.addAll(history.known);
+        }
+        List<ChapterRules.Chapter> fresh=new ArrayList<>();
+        for(ChapterRules.Chapter c:catalog)if(!known.contains(c.id))fresh.add(c);
         return new Result(new ArrayList<>(catalog),fresh,initialized);
     }
 }
