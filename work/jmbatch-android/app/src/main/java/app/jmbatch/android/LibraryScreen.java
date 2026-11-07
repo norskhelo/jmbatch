@@ -71,7 +71,7 @@ public final class LibraryScreen {
     private volatile CancellationSignal scanSignal;
     private volatile JmApi.Control updateControl;
     private final ChapterUpdates.Open chapterUpdateSession;
-    public LibraryScreen(Activity activity,Store store){this(activity,store,ChapterUpdates::open);}
+    public LibraryScreen(Activity activity,Store store){this(activity,store,(options,cookie,control)->ChapterUpdates.open(activity,options,cookie,control));}
     LibraryScreen(Activity activity,Store store,ChapterUpdates.Open open){this.activity=activity;this.store=store;this.chapterUpdateSession=open;}
     private int dp(int n){return (int)(n*activity.getResources().getDisplayMetrics().density);}
     private boolean visible(){return page!=null&&page.getParent()!=null&&!activity.isFinishing()&&!activity.isDestroyed()&&(dialog==null||dialog.isShowing());}

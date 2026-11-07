@@ -245,7 +245,7 @@ public class ChapterUpdatesRuntimeTest {
     @Test public void fetchPreservesCallersCancellationReason()throws Exception {
         JmApi.Control control=new JmApi.Control();
         control.cancel("检查已取消");
-        try{ChapterUpdates.open(store.settings,"",control).get("654321");fail();}catch(IOException expected){}
+        try{ChapterUpdates.open(context,store.settings,"",control).get("654321");fail();}catch(IOException expected){}
         assertEquals("检查已取消",control.stop);
     }
     @Test public void legacySingleLocalChapterCanBelongToSeries()throws Exception {

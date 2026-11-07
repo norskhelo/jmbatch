@@ -15,7 +15,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Android 1.0.4 — 漫画库检查提速与下载进度修复\n\n• 检查漫画库时最多并行查询四本，短时间内重复匿名检查可复用已验证的会话。每次检查都会重新获取在线章节目录，遇到慢线路会尝试备用线路。\n• 漫画更新使用普通下载流程，下载范围为确认的新增章节。先读取全部所选章节的图片清单，再校验缓存并下载。列表显示当前准备阶段，取得确切的图片总数后显示下载进度，更新的章节继续追加到原漫画。\n";
+    private static final String CURRENT_NOTES="Android 1.0.5 — 漫画库检查时限与线路复用\n\n• 漫画库检查更新时，每本漫画从开始查询起最多等待 15 秒。线路切换和重试共用这段时间，超时会显示该漫画的编号，其他漫画继续检查。\n• 优先使用上次成功取得章节目录的线路，重启应用后也可复用。旧线路失败或约 1 秒仍未响应时，会并行查找备用线路。每次检查都重新获取在线目录。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

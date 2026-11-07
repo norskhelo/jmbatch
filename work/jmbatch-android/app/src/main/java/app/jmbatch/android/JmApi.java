@@ -128,7 +128,7 @@ public final class JmApi {
     public JmApi(Store.Settings settings, String cookie, Control control) { this(settings,cookie,control,new FallbackDns()); }
     JmApi(Store.Settings settings,String cookie,Control control,FallbackDns fallbackDns) { this.settings=settings;userCookie=cookie;this.control=control;this.fallbackDns=fallbackDns; }
 
-    boolean openCatalog() throws Exception {
+    boolean reuseAnonymousCatalog() {
         long now=SystemClock.elapsedRealtime();
         previousCatalog=anonymousCatalog.get();
         if(userCookie.isEmpty()&&previousCatalog!=null&&now<previousCatalog.routes.expires){
@@ -138,16 +138,39 @@ public final class JmApi {
             quickCatalog=true;
             return true;
         }
-        initializeCatalogRoutes(false);
-        return quickCatalog;
+        return false;
     }
 
-    void initializeCatalogRoutes(boolean forceDiscovery)throws Exception {
+    void initializeSavedCatalog(String host)throws Exception {
+        previousCatalog=anonymousCatalog.get();
+        sessionRoutes=rememberedRoutes.get();
+        domains=Collections.singletonList(host);
+        quickCatalog=true;
+        rawApi("/setting",false);
+        catalogExpires=SystemClock.elapsedRealtime()+120000L;
+        domains=NetworkRoutes.merge(domains,Arrays.asList(DEFAULT_API));
+    }
+
+    JmApi catalogRequest(Control requestControl) {
+        JmApi request=new JmApi(settings,userCookie,requestControl,fallbackDns);
+        request.cookies=cookies;
+        request.domains=domains;
+        request.preferred=preferred;
+        request.previousCatalog=previousCatalog;
+        request.sessionRoutes=sessionRoutes;
+        request.catalogExpires=catalogExpires;
+        request.quickCatalog=quickCatalog;
+        return request;
+    }
+
+    boolean usesQuickCatalog(){return quickCatalog;}
+
+    void initializeCatalogRoutes(boolean forceDiscovery,boolean quickFirst)throws Exception {
         previousCatalog=anonymousCatalog.get();
         sessionRoutes=rememberedRoutes.get();
         boolean cached=!forceDiscovery&&sessionRoutes!=null&&SystemClock.elapsedRealtime()<sessionRoutes.expires;
         domains=cached?new ArrayList<>(sessionRoutes.hosts):discoverCatalogRoutes();
-        if(!forceDiscovery){
+        if(quickFirst){
             quickCatalog=true;
             try{
                 rawApi("/setting",false);
@@ -198,13 +221,16 @@ public final class JmApi {
         }
     }
 
-    void rememberCatalog() {
-        ApiRoutes routes=new ApiRoutes(NetworkRoutes.merge(Collections.singletonList(domains.get(preferred)),domains),catalogExpires);
+    String rememberCatalog(JmApi successful) {
+        preferred=successful.preferred;
+        String host=successful.domains.get(successful.preferred);
+        ApiRoutes routes=new ApiRoutes(NetworkRoutes.merge(Collections.singletonList(host),domains),catalogExpires);
         rememberedRoutes.compareAndSet(sessionRoutes,routes);
-        if(!userCookie.isEmpty())return;
+        if(!userCookie.isEmpty())return host;
         CatalogConnection next=new CatalogConnection(routes,cookies);
         CatalogConnection current=anonymousCatalog.get();
         if(current==previousCatalog||(current!=null&&current.cookies==cookies))anonymousCatalog.compareAndSet(current,next);
+        return host;
     }
     void forgetCatalog(){
         CatalogConnection current=anonymousCatalog.get();
