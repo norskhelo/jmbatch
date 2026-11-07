@@ -166,9 +166,9 @@ public final class DownloadService extends Service {
                         String result=new Downloader(DownloadService.this,store,task,attempt,store.cookie).run();
                         synchronized(store){
                             task.resultUri=result;
-                            if(task.discardRequested){task.cleanupUri=result;stopped();}
+                            if(task.discardRequested&&task.updateParent.isEmpty()){task.cleanupUri=result;stopped();}
                             else{
-                                task.status="done";task.cleanupUri="";task.phase="下载完成"+(task.cleanupNote.isEmpty()?"":"；"+task.cleanupNote);task.error="";
+                                task.discardRequested=false;task.status="done";task.cleanupUri="";task.phase=(task.updateParent.isEmpty()?"下载完成":"新章节已并入原漫画")+(task.cleanupNote.isEmpty()?"":"；"+task.cleanupNote);task.error="";
                                 try{LibraryStore.get(DownloadService.this).sync(store.snapshot());}catch(Exception error){store.note="文件已下载，但漫画列表保存失败："+error.getMessage();}
                             }
                         }

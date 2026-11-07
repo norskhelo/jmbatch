@@ -29,6 +29,7 @@ public final class DownloadDisplay {
         return status.equals("done") ? 100 : total > 0 ? Math.min(99.9, Math.max(0, done) * 100.0 / total) : 0;
     }
     public static String progress(int done, int total, String status) {
+        if(status.equals("running")&&done>0&&total==0)return String.format(Locale.ROOT,"已完成 %d 张 · 正在读取其余章节",done);
         return String.format(Locale.ROOT, "%.1f%% · %d/%s 张", percent(done, total, status), done, total > 0 ? String.valueOf(total) : "?");
     }
     public static String sizeText(int done, int total, long images, long result, String status) {

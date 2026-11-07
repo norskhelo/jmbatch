@@ -33,7 +33,12 @@ public final class Downloader {
     public String run() throws Exception {
         task.cleanupNote="";
         File marker = new File(cache, "completed.json");
-        if (marker.isFile()) {
+        if(!task.updateParent.isEmpty()){
+            ChapterMerge.recover(store);
+            if(!task.resultUri.isEmpty())return task.resultUri;
+            LibraryStore.get(context).byUri(task.updateParent);
+        }
+        if (task.updateParent.isEmpty() && marker.isFile()) {
             try {
                 JSONObject finished = new JSONObject(readText(marker)); Uri uri = Uri.parse(finished.getString("uri"));
                 if(task.settings.format.equals("images")) {
@@ -85,48 +90,44 @@ public final class Downloader {
                 return new ChapterMetadata.Detail(images,decodeParameter(id));
             }
         };
-        List<ChapterMetadata.Detail> details;
-        try{details=ChapterMetadata.load(selectedIds,metadata,fetch,control::check,
-            ()->{if(control.stop.isEmpty())control.cancel("ABORT");},
-            (done,total,cached)->{control.lastData=SystemClock.elapsedRealtime();task.phase="读取所选章节 "+done+"/"+total+"（复用 "+cached+" 章，最多 "+task.settings.chapterWorkers+" 章并行）";},task.settings.timeout,task.settings.chapterWorkers);}
-        catch(ChapterMetadata.UnstoppedWorkers error){control.cancel("FATAL");task.phase="等待旧章节线程退出后处理任务";error.awaitStopped();throw error;}
-        List<ImageJob> jobs = new ArrayList<>(); Set<String> chapterIds = new HashSet<>(); int detailIndex=0;
-        for (ChapterRules.Chapter chapter : chosen) {
-            control.check(); String id = chapter.id;
-            if (!id.matches("[0-9]{1,10}")) throw new IOException("服务端章节编号无效");
-            if (!chapterIds.add(id)) continue;
-            int index = chapter.number; ChapterMetadata.Detail detail=details.get(detailIndex++); List<String> files=detail.images;
-            File directory = new File(new File(cache, "images"), String.format(Locale.ROOT, "%04d", index));
-            if (!directory.exists() && !directory.mkdirs()) throw new IOException("无法创建图片目录");
-            for (int p = 0; p < files.size(); p++) {
-                ImageJob job = new ImageJob(); job.chapterId = id; job.filename = files.get(p); job.chapter = index; job.page = p + 1; job.scramble = detail.scramble;
-                job.target = new File(directory, String.format(Locale.ROOT, "%05d.jpg", p + 1)); jobs.add(job);
-                if (jobs.size() > 20000) throw new IOException("单本超过 20000 张图片，请拆分任务");
+        Map<String,ChapterRules.Chapter> chapters=new HashMap<>();
+        for(ChapterRules.Chapter chapter:chosen)chapters.put(chapter.id,chapter);
+        Map<String,List<ImageJob>> chapterJobs=new HashMap<>();
+        List<SinglePageRecovery.Failure<ImageJob>> failed=new ArrayList<>();
+        boolean resume=new File(cache,"images").exists();
+        if(!resume){
+            synchronized(task){task.total=task.done=task.cached=0;task.bytes=task.imageBytes=0;}
+        }
+        try{
+            ChapterMetadata.stream(selectedIds,metadata,fetch,control::check,this::abortWorkers,
+                (done,total,cached)->{control.lastData=SystemClock.elapsedRealtime();task.phase="读取所选章节 "+done+"/"+total;},
+                task.settings.timeout,task.settings.chapterWorkers,batch->{
+                    List<ImageJob> pending=new ArrayList<>();
+                    for(ChapterMetadata.Result ready:batch){
+                        List<ImageJob> pages=jobsFor(chapters.get(ready.id),ready.detail);
+                        chapterJobs.put(ready.id,pages);
+                        if(!resume)pending.addAll(pages);
+                    }
+                    if(!resume){
+                        if(chapterJobs.size()==chosen.size())task.total=chapterJobs.values().stream().mapToInt(List::size).sum();
+                        downloadPages(api,pending,failed);
+                    }
+                });
+        }catch(ChapterMetadata.UnstoppedWorkers error){
+            control.cancel("FATAL");task.phase="等待旧章节线程退出后处理任务";error.awaitStopped();throw error;
+        }
+        List<ImageJob> jobs=new ArrayList<>();
+        for(ChapterRules.Chapter chapter:chosen)jobs.addAll(chapterJobs.get(chapter.id));
+        if(resume){
+            task.stage=control.stage="cache";task.speed=0;
+            ResumeCache.Result<ImageJob> restored=ResumeCache.scan(jobs,control::check,
+                job->job.target.isFile()&&validImage(job.target)?job.target.length():-1,
+                (checked,total,cached)->{control.lastData=SystemClock.elapsedRealtime();task.phase="校验已有图片 "+checked+"/"+total;});
+            synchronized(task){
+                task.total=jobs.size();task.done=task.cached=restored.cached;task.bytes=0;task.imageBytes=restored.imageBytes;
             }
+            downloadPages(api,restored.pending,failed);
         }
-        task.stage = control.stage = "cache"; task.speed = 0;
-        task.phase = "正在校验已有图片，保留原进度";
-        ResumeCache.Result<ImageJob> restored = ResumeCache.scan(jobs, control::check,
-            job -> job.target.isFile() && validImage(job.target) ? job.target.length() : -1,
-            (checked, total, cached) -> {
-                control.lastData = SystemClock.elapsedRealtime();
-                task.phase = "校验已有图片 " + checked + "/" + total + "，已确认 " + cached + " 张可复用";
-            });
-        synchronized (task) {
-            task.total = jobs.size(); task.done = task.cached = restored.cached;
-            task.bytes = 0; task.imageBytes = restored.imageBytes;
-        }
-        task.stage = control.stage = "download"; task.downloadStarted = control.lastData = SystemClock.elapsedRealtime();
-        task.phase = "已恢复 " + task.done + "/" + task.total + " 张图片，继续下载剩余 " + restored.pending.size() + " 张";
-        List<SinglePageRecovery.Failure<ImageJob>> failed = new ArrayList<>();
-        try {
-            for (ImagePipeline.Failure<ImageJob> failure : ImagePipeline.run(restored.pending,
-                    task.settings.threads, ImageMemory.SHARED.workers(),
-                    job -> fetchImage(api, job, 0), this::finishImage, this::clearTemporaryImage,
-                    control::check, () -> { if (control.stop.isEmpty()) control.cancel("ABORT"); }, task.settings.timeout))
-                failed.add(new SinglePageRecovery.Failure<>(failure.page, failure.error,
-                    "第 " + failure.page.chapter + " 章第 " + failure.page.page + " 页"));
-        } catch (ImagePipeline.UnstoppedWorkers error) { control.cancel("FATAL");task.phase="等待旧图片线程退出后处理任务";error.awaitStopped();throw error; }
         control.check();
         for(SinglePageRecovery.Failure<ImageJob> failure:failed)metadata.invalidate(failure.page.chapterId);
         SinglePageRecovery.recover(failed,(job,round)->downloadImage(api,job,round),control::check,
@@ -143,10 +144,17 @@ public final class Downloader {
             task.phase="校验图片 "+pages.size()+"/"+jobs.size();
         }
         checkSpace(totalSize + 64L*1024*1024);
+        if(!task.updateParent.isEmpty()){
+            task.stage=control.stage="export";task.phase="正在合并到原漫画";
+            List<AlbumStorage.Image> addition=new ArrayList<>();
+            for(ImageJob job:jobs)addition.add(new AlbumStorage.Image(job.chapter,job.page,Uri.fromFile(job.target),job.target.length(),job.target.getName()));
+            String merged=ChapterMerge.download(store,task,addition,control::check);
+            task.resultBytes=totalSize;cleanImageCache();return merged;
+        }
         if(task.settings.format.equals("images")) {
             JSONArray entries=new JSONArray();List<FolderSave.Entry> sources=new ArrayList<>();
             for(ImageJob job:jobs){
-                control.check();String relative=AlbumRules.imageName(job.chapter,job.page,chapterIds.size());long size=job.target.length();
+                control.check();String relative=AlbumRules.imageName(job.chapter,job.page,chosen.size());long size=job.target.length();
                 sources.add(new FolderSave.Entry(job.target,relative,size));
                 entries.put(new JSONObject().put("chapter",job.chapter).put("page",job.page).put("file",relative).put("size",size));
             }
@@ -172,7 +180,7 @@ public final class Downloader {
                 for (int i = 0; i < jobs.size(); i++) {
                     control.check(); ImageJob job = jobs.get(i);
                     task.phase = "打包图片 " + (i+1) + "/" + jobs.size();
-                    zip.putNextEntry(new ZipEntry(Core.zipImageName(task.settings.flatZip, chapterIds.size(), i+1, job.chapter, job.page)));
+                    zip.putNextEntry(new ZipEntry(Core.zipImageName(task.settings.flatZip, chosen.size(), i+1, job.chapter, job.page)));
                     try (InputStream input = new FileInputStream(job.target)) { copyChecked(input, zip); }
                     zip.closeEntry();
                 }
@@ -214,6 +222,34 @@ public final class Downloader {
         }
     }
 
+    private void abortWorkers(){if(control.stop.isEmpty())control.cancel("ABORT");}
+
+    private List<ImageJob> jobsFor(ChapterRules.Chapter chapter,ChapterMetadata.Detail detail)throws Exception {
+        File directory=new File(new File(cache,"images"),String.format(Locale.ROOT,"%04d",chapter.number));
+        if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("无法创建图片目录");
+        List<ImageJob> jobs=new ArrayList<>();
+        for(int i=0;i<detail.images.size();i++){
+            control.check();ImageJob job=new ImageJob();
+            job.chapterId=chapter.id;job.chapter=chapter.number;job.page=i+1;
+            job.filename=detail.images.get(i);job.scramble=detail.scramble;
+            job.target=new File(directory,String.format(Locale.ROOT,"%05d.jpg",job.page));jobs.add(job);
+        }
+        return jobs;
+    }
+
+    private void downloadPages(JmApi api,List<ImageJob> pages,List<SinglePageRecovery.Failure<ImageJob>> failed)throws Exception {
+        if(pages.isEmpty())return;
+        task.stage=control.stage="download";control.lastData=SystemClock.elapsedRealtime();
+        if(task.downloadStarted==0)task.downloadStarted=control.lastData;
+        try{
+            for(ImagePipeline.Failure<ImageJob> failure:ImagePipeline.run(pages,task.settings.threads,ImageMemory.SHARED.workers(),
+                job->fetchImage(api,job,0),this::finishImage,this::clearTemporaryImage,control::check,this::abortWorkers,task.settings.timeout))
+                failed.add(new SinglePageRecovery.Failure<>(failure.page,failure.error,
+                    "第 "+failure.page.chapter+" 章第 "+failure.page.page+" 页"));
+        }catch(ImagePipeline.UnstoppedWorkers error){
+            control.cancel("FATAL");task.phase="等待旧图片线程退出后处理任务";error.awaitStopped();throw error;
+        }
+    }
     private void downloadImage(JmApi api, ImageJob job, int retryRound) throws Exception {
         try { fetchImage(api, job, retryRound); finishImage(job); }
         finally { clearTemporaryImage(job); }
@@ -229,13 +265,17 @@ public final class Downloader {
         decode(temporaryImage(job, ".download"), decoded, Core.segments(job.scramble, Long.parseLong(job.chapterId), name), control::check);
         control.check(); Files.move(decoded.toPath(), job.target.toPath(), StandardCopyOption.REPLACE_EXISTING);
         control.check();
-        synchronized (task) { task.imageBytes += job.target.length(); task.done++; task.phase = "第 " + job.chapter + " 章 · 图片 " + job.page + "（已完成 " + task.done + "/" + task.total + "）"; }
+        synchronized (task) { task.imageBytes += job.target.length(); task.done++; task.phase = "第 " + job.chapter + " 章 · 图片 " + job.page + "（已完成 " + task.done + "/" + (task.total>0?String.valueOf(task.total):"?") + "）"; }
         control.saved(job.target.length());
     }
     private void clearTemporaryImage(ImageJob job) { temporaryImage(job, ".download").delete(); temporaryImage(job, ".partial").delete(); }
 
-    static BitmapFactory.Options dimensions(File file) {
-        BitmapFactory.Options options = new BitmapFactory.Options(); options.inJustDecodeBounds = true; BitmapFactory.decodeFile(file.getAbsolutePath(), options); return options;
+    static BitmapFactory.Options dimensions(File file)throws IOException {
+        BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;
+        try(InputStream input=new BufferedInputStream(new FileInputStream(file))){
+            BitmapFactory.decodeStream(input,null,options);
+        }
+        return options;
     }
     private boolean validImage(File file) {
         try {

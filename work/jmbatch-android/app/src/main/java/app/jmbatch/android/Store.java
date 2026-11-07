@@ -9,7 +9,10 @@ import java.util.*;
 
 public final class Store {
     private static Store instance;
-    public static synchronized Store get(Context context) { if (instance == null) instance = new Store(context.getApplicationContext()); return instance; }
+    public static synchronized Store get(Context context) { if (instance == null) {
+            instance = new Store(context.getApplicationContext());
+            try { ChapterMerge.restoreOnStartup(instance); } catch(Exception error) { instance.note="章节合并待恢复："+error.getMessage(); }
+        } return instance; }
     public final Context context;
     public final List<Task> tasks = new ArrayList<>();
     public volatile String cookie = "";
@@ -21,7 +24,7 @@ public final class Store {
     private List<LibraryStore.Entry> fileTargets;
 
     private boolean conflicts(Task task,LibraryStore.Entry item) {
-        return (!task.resultUri.isEmpty()&&task.resultUri.equals(item.uri))||
+        return item.uri.equals(task.updateParent)||(!task.resultUri.isEmpty()&&task.resultUri.equals(item.uri))||
             (!task.cleanupUri.isEmpty()&&task.cleanupUri.equals(item.uri))||
             (task.id.equals(item.id)&&task.settings.outputUri.equals(item.tree));
     }
@@ -106,7 +109,7 @@ public final class Store {
         public volatile String stage = "metadata";
         public volatile String cleanupNote = "";
         public volatile boolean discardRequested;
-        public volatile String cleanupUri = "";
+        public volatile String cleanupUri = "", updateParent = "";
         public volatile List<ChapterRules.Chapter> chapterOptions = Collections.emptyList(), selectedChapters = Collections.emptyList();
         public String progressText() { return DownloadDisplay.progress(done, total, status); }
         public String sizeText() { return DownloadDisplay.sizeText(done, total, imageBytes, resultBytes, status); }
@@ -119,7 +122,7 @@ public final class Store {
             if (!id.matches("[0-9]{1,10}") || !key.matches("[0-9a-f-]{36}")) throw new JSONException("任务数据无效");
             settings = new Settings(json.getJSONObject("settings")); title = json.optString("title"); status = json.optString("status", "paused");
             phase = json.optString("phase"); error = json.optString("error"); resultUri = json.optString("resultUri");
-            cleanupNote = json.optString("cleanupNote");
+            updateParent=json.optString("updateParent"); cleanupNote = json.optString("cleanupNote");
             discardRequested = json.optBoolean("discardRequested"); cleanupUri = json.optString("cleanupUri");
             done = json.optInt("done"); total = json.optInt("total"); cached = json.optInt("cached"); resets = json.optInt("resets"); elapsed = json.optLong("elapsed");
             imageBytes = json.optLong("imageBytes"); resultBytes = json.optLong("resultBytes");
@@ -131,7 +134,7 @@ public final class Store {
         public JSONObject json() {
             JSONObject json = new JSONObject();
             try { json.put("chapterOptions", ChapterSelection.json(chapterOptions)).put("selectedChapters", ChapterSelection.json(selectedChapters)).put("id", id).put("key", key).put("settings", settings.json()).put("title", title).put("status", status).put("phase", phase).put("error", error)
-                .put("resultUri", resultUri).put("done", done).put("total", total).put("cached", cached).put("resets", resets).put("elapsed", elapsed)
+                .put("updateParent",updateParent).put("resultUri", resultUri).put("done", done).put("total", total).put("cached", cached).put("resets", resets).put("elapsed", elapsed)
                 .put("imageBytes", imageBytes).put("resultBytes", resultBytes).put("cleanupNote",cleanupNote)
                 .put("discardRequested",discardRequested).put("cleanupUri",cleanupUri); }
             catch (JSONException impossible) { throw new IllegalStateException(impossible); }
@@ -171,7 +174,8 @@ public final class Store {
         settings = new Settings(options.json()); save(); return count;
     }
     public synchronized Task next() { for (Task t : tasks) if (t.status.equals("queued") && !activeKeys.contains(t.key) && !fileBlocked(t)) return t; return null; }
-    public synchronized Task addChapterUpdate(String id,List<ChapterRules.Chapter> catalog,List<ChapterRules.Chapter> chapters,Settings options)throws IOException {
+    public synchronized Task addChapterUpdate(LibraryStore.Entry parent,List<ChapterRules.Chapter> catalog,List<ChapterRules.Chapter> chapters,Settings options)throws IOException {
+        String id=parent.id;
         if(globalFileOperation())throw new IOException("正在清理缓存，请稍后下载。");
         if(tasks.size()>=5000)throw new IOException("最多保留 5000 条记录，请先清理已完成记录。");
         for(Task t:tasks)if(t.id.equals(id)&&!t.status.equals("done")&&!t.status.equals("cancelled"))
@@ -179,7 +183,10 @@ public final class Store {
         if(!id.matches("[0-9]{1,10}"))throw new IOException("漫画编号无效");
         try{ChapterRules.resolve(catalog,Collections.emptyList(),true);}catch(ChapterRules.ChoiceRequired impossible){throw new IllegalStateException(impossible);}
         Set<String> ids=new HashSet<>();for(ChapterRules.Chapter c:chapters)ids.add(c.id);
-        Task task=new Task(id,options);task.chapterOptions=Collections.unmodifiableList(new ArrayList<>(catalog));
+        Task task=new Task(id,options);
+        task.updateParent=parent.uri;task.settings.outputUri=parent.tree;task.settings.outputLabel=parent.label;task.settings.format=parent.format;
+        if(fileBlocked(task))throw new IOException("正在处理这本漫画的文件，请稍后重试");
+        task.chapterOptions=Collections.unmodifiableList(new ArrayList<>(catalog));
         task.selectedChapters=ChapterRules.select(catalog,ids);task.phase="等待下载新章节";
         tasks.add(task);try{save();}catch(IOException error){tasks.remove(task);throw error;}return task;
     }

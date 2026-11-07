@@ -38,7 +38,7 @@ public final class LibraryScanner {
                     if(id!=null&&name!=null&&!name.startsWith(".")&&!name.contains(".partial")&&DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)){
                         try{Uri uri=DocumentsContract.buildDocumentUriUsingTree(root,id);AlbumStorage.Album album=AlbumStorage.load(context,uri);result.entries.add(new LibraryStore.Entry(album.id,album.title,uri.toString(),tree,label,"images",false));}catch(Exception invalid){result.skipped++;}continue;
                     }
-                    if(name==null||!LibraryRules.supported(name))continue;
+                    if(name==null||ChapterMerge.temporaryName(name)||!LibraryRules.supported(name))continue;
                     if(id==null||DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)||(!cursor.isNull(3)&&cursor.getLong(3)==0)){result.skipped++;continue;}
                     result.entries.add(entry(name,DocumentsContract.buildDocumentUriUsingTree(root,id),tree,label));
                 }

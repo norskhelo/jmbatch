@@ -70,9 +70,9 @@ public final class LibraryScreen {
     private String filter="",report="";
     private volatile CancellationSignal scanSignal;
     private volatile JmApi.Control updateControl;
-    private final ChapterUpdates.Fetch chapterUpdateFetch;
-    public LibraryScreen(Activity activity,Store store){this(activity,store,ChapterUpdates::fetch);}
-    LibraryScreen(Activity activity,Store store,ChapterUpdates.Fetch fetch){this.activity=activity;this.store=store;this.chapterUpdateFetch=fetch;}
+    private final ChapterUpdates.Open chapterUpdateSession;
+    public LibraryScreen(Activity activity,Store store){this(activity,store,ChapterUpdates::open);}
+    LibraryScreen(Activity activity,Store store,ChapterUpdates.Open open){this.activity=activity;this.store=store;this.chapterUpdateSession=open;}
     private int dp(int n){return (int)(n*activity.getResources().getDisplayMetrics().density);}
     private boolean visible(){return page!=null&&page.getParent()!=null&&!activity.isFinishing()&&!activity.isDestroyed()&&(dialog==null||dialog.isShowing());}
     private String title(LibraryStore.Entry e){return e.id.isEmpty()?e.title:"JM"+e.id+" · "+e.title;}
@@ -417,26 +417,49 @@ public final class LibraryScreen {
             try{
                 ChapterUpdates.record(activity,store.snapshot());
                 Set<String> singleChapterAlbums=ChapterUpdates.knownSingleChapterAlbums(activity);
-                Set<String> seen=new HashSet<>();
-                for(LibraryStore.Entry item:library.list("",false)){
+                Map<String,LibraryStore.Entry> books=new LinkedHashMap<>();
+                for(LibraryStore.Entry book:library.list("",false)){
                     control.check();
-                    // A local PDF, flat ZIP or partial download can represent a series.
-                    // Without catalogue history the local page layout cannot rule it out.
-                    if(!item.id.matches("[0-9]{1,10}")||(item.chapterCount==1&&singleChapterAlbums.contains(item.id)))continue;
-                    if(!seen.add(item.id))continue;
+                    if(book.id.matches("[0-9]{1,10}")&&!(book.chapterCount==1&&singleChapterAlbums.contains(book.id)))
+                        books.put(book.id,book); // newest first: append future updates to the earliest saved copy
+                }
+                if(!books.isEmpty()){
+                    ChapterUpdates.Session session=chapterUpdateSession.open(options,cookie,control);
+                    ExecutorService pool=Executors.newFixedThreadPool(Math.min(3,books.size()));
                     try{
-                        List<ChapterRules.Chapter> catalog=chapterUpdateFetch.get(item.id,options,cookie,control);
-                        control.check();
-                        if(catalog.size()<2)continue;
-                        ChapterUpdates.Result result=ChapterUpdates.compare(activity,item.id,catalog);
-                        if(!result.fresh.isEmpty())changed.put(item,result);
-                    }catch(Exception error){
-                        control.check();
-                        failures.add("JM"+item.id+"："+Core.error(error,cookie));
-                    }
+                        Iterator<LibraryStore.Entry> remaining=books.values().iterator();
+                        CompletionService<List<ChapterRules.Chapter>> completed=new ExecutorCompletionService<>(pool);
+                        Map<Future<List<ChapterRules.Chapter>>,LibraryStore.Entry> active=new HashMap<>();
+                        Map<LibraryStore.Entry,ChapterUpdates.Result> updates=new HashMap<>();
+                        Map<LibraryStore.Entry,String> errors=new HashMap<>();
+                        while(remaining.hasNext()||!active.isEmpty()){
+                            control.check();
+                            while(remaining.hasNext()&&active.size()<3){
+                                LibraryStore.Entry book=remaining.next();
+                                active.put(completed.submit(()->{control.check();return session.get(book.id);}),book);
+                            }
+                            Future<List<ChapterRules.Chapter>> request=completed.take();
+                            LibraryStore.Entry item=active.remove(request);
+                            try{
+                                List<ChapterRules.Chapter> catalog=request.get();
+                                control.check();
+                                if(catalog.size()<2)continue;
+                                ChapterUpdates.Result result=ChapterUpdates.compare(activity,item.id,catalog);
+                                if(!result.fresh.isEmpty())updates.put(item,result);
+                            }catch(Exception error){
+                                control.check();
+                                Throwable cause=error instanceof ExecutionException?error.getCause():error;
+                                errors.put(item,"JM"+item.id+"："+Core.error(cause,cookie));
+                            }
+                        }
+                        for(LibraryStore.Entry book:books.values()){
+                            if(updates.containsKey(book))changed.put(book,updates.get(book));
+                            if(errors.containsKey(book))failures.add(errors.get(book));
+                        }
+                    }finally{pool.shutdownNow();WorkerDrain.await(pool);}
                 }
             }catch(Exception error){
-                if(control.stop.isEmpty())failures.add("读取漫画库或章节记录失败："+Core.error(error,cookie));
+                if(control.stop.isEmpty())failures.add("检查更新失败："+Core.error(error,cookie));
             }finally{control.cancel("检查结束");}
             main.post(()->{
                 if(batchUpdateControl!=control)return;
@@ -451,7 +474,7 @@ public final class LibraryScreen {
         if(changed.isEmpty()&&failures.isEmpty())return;
         StringBuilder text=new StringBuilder();
         if(!changed.isEmpty()){
-            text.append("发现新章节，是否下载？");
+            text.append("发现新章节，是否下载并追加到原漫画？");
             for(Map.Entry<LibraryStore.Entry,ChapterUpdates.Result> row:changed.entrySet())
                 text.append("\n").append(title(row.getKey())).append(" · ").append(row.getValue().fresh.size()).append(" 章");
         }
@@ -472,7 +495,7 @@ public final class LibraryScreen {
         for(Map.Entry<LibraryStore.Entry,ChapterUpdates.Result> row:changed.entrySet()){
             String id=row.getKey().id;
             ChapterUpdates.Result result=row.getValue();
-            try{store.addChapterUpdate(id,result.catalog,result.fresh,options);queued++;}
+            try{store.addChapterUpdate(row.getKey(),result.catalog,result.fresh,options);queued++;}
             catch(Exception error){failures.add("JM"+id+"："+error.getMessage());}
         }
         if(queued>0){
@@ -504,7 +527,7 @@ public final class LibraryScreen {
             JmApi.Control control=new JmApi.Control();updateControl=control;
             try{
                 if(cancelled.get())throw new OperationCanceledException();
-                List<ChapterRules.Chapter> catalog=chapterUpdateFetch.get(entry.id,options,cookie,control);
+                List<ChapterRules.Chapter> catalog=chapterUpdateSession.open(options,cookie,control).get(entry.id);
                 if(cancelled.get())throw new OperationCanceledException();
                 ChapterUpdates.record(activity,store.snapshot());result[0]=ChapterUpdates.compare(activity,entry.id,catalog);
                 return "章节目录检查完成";
@@ -517,11 +540,11 @@ public final class LibraryScreen {
             StringBuilder text=new StringBuilder("发现 "+update.fresh.size()+" 个新章节。\n");
             for(int i=0;i<Math.min(20,update.fresh.size());i++){ChapterRules.Chapter c=update.fresh.get(i);text.append("\n第 ").append(c.number).append(" 章 · ").append(c.title);}
             if(update.fresh.size()>20)text.append("\n……另 ").append(update.fresh.size()-20).append(" 章");
-            text.append("\n\n是否使用正常下载功能下载？\n保存为独立漫画，原漫画保留。\n保存目录：").append(options.outputLabel).append("\n格式：").append(options.format.toUpperCase(Locale.ROOT));
+            text.append("\n\n是否下载并追加到原漫画？\n保存目录：").append(entry.label).append("\n格式：").append(entry.format.toUpperCase(Locale.ROOT));
             new AlertDialog.Builder(activity).setTitle("漫画章节更新").setMessage(text)
                 .setNegativeButton("暂不下载",null).setPositiveButton("下载新章节",(d,w)->{
                     try{
-                        store.addChapterUpdate(entry.id,update.catalog,update.fresh,options);
+                        store.addChapterUpdate(entry,update.catalog,update.fresh,options);
                         report="新章节已加入正常下载队列";
                         if(!store.running)activity.startForegroundService(new Intent(activity,DownloadService.class).setAction(DownloadService.SELECTED));
                     }catch(Exception error){message("无法开始下载："+error.getMessage()+"\n已入队的任务可在下载页继续。");}

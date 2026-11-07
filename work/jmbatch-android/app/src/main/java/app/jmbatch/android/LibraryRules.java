@@ -18,7 +18,7 @@ public final class LibraryRules {
         File[] files=folder.listFiles();if(files==null)throw new IOException("保存目录无法读取，请确认存储可用");
         for(File file:files){
             if(cancelled.getAsBoolean())throw new java.util.concurrent.CancellationException("扫描已取消");
-            if(!supported(file.getName()))continue;
+            if(file.getName().startsWith(".jmbatch-merge-")||!supported(file.getName()))continue;
             try{File checked=ownedFile(folder,file.getName());if(checked.length()==0){result.skipped++;continue;}result.files.add(checked);}
             catch(IOException invalid){result.skipped++;}
         }

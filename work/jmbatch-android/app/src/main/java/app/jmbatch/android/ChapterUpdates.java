@@ -9,13 +9,17 @@ import org.json.*;
 
 /** Album-only checks. Only successful downloads advance the known catalogue. */
 public final class ChapterUpdates {
-    interface Fetch { List<ChapterRules.Chapter> get(String id,Store.Settings settings,String cookie,JmApi.Control control)throws Exception; }
-    static List<ChapterRules.Chapter> fetch(String id,Store.Settings settings,String cookie,JmApi.Control control)throws Exception {
-        if(!id.matches("[0-9]{1,10}"))throw new IOException("这条漫画记录没有有效的 JM 编号，无法检查更新。");
+    interface Session { List<ChapterRules.Chapter> get(String id)throws Exception; }
+    interface Open { Session open(Store.Settings settings,String cookie,JmApi.Control control)throws Exception; }
+    static Session open(Store.Settings settings,String cookie,JmApi.Control control)throws Exception {
+        control.check();
         JmApi api=new JmApi(settings,cookie,control);
         api.initialize();
-        control.check();
-        return ChapterSelection.catalog(api.detail("album",id),id);
+        return id->{
+            control.check();
+            if(!id.matches("[0-9]{1,10}"))throw new IOException("漫画编号无效");
+            return ChapterSelection.catalog(api.detail("album",id),id);
+        };
     }
     static final class Result {
         final List<ChapterRules.Chapter> catalog,fresh;final boolean initialized;

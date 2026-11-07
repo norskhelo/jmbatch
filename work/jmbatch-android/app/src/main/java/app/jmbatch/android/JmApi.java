@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.*;
 import java.util.zip.GZIPInputStream;
 
@@ -22,8 +23,13 @@ public final class JmApi {
     static final String[] DEFAULT_API = {"www.cdnhjk.net", "www.cdngwc.net", "www.cdngwc.club", "www.cdngwc.cc"};
     static final String[] IMAGE_HOSTS = {"cdn-msp3.jmapinodeudzn.net", "cdn-msp.jmapiproxy1.cc", "cdn-msp.jmapinodeudzn.net", "cdn-msp.jmapiproxy2.cc", "cdn-msp3.jmapiproxy2.cc", "cdn-msp2.jmapiproxy2.cc"};
     static final String[] DOMAIN_SERVERS = {"https://rup4a04-c03.tos-cn-beijing.bytepluses.com.cn/newsvr-2025.txt", "https://rup4a04-c01.tos-ap-southeast-1.bytepluses.com/newsvr-2025.txt", "https://rup4a04-c02.tos-cn-hongkong.bytepluses.com/newsvr-2025.txt"};
-    private static volatile List<String> rememberedDomains;
-    private static volatile long domainsRememberedAt;
+    private static final class ApiRoutes {
+        final List<String> hosts;
+        final long expires;
+        ApiRoutes(List<String> hosts,long expires){this.hosts=hosts;this.expires=expires;}
+    }
+    private static final AtomicReference<ApiRoutes> rememberedRoutes=new AtomicReference<>();
+    private ApiRoutes sessionRoutes;
     private static final ScheduledThreadPoolExecutor HEADER_TIMER=new ScheduledThreadPoolExecutor(1,r->{
         Thread thread=new Thread(r,"jm-header-deadline");thread.setDaemon(true);return thread;
     });
@@ -109,8 +115,10 @@ public final class JmApi {
     JmApi(Store.Settings settings,String cookie,Control control,FallbackDns fallbackDns) { this.settings=settings;userCookie=cookie;this.control=control;this.fallbackDns=fallbackDns; }
 
     public void initialize() throws Exception {
-        List<String> cachedDomains=rememberedDomains;
-        if (cachedDomains != null && SystemClock.elapsedRealtime()-domainsRememberedAt<600000) domains = NetworkRoutes.merge(cachedDomains,Arrays.asList(DEFAULT_API));
+        sessionRoutes=rememberedRoutes.get();
+        boolean reuse=sessionRoutes!=null&&SystemClock.elapsedRealtime()<sessionRoutes.expires;
+        boolean discovered=false;
+        if (reuse) domains=new ArrayList<>(sessionRoutes.hosts);
         else {
             for (String source : DOMAIN_SERVERS) {
                 control.check();
@@ -120,12 +128,16 @@ public final class JmApi {
                     JSONArray servers = new JSONObject(Core.decrypt(body, "", Core.DOMAIN_SECRET)).getJSONArray("Server");
                     List<String> fresh = new ArrayList<>();
                     for (int i = 0; i < servers.length(); i++) { String host = servers.getString(i); if (host.matches("[A-Za-z0-9.-]+") && host.contains(".")) fresh.add(host); }
-                    if (!fresh.isEmpty()) { domains = NetworkRoutes.merge(fresh,Arrays.asList(DEFAULT_API)); rememberedDomains = new ArrayList<>(domains); domainsRememberedAt=SystemClock.elapsedRealtime(); break; }
+                    if (!fresh.isEmpty()) { domains = NetworkRoutes.merge(fresh,Arrays.asList(DEFAULT_API)); discovered=true; break; }
                 } catch (Exception error) { control.check(); }
             }
         }
         // Settings initializes the API session's server cookies, avoiding wrong-album redirects.
         rawApi("/setting", false);
+        // Remember only verified routing, never cookies. A fallback-only result expires sooner.
+        long expiry=reuse?sessionRoutes.expires:SystemClock.elapsedRealtime()+(discovered?600000L:120000L);
+        ApiRoutes verified=new ApiRoutes(NetworkRoutes.merge(Collections.singletonList(domains.get(preferred)),domains),expiry);
+        rememberedRoutes.compareAndSet(sessionRoutes,verified);sessionRoutes=verified;
         control.lastData = SystemClock.elapsedRealtime();
     }
 
@@ -165,7 +177,7 @@ public final class JmApi {
             },control::check,control.routeMessage::accept);
         } catch(NetworkRoutes.Exhausted error) {
             // Fetch a fresh list on the next task/retry instead of reusing failed discovery forever.
-            rememberedDomains=null;throw error;
+            rememberedRoutes.compareAndSet(sessionRoutes,null);throw error;
         }
     }
 

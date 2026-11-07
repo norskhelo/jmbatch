@@ -96,6 +96,26 @@ public final class LibraryStore {
         }
         if(changed)persist(next);
     }
+    synchronized Entry byUri(String uri)throws IOException {
+        writable();
+        Entry entry=entries.get(uri);
+        if(entry==null)throw new IOException("原漫画已移除，请刷新漫画库");
+        return entry;
+    }
+    synchronized void finishMerge(Entry original,Entry extra,String uri,int count)throws IOException {
+        writable();
+        Entry current=entries.get(original.uri);
+        if(current==null)current=entries.get(uri);
+        if(current==null)throw new IOException("原漫画记录不存在");
+        LinkedHashMap<String,Entry> next=new LinkedHashMap<>();
+        Entry merged=new Entry(current.id,current.title,uri,current.tree,current.label,current.format,
+            current.favorite||(extra!=null&&extra.favorite),current.collection,count);
+        for(Entry entry:entries.values()){
+            if(entry.uri.equals(current.uri))next.put(uri,merged);
+            else if(extra==null||!entry.uri.equals(extra.uri))next.put(entry.uri,entry);
+        }
+        persist(next);
+    }
     boolean fillChapterCounts(List<Entry> snapshot)throws IOException {
         Map<String,Integer> counts=new HashMap<>();
         // No store lock during file/provider I/O, so sorting remains immediate.
@@ -239,10 +259,13 @@ public final class LibraryStore {
             Entry updated=new Entry(current.id,current.title,replacement.uri,current.tree,current.label,current.format,current.favorite,current.collection,replacement.chapterCount);
             for(Entry entry:entries.values())next.put(entry.uri.equals(original.uri)?updated.uri:entry.uri,entry.uri.equals(original.uri)?updated:entry);
             List<Store.Task> affected=new ArrayList<>();for(Store.Task task:store.tasks)if(task.resultUri.equals(original.uri))affected.add(task);
+            List<Store.Task> pending=new ArrayList<>();for(Store.Task task:store.tasks)if(task.updateParent.equals(original.uri))pending.add(task);
             try{
-                persist(next);for(Store.Task task:affected)task.resultUri=updated.uri;store.save();
+                persist(next);for(Store.Task task:affected)task.resultUri=updated.uri;
+                for(Store.Task task:pending)task.updateParent=updated.uri;store.save();
             }catch(IOException failure){
                 for(Store.Task task:affected)task.resultUri=original.uri;
+                for(Store.Task task:pending)task.updateParent=original.uri;
                 try{persist(previous);store.save();}
                 catch(IOException rollback){throw new RecoveryFailure("记录保存及恢复失败，原漫画和新副本均已保留，请检查写入权限："+replacement.uri,rollback);}
                 throw failure;

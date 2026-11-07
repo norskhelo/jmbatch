@@ -67,19 +67,20 @@ public class ChapterUpdatesRuntimeTest {
     @Test public void queueUsesNewKeyNormalSettingsRestartAndDuplicateProtection()throws Exception {
         store.tasks.add(done(catalog.subList(0,2),catalog.subList(0,2)));
         Store.Task other=new Store.Task("777",store.settings);other.status="paused";store.tasks.add(other);
-        Store.Task update=store.addChapterUpdate("123456",catalog,catalog.subList(2,4),store.settings);
+        LibraryStore.Entry parent=new LibraryStore.Entry("123456","Original",store.tasks.get(0).resultUri,"",store.settings.outputLabel,store.settings.format,false);
+        Store.Task update=store.addChapterUpdate(parent,catalog,catalog.subList(2,4),store.settings);
         assertEquals("queued",update.status);assertEquals("paused",other.status);assertNotEquals(store.tasks.get(0).key,update.key);
         assertEquals(Arrays.asList("800003","800004"),ids(update.selectedChapters));
         assertEquals(store.settings.json().toString(),update.settings.json().toString());
-        Store.Task loaded=new Store.Task(update.json());assertEquals("paused",loaded.status);assertEquals(ids(update.selectedChapters),ids(loaded.selectedChapters));
-        try{store.addChapterUpdate("123456",catalog,catalog.subList(2,4),store.settings);fail();}catch(IOException expected){}
+        Store.Task loaded=new Store.Task(update.json());assertEquals(parent.uri,loaded.updateParent);assertEquals("paused",loaded.status);assertEquals(ids(update.selectedChapters),ids(loaded.selectedChapters));
+        try{store.addChapterUpdate(parent,catalog,catalog.subList(2,4),store.settings);fail();}catch(IOException expected){}
         update.status="cancelled";
         Field file=Store.class.getDeclaredField("file");file.setAccessible(true);Object original=file.get(store);
         try{
             file.set(store,new android.util.AtomicFile(new File(context.getFilesDir(),"queue.json")){
                 @Override public FileOutputStream startWrite()throws IOException {throw new IOException("disk full");}
             });
-            try{store.addChapterUpdate("123456",catalog,catalog.subList(2,4),store.settings);fail();}catch(IOException expected){}
+            try{store.addChapterUpdate(parent,catalog,catalog.subList(2,4),store.settings);fail();}catch(IOException expected){}
             assertEquals(3,store.tasks.size());
         }finally{file.set(store,original);}
     }
@@ -97,11 +98,13 @@ public class ChapterUpdatesRuntimeTest {
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100));
         }
     }
-    void open(ChapterUpdates.Fetch fetch)throws Exception {
+    interface Fetch { List<ChapterRules.Chapter> get(String id,Store.Settings options,String cookie,JmApi.Control control)throws Exception; }
+    int sessions;
+    void open(Fetch fetch)throws Exception {
         if(store.tasks.isEmpty())store.tasks.add(done(catalog.subList(0,2),catalog.subList(0,2)));
         controller=Robolectric.buildActivity(Activity.class);Activity activity=controller.get();
         activity.setTheme(android.R.style.Theme_Material_Light_NoActionBar);controller.setup();
-        screen=new LibraryScreen(activity,store,fetch);screen.show();settle();
+        screen=new LibraryScreen(activity,store,(options,cookie,control)->{sessions++;return id->fetch.get(id,options,cookie,control);});screen.show();settle();
     }
     View withText(View root,String text){
         ArrayList<View> matches=new ArrayList<>();
@@ -129,8 +132,26 @@ public class ChapterUpdatesRuntimeTest {
         settle();
         assertEquals(2,store.tasks.size());assertEquals(Arrays.asList("800003","800004"),ids(store.tasks.get(1).selectedChapters));
         Intent intent=shadowOf(RuntimeEnvironment.getApplication()).getNextStartedService();
+        assertEquals(store.tasks.get(0).resultUri,store.tasks.get(1).updateParent);
         assertNotNull(intent);assertEquals(DownloadService.SELECTED,intent.getAction());
         assertEquals(DownloadService.class.getName(),intent.getComponent().getClassName());
+    }
+    @Test public void tenBooksShareOneSessionWithBoundedParallelism()throws Exception {
+        for(int i=0;i<10;i++){
+            Store.Task t=new Store.Task(""+(123400+i),store.settings);
+            t.status="done";t.resultUri="content://app.jmbatch.android.exports/"+t.id+".zip";t.title=t.id;
+            t.chapterOptions=catalog.subList(0,2);t.selectedChapters=t.chapterOptions;store.tasks.add(t);
+        }
+        java.util.concurrent.atomic.AtomicInteger active=new java.util.concurrent.atomic.AtomicInteger(), peak=new java.util.concurrent.atomic.AtomicInteger(),calls=new java.util.concurrent.atomic.AtomicInteger();
+        CountDownLatch firstThree=new CountDownLatch(3);
+        open((id,settings,cookie,control)->{
+            int current=active.incrementAndGet();peak.accumulateAndGet(current,Math::max);
+            try{calls.incrementAndGet();firstThree.countDown();assertTrue(firstThree.await(3,TimeUnit.SECONDS));Thread.sleep(40);return catalog;}
+            finally{active.decrementAndGet();}
+        });
+        long start=System.nanoTime();check();
+        assertEquals(1,sessions);assertEquals(10,calls.get());assertEquals(3,peak.get());assertEquals(0,active.get());
+        System.out.println("BATCH books=10 sessions="+sessions+" parallel="+peak.get()+" elapsed_ms="+TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-start));
     }
     @Test public void requestFailureNeverQueuesDownloads()throws Exception {
         open((id,options,cookie,control)->{throw new IOException("offline fixture");});
@@ -148,13 +169,13 @@ public class ChapterUpdatesRuntimeTest {
         store.tasks.add(duplicate);
         Store.Task latest=done(catalog.subList(0,2),catalog.subList(1,2));
         latest.resultUri=duplicate.resultUri+"-copy";store.tasks.add(latest);
-        List<String> requested=new ArrayList<>();
+        List<String> requested=Collections.synchronizedList(new ArrayList<>());
         open((id,options,cookie,control)->{
             requested.add(id);control.check();
             if(id.equals("123456"))throw new IOException("fixture timeout");
             return catalog;
         });
-        check();assertEquals(Arrays.asList("123456","654321"),requested);
+        check();assertEquals(2,requested.size());assertEquals(new HashSet<>(Arrays.asList("123456","654321")),new HashSet<>(requested));
         AlertDialog dialog=ShadowAlertDialog.getLatestAlertDialog();
         String text=((TextView)dialog.findViewById(android.R.id.message)).getText().toString();
         assertTrue(text.contains("JM654321"));assertTrue(text.contains("1 章"));
@@ -167,7 +188,7 @@ public class ChapterUpdatesRuntimeTest {
     @Test public void fetchPreservesCallersCancellationReason()throws Exception {
         JmApi.Control control=new JmApi.Control();
         control.cancel("检查已取消");
-        try{ChapterUpdates.fetch("654321",store.settings,"",control);fail();}catch(IOException expected){}
+        try{ChapterUpdates.open(store.settings,"",control).get("654321");fail();}catch(IOException expected){}
         assertEquals("检查已取消",control.stop);
     }
     @Test public void legacySingleLocalChapterCanBelongToSeries()throws Exception {
@@ -178,7 +199,7 @@ public class ChapterUpdatesRuntimeTest {
         single.status="done";single.resultUri="content://app.jmbatch.android.exports/single.zip";
         single.selectedChapters=catalog.subList(0,1);single.chapterOptions=single.selectedChapters;
         store.tasks.add(single);
-        List<String> requested=new ArrayList<>();
+        List<String> requested=Collections.synchronizedList(new ArrayList<>());
         open((id,options,cookie,control)->{requested.add(id);return catalog;});
         check();
         assertEquals(Collections.singletonList(legacy.id),requested);

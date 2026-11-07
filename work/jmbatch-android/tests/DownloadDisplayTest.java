@@ -10,6 +10,7 @@ public class DownloadDisplayTest {
         check(DownloadDisplay.failureText("failed", null, "下载失败，点详情查看原因").contains("未记录具体原因"), "legacy generic fallback");
         for(String status:new String[]{"queued","running","paused","resetting","done","cancelled"})
             check(DownloadDisplay.failureText(status,"旧错误","").isEmpty(), "no stale reason " + status);
+        check(DownloadDisplay.progress(3,0,"running").equals("已完成 3 张 · 正在读取其余章节"),"streaming progress before page total");
         long[] values = {0, 1023, 1024, 1048576, 1073741824, -1};
         String[] expected = {"0 B/s", "1023 B/s", "1.0 KB/s", "1.0 MB/s", "1.0 GB/s", "0 B/s"};
         for (int i = 0; i < values.length; i++) check(DownloadDisplay.speed(values[i]).equals(expected[i]), "speed boundary " + i);
