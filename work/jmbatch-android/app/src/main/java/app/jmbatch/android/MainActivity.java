@@ -278,11 +278,19 @@ public final class MainActivity extends Activity {
             Store.Task task=tasks.get(i);if(task.status.equals("done"))completed++;if(task.status.equals("failed"))failed++;if(task.status.equals("running")||task.status.equals("resetting")){active++;speed+=Math.max(0,task.speed);}
             if(i>=limit)continue;visible.add(task.key);Row row=rows.get(task.key);if(row==null){row=new Row(task);rows.put(task.key,row);queue.addView(row.card);}
             Ui.setText(row.title,task.title.isEmpty()?"JM"+task.id:task.title);
-            Ui.setText(row.state,Store.status(task.status)+(task.status.equals("done")?"":" · "+task.done+"/"+task.total));Ui.setText(row.percent,String.format(Locale.ROOT,"%.0f%%",DownloadDisplay.percent(task.done,task.total,task.status)));
-            row.state.setTextColor(task.status.equals("failed")?Color.rgb(180,35,54):task.status.equals("done")?ACCENT:MUTED);
-            row.progress.setIndeterminate(task.status.equals("running")&&task.total==0);row.progress.setProgress((int)(DownloadDisplay.percent(task.done,task.total,task.status)*10));
+            int done=task.done,total=task.total;
+            boolean finished=task.status.equals("done"),knownTotal=total>0;
+            boolean preparing=task.status.equals("running")&&(task.stage.equals("metadata")||task.stage.equals("cache"));
+            String state=preparing?task.phase:Store.status(task.status);
+            if(!preparing&&!finished&&(knownTotal||done>0))state+=" · "+DownloadDisplay.pageCount(done,total);
+            Ui.setText(row.state,state);
+            double percent=DownloadDisplay.percent(done,total,task.status);
+            Ui.setText(row.percent,finished?"100%":knownTotal&&!preparing?Math.min(99,Math.round(percent))+"%":"");
+            row.state.setTextColor(task.status.equals("failed")?Color.rgb(180,35,54):finished?ACCENT:MUTED);
+            row.progress.setIndeterminate(task.status.equals("running")&&(!knownTotal||preparing));
+            row.progress.setProgress((int)(percent*10));
             String failure=DownloadDisplay.failureText(task.status,task.error,task.phase);
-            Ui.setText(row.phase,failure.isEmpty()?DownloadDisplay.size(task.status.equals("done")?task.resultBytes:task.imageBytes)+" / "+(task.status.equals("done")?DownloadDisplay.size(task.resultBytes):task.done>0&&task.total>0?DownloadDisplay.size(task.imageBytes*(double)task.total/task.done):"—")+(task.status.equals("running")||task.status.equals("resetting")?" · "+DownloadDisplay.speed(task.speed):""):failure);
+            Ui.setText(row.phase,failure.isEmpty()?DownloadDisplay.size(task.status.equals("done")?task.resultBytes:task.imageBytes)+" / "+(task.status.equals("done")?DownloadDisplay.size(task.resultBytes):done>0&&knownTotal?DownloadDisplay.size(task.imageBytes*(double)total/done):"—")+(task.status.equals("running")||task.status.equals("resetting")?" · "+DownloadDisplay.speed(task.speed):""):failure);
             row.phase.setTextColor(failure.isEmpty()?MUTED:Color.rgb(180,35,54));
             row.phase.setMaxLines(failure.isEmpty()?Integer.MAX_VALUE:2);
             row.phase.setEllipsize(failure.isEmpty()?null:android.text.TextUtils.TruncateAt.END);
@@ -376,7 +384,7 @@ public final class MainActivity extends Activity {
         task.status="queued";task.resets=0;task.error="";task.phase="等待重试";save();if(!store.running)startQueue();
     }
     private void details(Store.Task task){
-        String message="JM"+task.id+" · "+task.title+"\n\n"+Store.status(task.status)+"："+task.phase+"\n图片 "+task.done+"/"+task.total+"，复用 "+task.cached+" 张\n图片线程 "+task.settings.threads+"，自动重连 "+task.resets+"/"+task.settings.maxResets+"\n耗时 "+String.format(Locale.ROOT,"%.1f",task.elapsed/1000.0)+" 秒\n保存位置："+task.settings.outputLabel;
+        String message="JM"+task.id+" · "+task.title+"\n\n"+Store.status(task.status)+"："+task.phase+"\n图片 "+DownloadDisplay.pageCount(task.done,task.total)+"，复用 "+task.cached+" 张\n图片线程 "+task.settings.threads+"，自动重连 "+task.resets+"/"+task.settings.maxResets+"\n耗时 "+String.format(Locale.ROOT,"%.1f",task.elapsed/1000.0)+" 秒\n保存位置："+task.settings.outputLabel;
         if(!task.error.isEmpty())message+="\n\n错误原因：\n"+task.error;
         TextView content=text(message,14,INK);content.setPadding(dp(20),dp(10),dp(20),dp(10));content.setTextIsSelectable(true);ScrollView scroll=new ScrollView(this);LinearLayout details=column();details.addView(content);details.addView(button("打开保存目录",v->new SavedDirectory(this,task.settings.outputUri,task.settings.outputLabel).openExternal()));scroll.addView(details);
         AlertDialog.Builder builder=new AlertDialog.Builder(this).setTitle("任务详情").setView(scroll).setNegativeButton("关闭",null);

@@ -424,26 +424,26 @@ public final class LibraryScreen {
                 }
                 if(!books.isEmpty()){
                     ChapterUpdates.Session session=chapterUpdateSession.open(options,cookie,control);
-                    ExecutorService pool=Executors.newFixedThreadPool(Math.min(3,books.size()));
+                    ExecutorService pool=Executors.newFixedThreadPool(Math.min(4,books.size()));
                     try{
-                        Iterator<LibraryStore.Entry> remaining=books.values().iterator();
+                        ChapterUpdates.LegacyRecords records=new ChapterUpdates.LegacyRecords();
                         CompletionService<List<ChapterRules.Chapter>> completed=new ExecutorCompletionService<>(pool);
                         Map<Future<List<ChapterRules.Chapter>>,LibraryStore.Entry> active=new HashMap<>();
                         Map<LibraryStore.Entry,ChapterUpdates.Result> updates=new HashMap<>();
                         Map<LibraryStore.Entry,String> errors=new HashMap<>();
-                        while(remaining.hasNext()||!active.isEmpty()){
+                        for(LibraryStore.Entry book:books.values()){
                             control.check();
-                            while(remaining.hasNext()&&active.size()<3){
-                                LibraryStore.Entry book=remaining.next();
-                                active.put(completed.submit(()->{control.check();return session.get(book.id);}),book);
-                            }
+                            active.put(completed.submit(()->{control.check();return session.get(book.id);}),book);
+                        }
+                        while(!active.isEmpty()){
+                            control.check();
                             Future<List<ChapterRules.Chapter>> request=completed.take();
                             LibraryStore.Entry item=active.remove(request);
                             try{
                                 List<ChapterRules.Chapter> catalog=request.get();
                                 control.check();
                                 if(catalog.size()<2)continue;
-                                ChapterUpdates.Result result=ChapterUpdates.compare(activity,item.id,catalog);
+                                ChapterUpdates.Result result=ChapterUpdates.compare(activity,item.id,catalog,records);
                                 if(!result.fresh.isEmpty())updates.put(item,result);
                             }catch(Exception error){
                                 control.check();

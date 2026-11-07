@@ -28,9 +28,12 @@ public final class DownloadDisplay {
     public static double percent(int done, int total, String status) {
         return status.equals("done") ? 100 : total > 0 ? Math.min(99.9, Math.max(0, done) * 100.0 / total) : 0;
     }
+    public static String pageCount(int done,int total) {
+        return total>0 ? done+"/"+total+" 张" : "已完成 "+done+" 张";
+    }
     public static String progress(int done, int total, String status) {
-        if(status.equals("running")&&done>0&&total==0)return String.format(Locale.ROOT,"已完成 %d 张 · 正在读取其余章节",done);
-        return String.format(Locale.ROOT, "%.1f%% · %d/%s 张", percent(done, total, status), done, total > 0 ? String.valueOf(total) : "?");
+        if(total<=0)return pageCount(done,total)+(status.equals("running")?" · 总数统计中":"");
+        return String.format(Locale.ROOT,"%.1f%% · %s",percent(done,total,status),pageCount(done,total));
     }
     public static String sizeText(int done, int total, long images, long result, String status) {
         if (status.equals("done")) return "漫画大小 " + (result > 0 ? size(result) : "未知（旧记录）");

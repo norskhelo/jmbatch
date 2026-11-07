@@ -69,8 +69,7 @@ public final class ChapterMetadata {
         }
         public void invalidate(String id)throws IOException{Files.deleteIfExists(path(id).toPath());}
     }
-    interface Ready { void accept(List<Result> chapters)throws Exception; }
-    static final class Result {
+    private static final class Result {
         final String id;final Detail detail;final boolean cached;
         Result(String id,Detail detail,boolean cached){this.id=id;this.detail=detail;this.cached=cached;}
     }
@@ -80,25 +79,11 @@ public final class ChapterMetadata {
     }
     public static List<Detail> load(List<String> ids,Cache cache,Fetch fetch,Check check,
                                     Runnable abort,Progress progress,int timeout,int workers)throws Exception{
-        Map<String,Detail> values=new HashMap<>();
-        stream(ids,cache,fetch,check,abort,progress,timeout,workers,batch->{
-            for(Result chapter:batch)values.put(chapter.id,chapter.detail);
-        });
-        List<Detail> ordered=new ArrayList<>();for(String id:ids)ordered.add(values.get(id));
-        return ordered;
-    }
-    private static Callable<Result> readChapter(String id,Cache cache,Fetch fetch,Check check){
-        return ()->{
-            check.run();Detail previous=cache.read(id,System.currentTimeMillis());
-            return previous!=null?new Result(id,previous,true):new Result(id,fetch.get(id),false);
-        };
-    }
-    static void stream(List<String> ids,Cache cache,Fetch fetch,Check check,Runnable abort,Progress progress,
-                       int timeout,int workers,Ready ready)throws Exception{
         if(workers<1||workers>MAX_WORKERS)throw new IllegalArgumentException("章节读取并行数应为 1–8");
         if(new HashSet<>(ids).size()!=ids.size())throw new IOException("章节编号重复");
         progress.update(0,ids.size(),0);
-        check.run();if(ids.isEmpty())return;
+        check.run();if(ids.isEmpty())return Collections.emptyList();
+        Map<String,Detail> values=new HashMap<>();
         ExecutorService pool=Executors.newFixedThreadPool(Math.min(workers,ids.size()));
         CompletionService<Result> completion=new ExecutorCompletionService<>(pool);
         int next=0,done=0,cached=0,pages=0;boolean success=false;
@@ -108,22 +93,16 @@ public final class ChapterMetadata {
                 check.run();
                 Future<Result> finished=completion.poll(200,TimeUnit.MILLISECONDS);
                 if(finished==null)continue;
-                List<Result> batch=new ArrayList<>();
-                do{
-                    Result result;
-                    try{result=finished.get();}catch(ExecutionException error){
-                        Throwable cause=error.getCause();if(cause instanceof Exception)throw (Exception)cause;
-                        if(cause instanceof Error)throw (Error)cause;throw new IOException("章节读取异常",cause);
-                    }
-                    check.run();pages+=result.detail.images.size();
-                    if(pages>20000)throw new IOException("单本超过 20000 张图片，请拆分任务");
-                    if(result.cached)cached++;else cache.write(result.id,result.detail,System.currentTimeMillis());
-                    batch.add(result);progress.update(++done,ids.size(),cached);
-                    // Keep the next chapter requests in flight while this batch's images download.
-                    if(next<ids.size())completion.submit(readChapter(ids.get(next++),cache,fetch,check));
-                    // Deliver the first available chapter immediately, even when the cache is warm.
-                }while(done>1&&batch.size()<workers&&(finished=completion.poll())!=null);
-                check.run();ready.accept(batch);
+                Result result;
+                try{result=finished.get();}catch(ExecutionException error){
+                    Throwable cause=error.getCause();if(cause instanceof Exception)throw (Exception)cause;
+                    if(cause instanceof Error)throw (Error)cause;throw new IOException("章节读取异常",cause);
+                }
+                check.run();pages+=result.detail.images.size();
+                if(pages>20000)throw new IOException("单本超过 20000 张图片，请拆分任务");
+                if(result.cached)cached++;else cache.write(result.id,result.detail,System.currentTimeMillis());
+                values.put(result.id,result.detail);progress.update(++done,ids.size(),cached);
+                if(next<ids.size())completion.submit(readChapter(ids.get(next++),cache,fetch,check));
             }
             check.run();success=true;
         }finally{
@@ -132,5 +111,14 @@ public final class ChapterMetadata {
             try{if(!pool.awaitTermination(timeout+10L,TimeUnit.SECONDS))throw new UnstoppedWorkers(pool);}
             catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new UnstoppedWorkers(pool);}
         }
+        List<Detail> ordered=new ArrayList<>();
+        for(String id:ids)ordered.add(values.get(id));
+        return ordered;
+    }
+    private static Callable<Result> readChapter(String id,Cache cache,Fetch fetch,Check check){
+        return ()->{
+            check.run();Detail previous=cache.read(id,System.currentTimeMillis());
+            return previous!=null?new Result(id,previous,true):new Result(id,fetch.get(id),false);
+        };
     }
 }

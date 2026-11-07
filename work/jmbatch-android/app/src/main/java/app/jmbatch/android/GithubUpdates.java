@@ -15,7 +15,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Android 1.0.3 — 删除更新分册后可重新检查\n\n• 修复删除独立更新分册后，漫画库再次检查只提示“检查完成”的问题。现在按仍在库中的文件判断哪些章节可下载。只清理已完成的下载任务时，保留的分册仍参与检查。\n• 如果旧版下载任务已经清除，可从原图片文件夹的编号子目录恢复检查位置。确认下载后，新章节会追加到原漫画。\n";
+    private static final String CURRENT_NOTES="Android 1.0.4 — 漫画库检查提速与下载进度修复\n\n• 检查漫画库时最多并行查询四本，短时间内重复匿名检查可复用已验证的会话。每次检查都会重新获取在线章节目录，遇到慢线路会尝试备用线路。\n• 漫画更新使用普通下载流程，下载范围为确认的新增章节。先读取全部所选章节的图片清单，再校验缓存并下载。列表显示当前准备阶段，取得确切的图片总数后显示下载进度，更新的章节继续追加到原漫画。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

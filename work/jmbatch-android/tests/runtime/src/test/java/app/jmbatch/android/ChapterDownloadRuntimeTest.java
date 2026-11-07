@@ -22,7 +22,8 @@ import static org.junit.Assert.*;
     shadows={CollectionRuntimeTest.WindowsAtomicRename.class,ChapterDownloadRuntimeTest.LocalApi.class})
 public class ChapterDownloadRuntimeTest {
     static final int ADDED=145, ORIGINAL=100, FIRST=700000;
-    static CountDownLatch firstImage;
+    static volatile Store.Task observed;
+    static int expectedPages,doublePageChapter;
     static AtomicInteger details,requests,firstReady;
     static volatile long start,firstImageMs;
     static volatile boolean failLate;
@@ -41,17 +42,18 @@ public class ChapterDownloadRuntimeTest {
                 return new JSONObject().put("name","base").put("series",series);
             }
             int chapter=Integer.parseInt(id)-FIRST;
-            // Hold the rest of the catalogue until the downloader actually requests a page.
-            if(chapter>=ORIGINAL+4&&!firstImage.await(5,TimeUnit.SECONDS))throw new IOException("first image waited for all chapter details");
+            assertTrue("Only selected chapters may be fetched",chapter>=ORIGINAL&&chapter<ORIGINAL+ADDED);
             if(failLate&&chapter==ORIGINAL+8)throw new IOException("synthetic chapter failure");
             Thread.sleep(chapter%4==0?32:8);
             details.incrementAndGet();
-            return new JSONObject().put("images",new JSONArray().put("image.jpg"));
+            JSONArray pages=new JSONArray().put("image.jpg");
+            if(chapter==doublePageChapter)pages.put("second.jpg");
+            return new JSONObject().put("images",pages);
         }
         @Implementation protected long scramble(String id){return 10000000;}
         @Implementation protected void image(String chapter,String name,File output,int round)throws Exception {
             if(requests.getAndIncrement()==0){
-                firstReady.set(details.get());firstImageMs=java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime()-start;firstImage.countDown();
+                firstReady.set(details.get());firstImageMs=java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime()-start;assertEquals("Full page count before first image",expectedPages,observed.total);
             }
             Files.write(output.toPath(),jpegs[(Integer.parseInt(chapter)-FIRST)%jpegs.length]);
         }
@@ -62,7 +64,7 @@ public class ChapterDownloadRuntimeTest {
         for(int i=0;i<ORIGINAL+ADDED;i++)catalog.add(new ChapterRules.Chapter(""+(FIRST+i),i+1,"c"+i));
         task=fixture.store.addChapterUpdate(base,catalog,catalog.subList(ORIGINAL,catalog.size()),fixture.store.settings);
         ShadowStatFs.registerStats(fixture.store.cache(task),4000000,3000000,3000000);
-        firstImage=new CountDownLatch(1);details=new AtomicInteger();requests=new AtomicInteger();firstReady=new AtomicInteger();failLate=false;
+        expectedPages=ADDED;doublePageChapter=-1;observed=task;details=new AtomicInteger();requests=new AtomicInteger();firstReady=new AtomicInteger();failLate=false;
         jpegs=new byte[13][];
         for(int i=0;i<jpegs.length;i++){
             ByteArrayOutputStream data=new ByteArrayOutputStream();
@@ -73,8 +75,8 @@ public class ChapterDownloadRuntimeTest {
     void download()throws Exception {
         assertEquals(base.uri,new Downloader(fixture.c,fixture.store,task,new JmApi.Control(),"").run());
     }
-    @Test public void firstImageStartsBeforeAll145DetailsAndOutputKeepsChapterOrder()throws Exception {
-        download();assertTrue(firstImageMs>=0);assertTrue(firstReady.get()>=1&&firstReady.get()<ADDED);
+    @Test public void all145SelectedDetailsPrecedeFirstImageAndOutputKeepsChapterOrder()throws Exception {
+        download();assertTrue(firstImageMs>=0);assertEquals(ADDED,firstReady.get());
         assertEquals(ADDED,requests.get());assertEquals(ADDED,details.get());assertEquals(ADDED,task.done);
         AlbumStorage.Album book=AlbumStorage.load(fixture.c,Uri.parse(base.uri));
         assertEquals(245,book.images.size());
@@ -85,12 +87,25 @@ public class ChapterDownloadRuntimeTest {
         }
         System.out.println("START first_image_ms="+firstImageMs+" ready_chapters="+firstReady.get()+"/"+ADDED+" completed_pages="+task.done);
     }
-    @Test public void laterMetadataFailureKeepsOriginalAndRetryReusesDownloadedPages()throws Exception {
+    @Test public void ordinarySelectionCountsImagesAcrossOnlyTheTwoChosenChapters()throws Exception {
+        Store.Task ordinary=new Store.Task(task.id,task.settings);
+        Set<String> selected=new HashSet<>(Arrays.asList(""+(FIRST+ORIGINAL),""+(FIRST+ORIGINAL+3)));
+        ordinary.selectedChapters=ChapterRules.select(task.chapterOptions,selected);
+        expectedPages=3;doublePageChapter=ORIGINAL+3;observed=ordinary;
+        ShadowStatFs.registerStats(fixture.store.cache(ordinary),4000000,3000000,3000000);
+        String uri=new Downloader(fixture.c,fixture.store,ordinary,new JmApi.Control(),"").run();
+        assertFalse(base.uri.equals(uri));assertEquals(2,firstReady.get());assertEquals(2,details.get());
+        assertEquals(3,requests.get());assertEquals(3,ordinary.total);assertEquals(3,ordinary.done);
+    }
+    @Test public void metadataFailureStartsNoImageAndRetryValidatesExistingPages()throws Exception {
         failLate=true;
         try{download();fail("chapter error expected");}catch(IOException expected){assertTrue(expected.getMessage(),expected.getMessage().contains("synthetic"));}
-        int saved=task.done;assertTrue(saved>0&&saved<ADDED);
+        assertEquals(0,task.done);assertEquals(0,requests.get());
+        File alreadySaved=new File(fixture.store.cache(task),"images/0101/00001.jpg");
+        Files.createDirectories(alreadySaved.getParentFile().toPath());Files.write(alreadySaved.toPath(),jpegs[ORIGINAL%jpegs.length]);
+        int saved=1;
         assertEquals(ORIGINAL,AlbumStorage.load(fixture.c,Uri.parse(base.uri)).images.size());
         assertTrue(task.resultUri.isEmpty());failLate=false;
-        download();assertEquals(saved,task.cached);assertEquals(ADDED,requests.get());assertEquals(ADDED,task.total);assertEquals(ADDED,task.done);
+        download();assertEquals(saved,task.cached);assertEquals(ADDED-saved,requests.get());assertEquals(ADDED,task.total);assertEquals(ADDED,task.done);
     }
 }

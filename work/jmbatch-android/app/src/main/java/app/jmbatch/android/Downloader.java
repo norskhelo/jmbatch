@@ -90,44 +90,28 @@ public final class Downloader {
                 return new ChapterMetadata.Detail(images,decodeParameter(id));
             }
         };
-        Map<String,ChapterRules.Chapter> chapters=new HashMap<>();
-        for(ChapterRules.Chapter chapter:chosen)chapters.put(chapter.id,chapter);
-        Map<String,List<ImageJob>> chapterJobs=new HashMap<>();
-        List<SinglePageRecovery.Failure<ImageJob>> failed=new ArrayList<>();
-        boolean resume=new File(cache,"images").exists();
-        if(!resume){
-            synchronized(task){task.total=task.done=task.cached=0;task.bytes=task.imageBytes=0;}
-        }
+        List<ChapterMetadata.Detail> details;
         try{
-            ChapterMetadata.stream(selectedIds,metadata,fetch,control::check,this::abortWorkers,
+            details=ChapterMetadata.load(selectedIds,metadata,fetch,control::check,this::abortWorkers,
                 (done,total,cached)->{control.lastData=SystemClock.elapsedRealtime();task.phase="读取所选章节 "+done+"/"+total;},
-                task.settings.timeout,task.settings.chapterWorkers,batch->{
-                    List<ImageJob> pending=new ArrayList<>();
-                    for(ChapterMetadata.Result ready:batch){
-                        List<ImageJob> pages=jobsFor(chapters.get(ready.id),ready.detail);
-                        chapterJobs.put(ready.id,pages);
-                        if(!resume)pending.addAll(pages);
-                    }
-                    if(!resume){
-                        if(chapterJobs.size()==chosen.size())task.total=chapterJobs.values().stream().mapToInt(List::size).sum();
-                        downloadPages(api,pending,failed);
-                    }
-                });
+                task.settings.timeout,task.settings.chapterWorkers);
         }catch(ChapterMetadata.UnstoppedWorkers error){
             control.cancel("FATAL");task.phase="等待旧章节线程退出后处理任务";error.awaitStopped();throw error;
         }
         List<ImageJob> jobs=new ArrayList<>();
-        for(ChapterRules.Chapter chapter:chosen)jobs.addAll(chapterJobs.get(chapter.id));
-        if(resume){
-            task.stage=control.stage="cache";task.speed=0;
-            ResumeCache.Result<ImageJob> restored=ResumeCache.scan(jobs,control::check,
-                job->job.target.isFile()&&validImage(job.target)?job.target.length():-1,
-                (checked,total,cached)->{control.lastData=SystemClock.elapsedRealtime();task.phase="校验已有图片 "+checked+"/"+total;});
-            synchronized(task){
-                task.total=jobs.size();task.done=task.cached=restored.cached;task.bytes=0;task.imageBytes=restored.imageBytes;
-            }
-            downloadPages(api,restored.pending,failed);
+        for(int i=0;i<chosen.size();i++){
+            control.check();
+            jobs.addAll(jobsFor(chosen.get(i),details.get(i)));
         }
+        task.stage=control.stage="cache";task.speed=0;
+        ResumeCache.Result<ImageJob> restored=ResumeCache.scan(jobs,control::check,
+            job->job.target.isFile()&&validImage(job.target)?job.target.length():-1,
+            (checked,total,cached)->{control.lastData=SystemClock.elapsedRealtime();task.phase="校验已有图片 "+checked+"/"+total;});
+        synchronized(task){
+            task.total=jobs.size();task.done=task.cached=restored.cached;task.bytes=0;task.imageBytes=restored.imageBytes;
+        }
+        List<SinglePageRecovery.Failure<ImageJob>> failed=new ArrayList<>();
+        downloadPages(api,restored.pending,failed);
         control.check();
         for(SinglePageRecovery.Failure<ImageJob> failure:failed)metadata.invalidate(failure.page.chapterId);
         SinglePageRecovery.recover(failed,(job,round)->downloadImage(api,job,round),control::check,

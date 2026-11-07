@@ -8,6 +8,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,11 +34,21 @@ public final class JmApi {
     }
     private static final AtomicReference<ApiRoutes> rememberedRoutes=new AtomicReference<>();
     private ApiRoutes sessionRoutes;
+    // Only anonymous catalogue checks may share a short-lived server session.
+    // Each check still gets its own cancellation control and reads fresh albums.
+    private static final class CatalogConnection {
+        final ApiRoutes routes;final CookieManager cookies;
+        CatalogConnection(ApiRoutes routes,CookieManager cookies){this.routes=routes;this.cookies=cookies;}
+    }
+    private static final AtomicReference<CatalogConnection> anonymousCatalog=new AtomicReference<>();
+    private CatalogConnection previousCatalog;
+    private volatile long catalogExpires;
+    private boolean quickCatalog;
     private static final ScheduledThreadPoolExecutor HEADER_TIMER=new ScheduledThreadPoolExecutor(1,r->{
         Thread thread=new Thread(r,"jm-header-deadline");thread.setDaemon(true);return thread;
     });
     static { HEADER_TIMER.setRemoveOnCancelPolicy(true); }
-    private final CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER);
+    private CookieManager cookies = new CookieManager(null, CookiePolicy.ACCEPT_ORIGINAL_SERVER);
     private final Store.Settings settings;
     private final String userCookie;
     private final FallbackDns fallbackDns;
@@ -114,23 +128,96 @@ public final class JmApi {
     public JmApi(Store.Settings settings, String cookie, Control control) { this(settings,cookie,control,new FallbackDns()); }
     JmApi(Store.Settings settings,String cookie,Control control,FallbackDns fallbackDns) { this.settings=settings;userCookie=cookie;this.control=control;this.fallbackDns=fallbackDns; }
 
+    boolean openCatalog() throws Exception {
+        long now=SystemClock.elapsedRealtime();
+        previousCatalog=anonymousCatalog.get();
+        if(userCookie.isEmpty()&&previousCatalog!=null&&now<previousCatalog.routes.expires){
+            cookies=previousCatalog.cookies;
+            domains=new ArrayList<>(previousCatalog.routes.hosts);
+            catalogExpires=previousCatalog.routes.expires;
+            quickCatalog=true;
+            return true;
+        }
+        initializeCatalogRoutes(false);
+        return quickCatalog;
+    }
+
+    void initializeCatalogRoutes(boolean forceDiscovery)throws Exception {
+        previousCatalog=anonymousCatalog.get();
+        sessionRoutes=rememberedRoutes.get();
+        boolean cached=!forceDiscovery&&sessionRoutes!=null&&SystemClock.elapsedRealtime()<sessionRoutes.expires;
+        domains=cached?new ArrayList<>(sessionRoutes.hosts):discoverCatalogRoutes();
+        if(!forceDiscovery){
+            quickCatalog=true;
+            try{
+                rawApi("/setting",false);
+                catalogExpires=SystemClock.elapsedRealtime()+120000L;
+                return;
+            }catch(NetworkRoutes.Exhausted failed){
+                control.check();quickCatalog=false;
+                if(cached)domains=discoverCatalogRoutes();
+                preferred=0;
+            }
+        }
+        rawApi("/setting",false);
+        catalogExpires=SystemClock.elapsedRealtime()+120000L;
+    }
+
+    private static final ThreadPoolExecutor discoveryPool=new ThreadPoolExecutor(3,3,20,TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(),r->{Thread thread=new Thread(r,"jm-catalog-discovery");thread.setDaemon(true);return thread;});
+    static {discoveryPool.allowCoreThreadTimeOut(true);}
+
+    private List<String> discoverCatalogRoutes()throws Exception {
+        ExecutorCompletionService<List<String>> completed=new ExecutorCompletionService<>(discoveryPool);
+        List<Control> probes=new ArrayList<>();
+        List<Future<List<String>>> requests=new ArrayList<>();
+        int pending=0;
+        try{
+            while(probes.size()<DOMAIN_SERVERS.length||pending>0){
+                control.check();
+                if(probes.size()<DOMAIN_SERVERS.length){
+                    String source=DOMAIN_SERVERS[probes.size()];
+                    Control child=new Control();probes.add(child);
+                    requests.add(completed.submit(()->{
+                        JmApi probe=new JmApi(settings,"",child);
+                        return probe.discover(source,Math.min(8,settings.timeout))?probe.domains:Collections.emptyList();
+                    }));
+                    pending++;
+                }
+                // Start a backup only if the previous discovery failed or is still waiting.
+                Future<List<String>> next=completed.poll(250,TimeUnit.MILLISECONDS);
+                if(next!=null){
+                    pending--;List<String> hosts=next.get();
+                    if(!hosts.isEmpty())return hosts;
+                }
+            }
+            return new ArrayList<>(Arrays.asList(DEFAULT_API));
+        }finally{
+            for(Control probe:probes)probe.cancel("线路查询结束");
+            for(Future<?> request:requests)request.cancel(true);
+        }
+    }
+
+    void rememberCatalog() {
+        ApiRoutes routes=new ApiRoutes(NetworkRoutes.merge(Collections.singletonList(domains.get(preferred)),domains),catalogExpires);
+        rememberedRoutes.compareAndSet(sessionRoutes,routes);
+        if(!userCookie.isEmpty())return;
+        CatalogConnection next=new CatalogConnection(routes,cookies);
+        CatalogConnection current=anonymousCatalog.get();
+        if(current==previousCatalog||(current!=null&&current.cookies==cookies))anonymousCatalog.compareAndSet(current,next);
+    }
+    void forgetCatalog(){
+        CatalogConnection current=anonymousCatalog.get();
+        if(current!=null&&current.cookies==cookies)anonymousCatalog.compareAndSet(current,null);
+    }
+
     public void initialize() throws Exception {
         sessionRoutes=rememberedRoutes.get();
         boolean reuse=sessionRoutes!=null&&SystemClock.elapsedRealtime()<sessionRoutes.expires;
         boolean discovered=false;
         if (reuse) domains=new ArrayList<>(sessionRoutes.hosts);
-        else {
-            for (String source : DOMAIN_SERVERS) {
-                control.check();
-                try {
-                    String body = text(source, Collections.emptyMap(), false, Math.min(8, settings.timeout));
-                    while (!body.isEmpty() && body.charAt(0) > 127) body = body.substring(1);
-                    JSONArray servers = new JSONObject(Core.decrypt(body, "", Core.DOMAIN_SECRET)).getJSONArray("Server");
-                    List<String> fresh = new ArrayList<>();
-                    for (int i = 0; i < servers.length(); i++) { String host = servers.getString(i); if (host.matches("[A-Za-z0-9.-]+") && host.contains(".")) fresh.add(host); }
-                    if (!fresh.isEmpty()) { domains = NetworkRoutes.merge(fresh,Arrays.asList(DEFAULT_API)); discovered=true; break; }
-                } catch (Exception error) { control.check(); }
-            }
+        else for(String source:DOMAIN_SERVERS){
+            if(discover(source,Math.min(8,settings.timeout))){discovered=true;break;}
         }
         // Settings initializes the API session's server cookies, avoiding wrong-album redirects.
         rawApi("/setting", false);
@@ -141,15 +228,35 @@ public final class JmApi {
         control.lastData = SystemClock.elapsedRealtime();
     }
 
+    private boolean discover(String address,int timeout)throws Exception {
+        control.check();
+        try{
+            String body=text(address,Collections.emptyMap(),false,timeout);
+            while(!body.isEmpty()&&body.charAt(0)>127)body=body.substring(1);
+            JSONArray servers=new JSONObject(Core.decrypt(body,"",Core.DOMAIN_SECRET)).getJSONArray("Server");
+            List<String> hosts=new ArrayList<>();
+            for(int i=0;i<servers.length();i++){
+                String host=servers.getString(i);
+                if(host.matches("[A-Za-z0-9.-]+")&&host.contains("."))hosts.add(host);
+            }
+            if(!hosts.isEmpty()){domains=NetworkRoutes.merge(hosts,Arrays.asList(DEFAULT_API));return true;}
+        }catch(Exception failure){control.check();}
+        return false;
+    }
+
+    static final class WrongAlbum extends IOException {
+        WrongAlbum(){super("服务器返回了不同编号，可能需要有效 Cookie；已停止以免下载错误内容");}
+    }
     public JSONObject detail(String type, String id) throws Exception {
         String[] reply = rawApi("/" + type + "?id=" + id, false);
         JSONObject envelope = parseJson(reply[0]);
+        if(quickCatalog&&envelope.optInt("code")==401)throw new HttpError(401);
         if (envelope.optInt("code", 0) != 200) throw new IOException("API " + envelope.optInt("code") + "：" + envelope.optString("errorMsg", "编号不存在、无权限或服务端异常"));
         Object encoded = envelope.opt("data");
         if (!(encoded instanceof String) || ((String)encoded).isEmpty()) throw new IOException("编号不存在或当前账号不可访问：" + id);
         JSONObject data = new JSONObject(Core.decrypt((String)encoded, reply[1], Core.API_SECRET));
         if (!data.has("name")) throw new IOException("编号没有可下载内容：" + id);
-        if (!id.equals(data.optString("id", id))) throw new IOException("服务器返回了不同编号，可能需要有效 Cookie；已停止以免下载错误内容");
+        if (!id.equals(data.optString("id", id))) throw new WrongAlbum();
         control.lastData = SystemClock.elapsedRealtime();
         return data;
     }
@@ -165,19 +272,21 @@ public final class JmApi {
     private String[] rawApi(String path, boolean content) throws Exception {
         List<String> routes=new ArrayList<>(domains);
         Collections.rotate(routes,-preferred);
+        if(quickCatalog)routes=routes.subList(0,Math.min(2,routes.size()));
+        int timeout=quickCatalog?Math.min(5,settings.timeout):settings.timeout;
         try {
-            return NetworkRoutes.run(routes,settings.retries,"漫画接口",host->{
+            return NetworkRoutes.run(routes,quickCatalog?0:settings.retries,"漫画接口",host->{
                 String ts=Long.toString(System.currentTimeMillis()/1000);
                 Map<String,String> headers=new HashMap<>();
                 headers.put("token",Core.md5(ts+(content?Core.CONTENT_SECRET:Core.API_SECRET)));
                 headers.put("tokenparam",ts+","+Core.APP_VERSION);
-                String body=text("https://"+host+path,headers,true,settings.timeout);
+                String body=text("https://"+host+path,headers,true,timeout);
                 if(!content)try{parseJson(body);}catch(JSONException invalid){throw new NetworkRoutes.BadResponse();}
                 preferred=domains.indexOf(host);return new String[]{body,ts};
             },control::check,control.routeMessage::accept);
         } catch(NetworkRoutes.Exhausted error) {
             // Fetch a fresh list on the next task/retry instead of reusing failed discovery forever.
-            rememberedRoutes.compareAndSet(sessionRoutes,null);throw error;
+            if(!quickCatalog)rememberedRoutes.compareAndSet(sessionRoutes,null);throw error;
         }
     }
 

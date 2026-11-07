@@ -10,7 +10,7 @@ public class DownloadDisplayTest {
         check(DownloadDisplay.failureText("failed", null, "下载失败，点详情查看原因").contains("未记录具体原因"), "legacy generic fallback");
         for(String status:new String[]{"queued","running","paused","resetting","done","cancelled"})
             check(DownloadDisplay.failureText(status,"旧错误","").isEmpty(), "no stale reason " + status);
-        check(DownloadDisplay.progress(3,0,"running").equals("已完成 3 张 · 正在读取其余章节"),"streaming progress before page total");
+        check(DownloadDisplay.progress(3,0,"running").equals("已完成 3 张 · 总数统计中"),"streaming progress before page total");
         long[] values = {0, 1023, 1024, 1048576, 1073741824, -1};
         String[] expected = {"0 B/s", "1023 B/s", "1.0 KB/s", "1.0 MB/s", "1.0 GB/s", "0 B/s"};
         for (int i = 0; i < values.length; i++) check(DownloadDisplay.speed(values[i]).equals(expected[i]), "speed boundary " + i);
@@ -18,7 +18,7 @@ public class DownloadDisplayTest {
         check(DownloadDisplay.percent(4, 4, "running") == 99.9, "wait for export");
         check(DownloadDisplay.percent(4, 4, "failed") == 99.9, "failed export not 100");
         check(DownloadDisplay.percent(4, 4, "done") == 100, "verified completion");
-        check(DownloadDisplay.progress(0, 0, "running").contains("0.0%"), "unknown total");
+        check(DownloadDisplay.progress(0, 0, "running").equals("已完成 0 张 · 总数统计中"), "unknown total");
         check(DownloadDisplay.sizeText(2, 4, 2048, 0, "running").equals("已下载图片 2.0 KB / 预计大小 4.0 KB"), "estimated images");
         check(DownloadDisplay.sizeText(4, 4, 4096, 3000, "done").equals("漫画大小 2.9 KB"), "actual export");
         check(DownloadDisplay.sizeText(4, 4, 0, 0, "done").contains("未知"), "legacy queue");

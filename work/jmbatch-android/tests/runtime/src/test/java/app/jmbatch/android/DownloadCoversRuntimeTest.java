@@ -110,6 +110,25 @@ public class DownloadCoversRuntimeTest {
         covers.bind(task,target);assertNull(image.getDrawable());
         seed(task,blue);image.visible=true;covers.bind(task,target);flush();assertNotNull(image.getDrawable());
     }
+    @Test public void actualTaskRowShowsMetadataThenKnownPageProgress()throws Exception {
+        Field singleton=Store.class.getDeclaredField("instance");singleton.setAccessible(true);singleton.set(null,null);
+        Store store=Store.get(context);store.tasks.clear();store.tasks.add(task);
+        task.stage="metadata";task.phase="读取所选章节 17/145";task.done=27;task.total=0;
+        org.robolectric.android.controller.ActivityController<MainActivity> controller=Robolectric.buildActivity(MainActivity.class);
+        MainActivity activity=controller.get();activity.setTheme(android.R.style.Theme_Material_Light_NoActionBar);
+        try{
+            controller.setup();
+            Field rows=MainActivity.class.getDeclaredField("rows");rows.setAccessible(true);
+            Object row=((java.util.Map)rows.get(activity)).get(task.key);
+            Field state=row.getClass().getDeclaredField("state"),percent=row.getClass().getDeclaredField("percent");
+            state.setAccessible(true);percent.setAccessible(true);
+            TextView label=(TextView)state.get(row),percentage=(TextView)percent.get(row);
+            assertEquals(task.phase,label.getText().toString());assertEquals("",percentage.getText().toString());
+            task.stage="download";task.total=108;
+            Method render=MainActivity.class.getDeclaredMethod("render");render.setAccessible(true);render.invoke(activity);
+            assertTrue(label.getText().toString().contains("27/108"));assertEquals("25%",percentage.getText().toString());
+        }finally{controller.pause().stop().destroy();singleton.set(null,null);}
+    }
     @Test public void activityColdStartHasCoverBeforeAnyRenderTimer()throws Exception {
         covers.bind(task,target);flush();
         Field singleton=Store.class.getDeclaredField("instance");singleton.setAccessible(true);singleton.set(null,null);

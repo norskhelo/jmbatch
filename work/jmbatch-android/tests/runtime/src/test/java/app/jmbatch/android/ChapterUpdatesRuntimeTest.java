@@ -144,14 +144,14 @@ public class ChapterUpdatesRuntimeTest {
             t.chapterOptions=catalog.subList(0,2);t.selectedChapters=t.chapterOptions;store.tasks.add(t);
         }
         java.util.concurrent.atomic.AtomicInteger active=new java.util.concurrent.atomic.AtomicInteger(), peak=new java.util.concurrent.atomic.AtomicInteger(),calls=new java.util.concurrent.atomic.AtomicInteger();
-        CountDownLatch firstThree=new CountDownLatch(3);
+        CountDownLatch firstFour=new CountDownLatch(4);
         open((id,settings,cookie,control)->{
             int current=active.incrementAndGet();peak.accumulateAndGet(current,Math::max);
-            try{calls.incrementAndGet();firstThree.countDown();assertTrue(firstThree.await(3,TimeUnit.SECONDS));Thread.sleep(40);return catalog;}
+            try{calls.incrementAndGet();firstFour.countDown();assertTrue(firstFour.await(3,TimeUnit.SECONDS));Thread.sleep(40);return catalog;}
             finally{active.decrementAndGet();}
         });
         long start=System.nanoTime();check();
-        assertEquals(1,sessions);assertEquals(10,calls.get());assertEquals(3,peak.get());assertEquals(0,active.get());
+        assertEquals(1,sessions);assertEquals(10,calls.get());assertEquals(4,peak.get());assertEquals(0,active.get());
         System.out.println("BATCH books=10 sessions="+sessions+" parallel="+peak.get()+" elapsed_ms="+TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-start));
     }
     @Test public void requestFailureNeverQueuesDownloads()throws Exception {

@@ -13,13 +13,39 @@ public final class ChapterUpdates {
     interface Open { Session open(Store.Settings settings,String cookie,JmApi.Control control)throws Exception; }
     static Session open(Store.Settings settings,String cookie,JmApi.Control control)throws Exception {
         control.check();
-        JmApi api=new JmApi(settings,cookie,control);
-        api.initialize();
-        return id->{
-            control.check();
-            if(!id.matches("[0-9]{1,10}"))throw new IOException("漫画编号无效");
-            return ChapterSelection.catalog(api.detail("album",id),id);
+        JmApi quick=new JmApi(settings,cookie,control);
+        if(!quick.openCatalog())return id->catalog(quick,id,control);
+        return new Session(){
+            private volatile JmApi full;
+            private Exception recoveryFailure;
+            private synchronized JmApi recover()throws Exception {
+                control.check();
+                if(recoveryFailure!=null)throw recoveryFailure;
+                if(full==null){
+                    quick.forgetCatalog();
+                    JmApi replacement=new JmApi(settings,cookie,control);
+                    try{replacement.initializeCatalogRoutes(true);}catch(Exception error){recoveryFailure=error;throw error;}
+                    full=replacement;
+                }
+                return full;
+            }
+            public List<ChapterRules.Chapter> get(String id)throws Exception {
+                JmApi active=full;
+                if(active==null){
+                    try{return catalog(quick,id,control);}
+                    catch(NetworkRoutes.Exhausted|JmApi.WrongAlbum stale){active=recover();}
+                    catch(JmApi.HttpError denied){if(denied.code!=401)throw denied;active=recover();}
+                }
+                return catalog(active,id,control);
+            }
         };
+    }
+    private static List<ChapterRules.Chapter> catalog(JmApi api,String id,JmApi.Control control)throws Exception {
+        control.check();
+        if(!id.matches("[0-9]{1,10}"))throw new IOException("漫画编号无效");
+        List<ChapterRules.Chapter> chapters=ChapterSelection.catalog(api.detail("album",id),id);
+        api.rememberCatalog();
+        return chapters;
     }
     static final class Result {
         final List<ChapterRules.Chapter> catalog,fresh;final boolean initialized;
@@ -97,7 +123,17 @@ public final class ChapterUpdates {
         return new History(known,anchors);
     }
 
+    static final class LegacyRecords {
+        private JSONObject data;
+        History forBook(Context context,String id)throws Exception {
+            if(data==null)data=read(context);
+            return History.from(data.optJSONObject(id));
+        }
+    }
     static Result compare(Context context,String id,List<ChapterRules.Chapter> catalog)throws Exception {
+        return compare(context,id,catalog,new LegacyRecords());
+    }
+    static Result compare(Context context,String id,List<ChapterRules.Chapter> catalog,LegacyRecords records)throws Exception {
         ChapterRules.resolve(catalog,Collections.emptyList(),true);
         LibraryStore library=LibraryStore.get(context);
         List<LibraryStore.Entry> copies=library.albumEntries(id);
@@ -109,7 +145,7 @@ public final class ChapterUpdates {
         for(LibraryStore.Entry book:copies){
             History history=book.history;
             if(history.known.isEmpty()){
-                if(legacy==null)legacy=History.from(read(context).optJSONObject(id));
+                if(legacy==null)legacy=records.forBook(context,id);
                 // An untracked import must not mask updates confirmed by a tracked sibling.
                 if(history.empty()&&hasHistory&&legacy.empty())continue;
                 if(!history.empty()||!legacy.empty())initialized=false;
