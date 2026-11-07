@@ -13,8 +13,9 @@ public final class ChapterUpdates {
     static List<ChapterRules.Chapter> fetch(String id,Store.Settings settings,String cookie,JmApi.Control control)throws Exception {
         if(!id.matches("[0-9]{1,10}"))throw new IOException("这条漫画记录没有有效的 JM 编号，无法检查更新。");
         JmApi api=new JmApi(settings,cookie,control);
-        try{api.initialize();control.check();return ChapterSelection.catalog(api.detail("album",id),id);}
-        finally{control.cancel("检查结束");}
+        api.initialize();
+        control.check();
+        return ChapterSelection.catalog(api.detail("album",id),id);
     }
     static final class Result {
         final List<ChapterRules.Chapter> catalog,fresh;final boolean initialized;
@@ -33,6 +34,17 @@ public final class ChapterUpdates {
     private static Set<String> ids(JSONObject item,String key)throws Exception {
         Set<String> ids=new TreeSet<>();JSONArray array=item.optJSONArray(key);
         if(array!=null)for(int i=0;i<array.length();i++)ids.add(array.getString(i));return ids;
+    }
+    static synchronized Set<String> knownSingleChapterAlbums(Context context)throws Exception {
+        JSONObject history=read(context);
+        Set<String> albums=new HashSet<>();
+        for(Iterator<String> keys=history.keys();keys.hasNext();){
+            String id=keys.next();
+            JSONObject item=history.getJSONObject(id);
+            Set<String> chapters=ids(item,"known");
+            if(chapters.size()==1&&chapters.containsAll(ids(item,"anchors")))albums.add(id);
+        }
+        return albums;
     }
     static synchronized void record(Context context,List<Store.Task> tasks)throws IOException {
         try{

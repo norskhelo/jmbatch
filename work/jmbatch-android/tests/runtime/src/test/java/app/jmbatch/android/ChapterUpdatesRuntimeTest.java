@@ -3,6 +3,7 @@ package app.jmbatch.android;
 import android.app.*;
 import android.content.*;
 import android.os.Looper;
+import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import java.io.*;
@@ -97,26 +98,34 @@ public class ChapterUpdatesRuntimeTest {
         }
     }
     void open(ChapterUpdates.Fetch fetch)throws Exception {
-        store.tasks.add(done(catalog.subList(0,2),catalog.subList(0,2)));
+        if(store.tasks.isEmpty())store.tasks.add(done(catalog.subList(0,2),catalog.subList(0,2)));
         controller=Robolectric.buildActivity(Activity.class);Activity activity=controller.get();
         activity.setTheme(android.R.style.Theme_Material_Light_NoActionBar);controller.setup();
         screen=new LibraryScreen(activity,store,fetch);screen.show();settle();
-        call("setBatchMode",new Class<?>[]{boolean.class},true);call("itemClick",new Class<?>[]{int.class},0);
-        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100));
+    }
+    View withText(View root,String text){
+        ArrayList<View> matches=new ArrayList<>();
+        root.findViewsWithText(matches,text,View.FIND_VIEWS_WITH_TEXT);
+        assertFalse(text,matches.isEmpty());
+        return matches.get(0);
+    }
+    void clickCheck()throws Exception {
+        Button button=(Button)withText((View)get(screen,"toolbar"),"检查更新");
+        assertTrue(button.isEnabled());button.performClick();
     }
     void check()throws Exception {
-        @SuppressWarnings("unchecked") List<Button> buttons=(List<Button>)get(screen,"singleButtons");
-        Button button=buttons.stream().filter(b->b.getText().toString().equals("检查更新")).findFirst().get();
-        assertTrue(button.isEnabled());button.performClick();settle();
+        clickCheck();
+        ((ExecutorService)get(screen,"updateWorker")).submit(()->{}).get(10,TimeUnit.SECONDS);
+        settle();
     }
     @Test public void actualLibraryButtonAsksThenDispatchesNormalServiceOnlyAfterConsent()throws Exception {
         int[] calls={0};open((id,options,cookie,control)->{calls[0]++;assertEquals("123456",id);return catalog;});
         check();assertEquals(1,calls[0]);assertEquals(1,store.tasks.size());
         AlertDialog dialog=ShadowAlertDialog.getLatestAlertDialog();assertTrue(dialog.isShowing());
-        assertTrue(((TextView)dialog.findViewById(android.R.id.message)).getText().toString().contains("发现 2"));
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick();check();
+        withText(dialog.getWindow().getDecorView(),"2 章");
+        withText(dialog.getWindow().getDecorView(),"取消").performClick();check();
         assertEquals(1,store.tasks.size());dialog=ShadowAlertDialog.getLatestAlertDialog();
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+        withText(dialog.getWindow().getDecorView(),"确认").performClick();
         settle();
         assertEquals(2,store.tasks.size());assertEquals(Arrays.asList("800003","800004"),ids(store.tasks.get(1).selectedChapters));
         Intent intent=shadowOf(RuntimeEnvironment.getApplication()).getNextStartedService();
@@ -126,14 +135,62 @@ public class ChapterUpdatesRuntimeTest {
     @Test public void requestFailureNeverQueuesDownloads()throws Exception {
         open((id,options,cookie,control)->{throw new IOException("offline fixture");});
         check();assertEquals(1,store.tasks.size());
-        AlertDialog dialog=ShadowAlertDialog.getLatestAlertDialog();assertTrue(((TextView)dialog.findViewById(android.R.id.message)).getText().toString().contains("offline fixture"));
+        AlertDialog dialog=ShadowAlertDialog.getLatestAlertDialog();
+        String text=((TextView)dialog.findViewById(android.R.id.message)).getText().toString();
+        assertTrue(text.contains("JM123456"));assertTrue(text.contains("offline fixture"));
+    }
+    @Test public void oneFailedSeriesDoesNotHideAnotherOrQueueWithoutConsent()throws Exception {
+        Store.Task partial=new Store.Task("654321",store.settings);
+        partial.status="done";partial.resultUri="content://app.jmbatch.android.exports/partial.pdf";
+        partial.settings.format="pdf";partial.chapterOptions=catalog.subList(0,3);partial.selectedChapters=catalog.subList(0,1);
+        store.tasks.add(partial);
+        Store.Task duplicate=done(catalog.subList(0,2),catalog.subList(0,2));
+        store.tasks.add(duplicate);
+        Store.Task latest=done(catalog.subList(0,2),catalog.subList(1,2));
+        latest.resultUri=duplicate.resultUri+"-copy";store.tasks.add(latest);
+        List<String> requested=new ArrayList<>();
+        open((id,options,cookie,control)->{
+            requested.add(id);control.check();
+            if(id.equals("123456"))throw new IOException("fixture timeout");
+            return catalog;
+        });
+        check();assertEquals(Arrays.asList("123456","654321"),requested);
+        AlertDialog dialog=ShadowAlertDialog.getLatestAlertDialog();
+        String text=((TextView)dialog.findViewById(android.R.id.message)).getText().toString();
+        assertTrue(text.contains("JM654321"));assertTrue(text.contains("1 章"));
+        assertTrue(text.contains("JM123456"));assertTrue(text.contains("fixture timeout"));
+        assertEquals(3,store.tasks.size());
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();settle();
+        assertEquals(4,store.tasks.size());assertEquals("654321",store.tasks.get(3).id);
+        assertEquals(Collections.singletonList("800004"),ids(store.tasks.get(3).selectedChapters));
+    }
+    @Test public void fetchPreservesCallersCancellationReason()throws Exception {
+        JmApi.Control control=new JmApi.Control();
+        control.cancel("检查已取消");
+        try{ChapterUpdates.fetch("654321",store.settings,"",control);fail();}catch(IOException expected){}
+        assertEquals("检查已取消",control.stop);
+    }
+    @Test public void legacySingleLocalChapterCanBelongToSeries()throws Exception {
+        Store.Task legacy=done(Collections.emptyList(),catalog.subList(0,1));
+        legacy.settings.format="pdf";
+        store.tasks.add(legacy);
+        Store.Task single=new Store.Task("700",store.settings);
+        single.status="done";single.resultUri="content://app.jmbatch.android.exports/single.zip";
+        single.selectedChapters=catalog.subList(0,1);single.chapterOptions=single.selectedChapters;
+        store.tasks.add(single);
+        List<String> requested=new ArrayList<>();
+        open((id,options,cookie,control)->{requested.add(id);return catalog;});
+        check();
+        assertEquals(Collections.singletonList(legacy.id),requested);
+        withText(ShadowAlertDialog.getLatestAlertDialog().getWindow().getDecorView(),"3 章");
     }
     @Test public void cancellationDuringMetadataCheckLeavesQueueAndHistoryUnchanged()throws Exception {
         CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1);
         open((id,options,cookie,control)->{entered.countDown();assertTrue(release.await(5,TimeUnit.SECONDS));assertEquals("检查已取消",control.stop);return catalog;});
-        LibraryStore.Entry entry=LibraryStore.get(context).list("",false).get(0);
-        call("checkUpdates",new Class<?>[]{LibraryStore.Entry.class},entry);
-        assertTrue(entered.await(5,TimeUnit.SECONDS));call("cancel",new Class<?>[0]);release.countDown();settle();
+        clickCheck();
+        assertTrue(entered.await(5,TimeUnit.SECONDS));call("cancel",new Class<?>[0]);release.countDown();
+        ((ExecutorService)get(screen,"updateWorker")).submit(()->{}).get(10,TimeUnit.SECONDS);settle();
+        assertNull(ShadowAlertDialog.getLatestAlertDialog());
         assertEquals(1,store.tasks.size());assertEquals(2,ChapterUpdates.compare(context,"123456",catalog).fresh.size());
     }
     @After public void close()throws Exception {

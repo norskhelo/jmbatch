@@ -36,7 +36,7 @@ public final class LibraryScreen {
     private List<LibraryStore.Entry> movingItems;
     private String moveOrigin="";
     private Bundle moveViewport;
-    private boolean checkingAll;
+    private JmApi.Control batchUpdateControl;
     private final ExecutorService updateWorker=Executors.newSingleThreadExecutor();
     public boolean back(){if(moving){cancelMove();return true;}if(batchMode){setBatchMode(false);return true;}if(!collection.isEmpty()){navigate("");return true;}return false;}
 
@@ -249,7 +249,16 @@ public final class LibraryScreen {
             return row;
         }
     }
-    private void cancel(){cancelled.set(true);if(scanSignal!=null)scanSignal.cancel();if(updateControl!=null)updateControl.cancel("检查已取消");}
+    private void cancel(){
+        cancelled.set(true);
+        if(scanSignal!=null)scanSignal.cancel();
+        JmApi.Control single=updateControl;
+        if(single!=null)single.cancel("检查已取消");
+        if(batchUpdateControl!=null){
+            batchUpdateControl.cancel("检查已取消");
+            batchUpdateControl=null;
+        }
+    }
     private void counts(){selectionTitle.setText("已选中"+selected.size()+"项");status.setText("共 "+entries.size()+" 项"+(batchMode?"，已选 "+selected.size()+" 项":"")+(report.isEmpty()?"":"\n"+report));modeButton.setEnabled(!busy&&!loading);backButton.setEnabled(!busy&&!loading&&!collection.isEmpty());for(int i=0;i<displaySelector.getChildCount();i++)displaySelector.getChildAt(i).setEnabled(!busy&&!loading);for(Button b:singleButtons)b.setEnabled(!busy&&!loading&&selected.size()==1);for(Button b:batchButtons)b.setEnabled(!busy&&!loading&&!selected.isEmpty());}
     private void select(int mode){if(busy||loading||!batchMode)return;for(int i=0;i<entries.size();i++){LibraryStore.Entry entry=entries.get(i);if(entry.isCollection())continue;String uri=entry.uri;boolean checked=mode==0||(mode==1&&!selected.contains(uri));if(checked)selected.add(uri);else selected.remove(uri);list.setItemChecked(i,checked);}counts();}
     private List<LibraryStore.Entry> selection(){List<LibraryStore.Entry> result=new ArrayList<>();for(LibraryStore.Entry e:entries)if(!e.isCollection()&&selected.contains(e.uri))result.add(e);return result;}
@@ -396,11 +405,83 @@ public final class LibraryScreen {
     }
     private void commitMove(){List<LibraryStore.Entry> items=movingItems;if(items==null)return;String target=collection;perform(()->"已移动 "+library.moveToCollection(items,target)+" 本漫画",()->{moving=false;movingItems=null;moveViewport=null;selected.clear();list.clearChoices();list.setChoiceMode(ListView.CHOICE_MODE_NONE);sheet.setVisibility(View.GONE);});}
     private void checkAllUpdates(){
-        if(checkingAll){Ui.notice(activity,"正在检查章节更新");return;}checkingAll=true;Ui.notice(activity,"开始检查章节更新");Store.Settings options=new Store.Settings(store.settings.json());String cookie=store.cookie;
-        updateWorker.execute(()->{List<LibraryStore.Entry> changed=new ArrayList<>();Map<String,ChapterUpdates.Result> results=new LinkedHashMap<>();int failures=0;JmApi.Control control=new JmApi.Control();updateControl=control;
-            try{ChapterUpdates.record(activity,store.snapshot());Set<String> seen=new HashSet<>();for(LibraryStore.Entry item:library.list("",false)){if(!item.id.matches("[0-9]{1,10}")||!seen.add(item.id))continue;control.check();try{if(ChapterDeletion.inspect(activity,item,()->!control.stop.isEmpty()).counts.size()<2)continue;List<ChapterRules.Chapter> catalog=chapterUpdateFetch.get(item.id,options,cookie,control);if(catalog.size()<2)continue;ChapterUpdates.Result result=ChapterUpdates.compare(activity,item.id,catalog);if(!result.fresh.isEmpty()){changed.add(item);results.put(item.uri,result);}}catch(Exception e){if(!control.stop.isEmpty())break;failures++;}}}catch(Exception e){failures++;}finally{control.cancel("检查结束");updateControl=null;}
-            final int failed=failures;main.post(()->{checkingAll=false;if(!visible())return;Ui.notice(activity,"检查完成"+(failed>0?"，"+failed+" 项失败":""));if(changed.isEmpty())return;StringBuilder text=new StringBuilder("发现新章节，是否下载？");for(LibraryStore.Entry item:changed)text.append("\n").append(item.title).append(" · ").append(results.get(item.uri).fresh.size()).append(" 章");Ui.confirm(activity,text.toString(),()->{try{for(LibraryStore.Entry item:changed){ChapterUpdates.Result result=results.get(item.uri);store.addChapterUpdate(item.id,result.catalog,result.fresh,options);}if(!store.running)activity.startForegroundService(new Intent(activity,DownloadService.class).setAction(DownloadService.SELECTED));Ui.notice(activity,"新章节已加入下载队列");}catch(Exception e){message(e.getMessage());}});});
+        if(batchUpdateControl!=null){Ui.notice(activity,"正在检查章节更新");return;}
+        JmApi.Control control=new JmApi.Control();
+        batchUpdateControl=control;
+        Ui.notice(activity,"开始检查章节更新");
+        Store.Settings options=new Store.Settings(store.settings.json());
+        String cookie=store.cookie;
+        updateWorker.execute(()->{
+            Map<LibraryStore.Entry,ChapterUpdates.Result> changed=new LinkedHashMap<>();
+            List<String> failures=new ArrayList<>();
+            try{
+                ChapterUpdates.record(activity,store.snapshot());
+                Set<String> singleChapterAlbums=ChapterUpdates.knownSingleChapterAlbums(activity);
+                Set<String> seen=new HashSet<>();
+                for(LibraryStore.Entry item:library.list("",false)){
+                    control.check();
+                    // A local PDF, flat ZIP or partial download can represent a series.
+                    // Without catalogue history the local page layout cannot rule it out.
+                    if(!item.id.matches("[0-9]{1,10}")||(item.chapterCount==1&&singleChapterAlbums.contains(item.id)))continue;
+                    if(!seen.add(item.id))continue;
+                    try{
+                        List<ChapterRules.Chapter> catalog=chapterUpdateFetch.get(item.id,options,cookie,control);
+                        control.check();
+                        if(catalog.size()<2)continue;
+                        ChapterUpdates.Result result=ChapterUpdates.compare(activity,item.id,catalog);
+                        if(!result.fresh.isEmpty())changed.put(item,result);
+                    }catch(Exception error){
+                        control.check();
+                        failures.add("JM"+item.id+"："+Core.error(error,cookie));
+                    }
+                }
+            }catch(Exception error){
+                if(control.stop.isEmpty())failures.add("读取漫画库或章节记录失败："+Core.error(error,cookie));
+            }finally{control.cancel("检查结束");}
+            main.post(()->{
+                if(batchUpdateControl!=control)return;
+                batchUpdateControl=null;
+                if(visible())showChapterUpdateResults(changed,failures,options);
+            });
         });
+    }
+    private void showChapterUpdateResults(Map<LibraryStore.Entry,ChapterUpdates.Result> changed,List<String> failures,Store.Settings options){
+        String summary=failures.isEmpty()?"检查完成":"检查完成，"+failures.size()+" 项失败";
+        Ui.notice(activity,summary);
+        if(changed.isEmpty()&&failures.isEmpty())return;
+        StringBuilder text=new StringBuilder();
+        if(!changed.isEmpty()){
+            text.append("发现新章节，是否下载？");
+            for(Map.Entry<LibraryStore.Entry,ChapterUpdates.Result> row:changed.entrySet())
+                text.append("\n").append(title(row.getKey())).append(" · ").append(row.getValue().fresh.size()).append(" 章");
+        }
+        if(failures.isEmpty()){
+            Ui.confirm(activity,text.toString(),()->queueChapterUpdates(changed,options));
+            return;
+        }
+        if(text.length()>0)text.append("\n\n");
+        text.append(summary).append("\n").append(String.join("\n\n",failures));
+        AlertDialog.Builder dialog=new AlertDialog.Builder(activity).setTitle("漫画章节更新").setMessage(text);
+        if(changed.isEmpty())dialog.setPositiveButton("确定",null);
+        else dialog.setNegativeButton("暂不下载",null).setPositiveButton("下载新章节",(d,w)->queueChapterUpdates(changed,options));
+        dialog.show();
+    }
+    private void queueChapterUpdates(Map<LibraryStore.Entry,ChapterUpdates.Result> changed,Store.Settings options){
+        List<String> failures=new ArrayList<>();
+        int queued=0;
+        for(Map.Entry<LibraryStore.Entry,ChapterUpdates.Result> row:changed.entrySet()){
+            String id=row.getKey().id;
+            ChapterUpdates.Result result=row.getValue();
+            try{store.addChapterUpdate(id,result.catalog,result.fresh,options);queued++;}
+            catch(Exception error){failures.add("JM"+id+"："+error.getMessage());}
+        }
+        if(queued>0){
+            try{
+                if(!store.running)activity.startForegroundService(new Intent(activity,DownloadService.class).setAction(DownloadService.SELECTED));
+                Ui.notice(activity,"新章节已加入下载队列");
+            }catch(RuntimeException error){failures.add("请到下载页继续已入队的任务："+error.getMessage());}
+        }
+        if(!failures.isEmpty())message(String.join("\n",failures));
     }
     private void details(LibraryStore.Entry entry){
         new AlertDialog.Builder(activity).setTitle(title(entry)).setItems(new String[]{"开始阅读","分享文件",entry.favorite?"取消收藏":"加入收藏","打开保存目录","应用内查看目录","导出漫画","删除章节","检查更新"},(d,index)->{
