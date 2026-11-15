@@ -61,6 +61,14 @@ public final class MainActivity extends Activity {
     private Store.Task chapterTask;
     private final Runnable refresh=new Runnable(){public void run(){render();handler.postDelayed(this,700);}};
 
+    private final class PageSurface extends FrameLayout {
+        PageSurface(){super(MainActivity.this);}
+        // An opaque background alone does not consume input. Keep unhandled
+        // gestures on the front page instead of trying the covered sibling.
+        @Override public boolean dispatchTouchEvent(MotionEvent event){super.dispatchTouchEvent(event);return true;}
+        @Override public boolean dispatchGenericMotionEvent(MotionEvent event){super.dispatchGenericMotionEvent(event);return true;}
+    }
+
     public void onCreate(Bundle state){
         super.onCreate(state);store=Store.get(this);downloadCovers=new DownloadCovers(this);
         for(Store.Task task:store.snapshot())if(task.discardRequested&&task.status.equals("cancelling")){send(DownloadService.CLEANUP,null);break;}
@@ -72,7 +80,7 @@ public final class MainActivity extends Activity {
         pages=new FrameLayout(this);LinearLayout.LayoutParams pageParams=new LinearLayout.LayoutParams(-1,0,1);pageParams.topMargin=dp(12);shell.addView(pages,pageParams);
         pageOffset=dp(124);
         pages.setBackground(Ui.shape(this,BG,18,false));pages.setClipToOutline(true);
-        FrameLayout panel=downloadPanel=new FrameLayout(this);downloadPage=panel;panel.setBackground(pageBackground(false));pages.addView(panel,new FrameLayout.LayoutParams(-1,-1));
+        FrameLayout panel=downloadPanel=new PageSurface();downloadPage=panel;panel.setBackground(pageBackground(false));pages.addView(panel,new FrameLayout.LayoutParams(-1,-1));
         layout=column();layout.setPadding(dp(14),dp(10),dp(14),dp(12));panel.addView(layout,new FrameLayout.LayoutParams(-1,-1));layout.addView(Ui.heading(this,"下载页面"));
         start=buttonAccent("开始全部",v->{if(store.running)send(DownloadService.PAUSE,null);else startQueue();});pause=button("暂停全部",v->send(DownloadService.PAUSE,null));
         taskActions=horizontal();taskActions.addView(start,new LinearLayout.LayoutParams(-2,-2));Button clear=Ui.iconButton(this,"trash","清除下载记录",()->confirmRemoval(this::clearHistory));LinearLayout.LayoutParams clearParams=new LinearLayout.LayoutParams(-2,-2);clearParams.leftMargin=dp(8);taskActions.addView(clear,clearParams);layout.addView(taskActions);
@@ -86,7 +94,7 @@ public final class MainActivity extends Activity {
         scroll.addOnLayoutChangeListener((view,l,t,r,b,ol,ot,or,ob)->refreshDownloadCovers());
         Button add=buttonAccent("＋",v->addDownload());add.setTextSize(Ui.ADD_ACTION_TEXT_SIZE);Ui.square(add);add.setContentDescription("添加下载");add.setBackground(Ui.circle(ACCENT));add.setElevation(dp(5));FrameLayout.LayoutParams fab=new FrameLayout.LayoutParams(-2,Ui.controlHeight(add),Gravity.BOTTOM|Gravity.RIGHT);fab.setMargins(0,0,dp(16),dp(14));listPanel.addView(add,fab);listBody.addView(new View(this),new LinearLayout.LayoutParams(1,Ui.controlHeight(add)+dp(8)));
         taskSheet=column();taskSheet.setPadding(dp(18),dp(20),dp(18),dp(24));taskSheet.setBackground(Ui.shape(this,Color.WHITE,18,true));taskSheet.setElevation(dp(10));selectedCount=text("",16,INK);selectedCount.setGravity(Gravity.CENTER);selectedCount.setTypeface(null,Typeface.BOLD);taskSheet.addView(selectedCount);Ui.gap(taskSheet,20);taskSheet.addView(Ui.pair(this,buttonAccent("删除任务",v->removeSelected()),button("返回",v->exitSelection())));FrameLayout.LayoutParams sheetParams=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);panel.addView(taskSheet,sheetParams);taskSheet.setVisibility(View.GONE);
-        libraryHost=new FrameLayout(this);libraryHost.setBackground(pageBackground(false));pages.addView(libraryHost,new FrameLayout.LayoutParams(-1,-1));
+        libraryHost=new PageSurface();libraryHost.setBackground(pageBackground(false));pages.addView(libraryHost,new FrameLayout.LayoutParams(-1,-1));
         pageSwitch=new View(this){
             final android.graphics.Paint paint=new android.graphics.Paint(3);
             android.graphics.Bitmap strip;
@@ -165,8 +173,9 @@ public final class MainActivity extends Activity {
         downloadPanel.setTranslationY(libraryVisible?0:pageOffset);libraryHost.setTranslationY(libraryVisible?pageOffset:0);
         downloadPanel.setAlpha(1);libraryHost.setAlpha(1);
         downloadPanel.setLayerType(View.LAYER_TYPE_NONE,null);libraryHost.setLayerType(View.LAYER_TYPE_NONE,null);
-        downloadPanel.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);libraryHost.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);
-        (libraryVisible?libraryHost:downloadPanel).bringToFront();
+        FrameLayout front=libraryVisible?libraryHost:downloadPanel,rear=libraryVisible?downloadPanel:libraryHost;
+        rear.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);rear.clearFocus();
+        front.setDescendantFocusability(ViewGroup.FOCUS_AFTER_DESCENDANTS);front.bringToFront();
         downloadPanel.setImportantForAccessibility(libraryVisible?View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS:View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
         libraryHost.setImportantForAccessibility(libraryVisible?View.IMPORTANT_FOR_ACCESSIBILITY_AUTO:View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
         FrameLayout.LayoutParams hit=(FrameLayout.LayoutParams)pageSwitch.getLayoutParams();hit.height=pageOffset;pageSwitch.setLayoutParams(hit);

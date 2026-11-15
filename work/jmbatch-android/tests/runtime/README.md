@@ -1,5 +1,12 @@
 # Android framework regression tests
 
+PageInputRuntimeTest dispatches touch and mouse events through MainActivity's
+overlapping pages on Android 10/15. It checks blank-area taps, holds, drags,
+mouse-wheel isolation, hidden-page focus, header switching, active buttons and
+download-list scrolling/long-press selection. Run the offline workspace helper
+`work/scripts/maintenance/check_page_input_android.py --run-id page-input-fixed`.
+Use `--main-source` for an isolated old-source comparison.
+
 ClearHistoryRuntimeTest covers the download page's real clear-history confirmation
 on Android 10/15: paused/failed/completed records, cancel, active and pending task
 protection, removal of incomplete cache/output files, retention of successful files

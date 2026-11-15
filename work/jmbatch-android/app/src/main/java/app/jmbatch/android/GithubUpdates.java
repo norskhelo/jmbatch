@@ -15,7 +15,7 @@ import org.json.*;
 
 /** Optional check and user-confirmed in-app installation. */
 public final class GithubUpdates {
-    private static final String CURRENT_NOTES="Android 1.0.5 — 漫画库检查时限与线路复用\n\n• 漫画库检查更新时，每本漫画从开始查询起最多等待 15 秒。线路切换和重试共用这段时间，超时会显示该漫画的编号，其他漫画继续检查。\n• 优先使用上次成功取得章节目录的线路，重启应用后也可复用。旧线路失败或约 1 秒仍未响应时，会并行查找备用线路。每次检查都重新获取在线目录。\n";
+    private static final String CURRENT_NOTES="Android 1.0.6 — 修复下载页操作穿透\n\n• 修复在下载页空白、边缘区域点击、长按或滑动时，操作可能穿透到后层漫画库的问题；漫画库在前时也同样隔离后层下载页。\n• 隐藏页面不再接收键盘焦点；前层按钮、列表滚动、长按选择和顶部切页保持正常。\n";
     private static final AtomicBoolean busy=new AtomicBoolean();
     private static boolean startupChecked;
     private final Activity activity;

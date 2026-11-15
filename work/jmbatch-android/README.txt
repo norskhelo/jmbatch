@@ -1,4 +1,6 @@
-JM Batch 1.0.5 — Android 使用说明
+JM Batch 1.0.6 — Android 使用说明
+
+本版修复下载页空白、边缘区域的操作穿透到后层漫画库的问题。两页相互隔离触摸和鼠标滚轮输入，隐藏控件不能获取键盘焦点。可直接覆盖安装 1.0.5 正式版或本地修复版，保留设置与数据。
 
 漫画库顶部的“检查更新”按章节编号比对在线目录。每本漫画查询时限为 15 秒，优先使用上次查到目录的线路。发现新章节后可确认下载。某本检查失败时会显示 JM 编号和原因，其他漫画继续检查。删除独立更新分册后可重新检查并下载。只清理下载任务时，库内文件仍参与检查。
 
@@ -14,11 +16,11 @@ JM Batch 1.0.5 — Android 使用说明
 4. ZIP 只含图片，图片文件夹另含相册隐藏标记 .nomedia：单章节平铺，多章节先分章节文件夹再平铺图片；下载后可在任务详情或漫画库将 PDF、ZIP、文件夹互相导出，源文件保留。PDF 转图片按页渲染，可能损失画质，作为一个章节。下载期间可操作其他漫画文件；操作正在下载的同一本漫画前，请先暂停或取消其任务。
 5. Windows 完整解压 ZIP 后运行 JMBatch.exe；Android 覆盖安装 APK，保留设置、队列和收藏。Android 卸载应用可能删除应用目录中的图片，请事先备份。
 
-安装包下载（2026-10-26）
-GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.24/JMBatch-0.6.24-Android.apk
-国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.24/JMBatch-0.6.24-Android.apk
-国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.24/JMBatch-0.6.24-Android.apk
-SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-0.6.24/SHA256-release-android-0.6.24.txt
+安装包下载（2026-11-15）
+GitHub：https://github.com/norskhelo/jmbatch/releases/download/release-android-1.0.6/JMBatch-1.0.6-Android.apk
+国内镜像 1：https://ghfast.top/https://github.com/norskhelo/jmbatch/releases/download/release-android-1.0.6/JMBatch-1.0.6-Android.apk
+国内镜像 2：https://gh-proxy.com/https://github.com/norskhelo/jmbatch/releases/download/release-android-1.0.6/JMBatch-1.0.6-Android.apk
+SHA-256：https://github.com/norskhelo/jmbatch/releases/download/release-android-1.0.6/SHA256-release-android-1.0.6.txt
 发布列表：https://github.com/norskhelo/jmbatch/releases
 镜像转发 GitHub 附件，无需单独上传；可用性随缓存和网络变化。应用内更新仓库为 norskhelo/jmbatch。
 
